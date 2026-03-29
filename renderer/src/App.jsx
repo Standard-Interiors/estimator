@@ -521,9 +521,15 @@ function EditorApp({ roomId, projectId, projectName, onBack }) {
         @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}
         input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
         textarea{font-family:'JetBrains Mono',monospace}
+        @media print {
+          body{background:#fff !important}
+          [data-noprint]{display:none !important}
+          [data-printable]{background:#fff !important;overflow:visible !important;height:auto !important;position:static !important}
+          svg{max-width:100% !important}
+        }
       `}</style>
 
-      <div style={{padding:"16px 20px 12px",borderBottom:"1px solid #1a1a2a",display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+      <div data-noprint style={{padding:"16px 20px 12px",borderBottom:"1px solid #1a1a2a",display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
         {onBack ? (
           <div style={{display:"flex",alignItems:"center",gap:10}}>
             <span onClick={onBack} style={{color:"#666",fontSize:12,cursor:"pointer"}}
@@ -750,7 +756,7 @@ function EditorApp({ roomId, projectId, projectName, onBack }) {
           return (
             <div style={{display:"flex",flexDirection:"column",height:"calc(100vh - 50px)",margin:"-14px -20px 0",padding:0}}>
               {/* Toolbar */}
-              <div style={{display:"flex",alignItems:"center",gap:6,padding:"5px 10px",background:"#06060c",borderBottom:"1px solid #1a1a2a",flexShrink:0,fontSize:11,fontFamily:"'JetBrains Mono',monospace"}}>
+              <div data-noprint style={{display:"flex",alignItems:"center",gap:6,padding:"5px 10px",background:"#06060c",borderBottom:"1px solid #1a1a2a",flexShrink:0,fontSize:11,fontFamily:"'JetBrains Mono',monospace"}}>
                 <button onClick={undo} disabled={!canUndo} style={{background:canUndo?"#1a1a2a":"transparent",border:"1px solid #2a2a3a",color:canUndo?"#e0e0e0":"#333",padding:"4px 10px",borderRadius:4,fontSize:11,cursor:canUndo?"pointer":"default",fontWeight:600}}>Undo</button>
                 <button onClick={redo} disabled={!canRedo} style={{background:canRedo?"#1a1a2a":"transparent",border:"1px solid #2a2a3a",color:canRedo?"#e0e0e0":"#333",padding:"4px 10px",borderRadius:4,fontSize:11,cursor:canRedo?"pointer":"default",fontWeight:600}}>Redo</button>
                 <span style={{flex:1}}/>
@@ -767,10 +773,12 @@ function EditorApp({ roomId, projectId, projectName, onBack }) {
                   style={{width:42,height:22,background:"#0a0a14",border:"1px solid #2a2a3a",borderRadius:3,color:"#ccc",textAlign:"center",fontSize:11,fontFamily:"'JetBrains Mono',monospace"}}
                 />
                 {wallLength && (()=>{const maxRun=Math.max(baseRun,wallRun);const filler=wallLength-maxRun;return <span style={{color:filler<0?"#e04040":filler>6?"#e0a020":"#22c55e",fontWeight:600,fontSize:10}}>{filler>=0?`+${filler}" filler`:`${filler}" over!`}</span>;})()}
+                <span style={{color:"#333"}}>|</span>
+                <button onClick={()=>window.print()} style={{height:22,padding:"0 8px",borderRadius:3,background:"#1a1a2a",border:"1px solid #2a2a3a",color:"#888",fontSize:10,fontWeight:600,cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>Print</button>
               </div>
 
               {/* Interactive 3D Render */}
-              <div style={{flex:"1 1 auto",overflow:"auto",background:"#fff",position:"relative"}} onClick={()=>setRenderCtxMenu(null)}>
+              <div data-printable style={{flex:"1 1 auto",overflow:"auto",background:"#fff",position:"relative"}} onClick={()=>setRenderCtxMenu(null)}>
                 {/* Photo reference overlay */}
                 {photoPreview && (
                   <div onClick={(e)=>e.stopPropagation()} style={{position:"absolute",top:8,right:8,zIndex:5,cursor:"pointer"}}
@@ -872,8 +880,8 @@ function EditorApp({ roomId, projectId, projectName, onBack }) {
 
               {/* Bottom bar — nothing selected */}
               {!sel && !selectedGapItem && (
-                <div style={{flexShrink:0,background:"#0c0c14",borderTop:"1px solid #1a1a2a",padding:"8px 10px",display:"flex",alignItems:"center",gap:8}}>
-                  <span style={{color:"#444",fontSize:12,fontFamily:"'DM Sans',sans-serif"}}>Click a cabinet to edit. <span style={{color:"#333"}}>Tab: next · ⌘D: duplicate · Right-click: more</span></span>
+                <div data-noprint style={{flexShrink:0,background:"#0c0c14",borderTop:"1px solid #1a1a2a",padding:"8px 10px",display:"flex",alignItems:"center",gap:8}}>
+                  <span style={{color:"#444",fontSize:12,fontFamily:"'DM Sans',sans-serif"}}>Click a cabinet to edit. <span style={{color:"#333"}}>Tab: next · ⌘D: duplicate · Delete: remove · Right-click: more</span></span>
                   <span style={{flex:1}}/>
                   <button onClick={()=>{
                     const id=generateId("base",spec),cab=defaultCabinet("base");cab.id=id;
