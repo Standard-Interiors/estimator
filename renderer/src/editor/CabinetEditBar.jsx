@@ -55,9 +55,20 @@ export default function CabinetEditBar({ cab, spec, dispatch, selColor, widthInp
     color: "#fff", fontSize: 14, textAlign: "center", fontFamily: MONO, fontWeight: 700,
   });
 
-  const commitDim = (field, val) => {
-    const v = parseFloat(val);
-    if (!isNaN(v) && v > 0 && v !== cab[field]) {
+  const commitDim = (field, val, inputEl) => {
+    let v = parseFloat(val);
+    if (isNaN(v) || v <= 0) return;
+    // Snap width to nearest standard size
+    if (field === "width") {
+      let best = STANDARD_WIDTHS[0], bestDist = Math.abs(v - best);
+      for (const sw of STANDARD_WIDTHS) {
+        const d = Math.abs(v - sw);
+        if (d < bestDist) { best = sw; bestDist = d; }
+      }
+      v = best;
+      if (inputEl) inputEl.value = v;
+    }
+    if (v !== cab[field]) {
       dispatch({ type: "SET_DIMENSION", id: cab.id, field, value: v });
     }
   };
@@ -85,8 +96,8 @@ export default function CabinetEditBar({ cab, spec, dispatch, selColor, widthInp
         {/* Dimensions */}
         <input ref={widthInputRef} key={cab.id + "w"} type="number" defaultValue={cab.width}
           onFocus={e => e.target.select()}
-          onKeyDown={e => { if (e.key === "Enter") { commitDim("width", e.target.value); e.target.blur(); } }}
-          onBlur={e => commitDim("width", e.target.value)}
+          onKeyDown={e => { if (e.key === "Enter") { commitDim("width", e.target.value, e.target); e.target.blur(); } }}
+          onBlur={e => commitDim("width", e.target.value, e.target)}
           style={{ ...inputStyle(56, selColor), border: `2px solid ${selColor}` }}
         />
         <span style={{ color: "#555", fontSize: 12, fontFamily: MONO }}>w</span>
