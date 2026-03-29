@@ -275,6 +275,7 @@ function EditorApp({ roomId, projectId, projectName, onBack }) {
   const [isDragging, setIsDragging] = useState(false);
   const [jsonOpen, setJsonOpen] = useState(false);
   const [exampleHover, setExampleHover] = useState(false);
+  const [wallLength, setWallLength] = useState(null); // user-entered actual wall measurement
 
   // Ref to the width input in the bottom bar — passed to GridEditor for double-click focus
   const widthInputRef = useRef(null);
@@ -758,6 +759,14 @@ function EditorApp({ roomId, projectId, projectName, onBack }) {
                 <span style={{color:"#D94420",fontWeight:600}}>B:{baseRun}"</span>
                 <span style={{color:"#333"}}>|</span>
                 <span style={{color:"#1a6fbf",fontWeight:600}}>W:{wallRun}"</span>
+                <span style={{color:"#333"}}>|</span>
+                <span style={{color:"#555",fontSize:10}}>wall</span>
+                <input type="number" defaultValue={wallLength||""} placeholder="—"
+                  onBlur={e=>{const v=parseFloat(e.target.value);setWallLength(isNaN(v)||v<=0?null:v);}}
+                  onKeyDown={e=>{if(e.key==="Enter")e.target.blur();}}
+                  style={{width:42,height:22,background:"#0a0a14",border:"1px solid #2a2a3a",borderRadius:3,color:"#ccc",textAlign:"center",fontSize:11,fontFamily:"'JetBrains Mono',monospace"}}
+                />
+                {wallLength && (()=>{const maxRun=Math.max(baseRun,wallRun);const filler=wallLength-maxRun;return <span style={{color:filler<0?"#e04040":filler>6?"#e0a020":"#22c55e",fontWeight:600,fontSize:10}}>{filler>=0?`+${filler}" filler`:`${filler}" over!`}</span>;})()}
               </div>
 
               {/* Interactive 3D Render */}
