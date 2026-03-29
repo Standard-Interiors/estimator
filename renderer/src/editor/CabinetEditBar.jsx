@@ -32,6 +32,7 @@ function sectionSummary(sec) {
 
 export default function CabinetEditBar({ cab, spec, dispatch, selColor, widthInputRef, onSelectNext, onSelectId, onDelete, onAddGap, onAddCab, onMoveLeft, onMoveRight }) {
   const [editingSec, setEditingSec] = useState(null); // index of section being edited
+  const [showSecPicker, setShowSecPicker] = useState(false);
   const sections = cab?.face?.sections || [];
 
   // Reset editing section when cabinet changes
@@ -151,14 +152,28 @@ export default function CabinetEditBar({ cab, spec, dispatch, selColor, widthInp
           );
         })}
 
-        <button onClick={() => {
-          dispatch({ type: "ADD_SECTION", cabId: cab.id, section: { type: "door", count: 1 } });
-          setEditingSec(sections.length);
-        }} style={{
-          padding: "3px 8px", borderRadius: 4, background: "transparent",
-          border: "1px dashed #333", color: "#555", fontSize: 11, fontFamily: MONO,
-          cursor: "pointer", fontWeight: 600,
-        }}>+ Section</button>
+        <span style={{ position: "relative", display: "inline-block" }}>
+          <button onClick={() => setShowSecPicker(!showSecPicker)} style={{
+            padding: "3px 8px", borderRadius: 4, background: showSecPicker ? "#1a1a2a" : "transparent",
+            border: "1px dashed #333", color: "#555", fontSize: 11, fontFamily: MONO,
+            cursor: "pointer", fontWeight: 600,
+          }}>+ Section</button>
+          {showSecPicker && (
+            <div style={{ position: "absolute", bottom: "100%", left: 0, marginBottom: 4, background: "#14141e", border: "1px solid #2a2a3a", borderRadius: 6, padding: 4, display: "flex", gap: 3, zIndex: 10 }}>
+              {["door", "drawer", "false_front", "glass_door", "open"].map(t => (
+                <button key={t} onClick={() => {
+                  const sec = t === "drawer" ? { type: "drawer", count: 1, height: 6 } : t === "false_front" ? { type: "false_front", height: 6 } : { type: t, count: 1 };
+                  dispatch({ type: "ADD_SECTION", cabId: cab.id, section: sec });
+                  setShowSecPicker(false);
+                  setEditingSec(sections.length);
+                }} style={{
+                  padding: "4px 8px", borderRadius: 4, background: "#1a1a2a", border: "1px solid #2a2a3a",
+                  color: "#ccc", fontSize: 10, fontFamily: MONO, cursor: "pointer", fontWeight: 600, whiteSpace: "nowrap",
+                }}>{SEC_LABELS[t] || t}</button>
+              ))}
+            </div>
+          )}
+        </span>
 
         {/* Inline section editor */}
         {editSec && (
