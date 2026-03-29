@@ -85,7 +85,7 @@ export default function CabinetEditBar({ cab, spec, dispatch, selColor, widthInp
         {/* Dimensions */}
         <input ref={widthInputRef} key={cab.id + "w"} type="number" defaultValue={cab.width}
           onFocus={e => e.target.select()}
-          onKeyDown={e => { if (e.key === "Enter") { commitDim("width", e.target.value); onSelectNext(); } }}
+          onKeyDown={e => { if (e.key === "Enter") { commitDim("width", e.target.value); e.target.blur(); } }}
           onBlur={e => commitDim("width", e.target.value)}
           style={{ ...inputStyle(56, selColor), border: `2px solid ${selColor}` }}
         />

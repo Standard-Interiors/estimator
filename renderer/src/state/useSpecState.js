@@ -31,8 +31,11 @@ function historyReducer(state, action) {
       // Forward to specReducer
       const newPresent = specReducer(state.present, action);
 
-      // If specReducer returned the same reference (no-op clone still differs,
-      // but LOAD_SPEC with identical data is fine to push), always push history.
+      // LOAD_SPEC resets history — the extraction is the undo floor
+      if (action.type === "LOAD_SPEC") {
+        return { past: [], present: newPresent, future: [] };
+      }
+
       const newPast =
         state.past.length >= MAX_HISTORY
           ? [...state.past.slice(1), state.present]

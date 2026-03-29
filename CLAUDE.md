@@ -114,19 +114,27 @@ If the answer to those three questions is yes, the extraction is good. Everythin
 
 ---
 
-## TEMPORARY HARD CONSTRAINT — 150 Bold Iterations
+## CURRENT ITERATION BLOCK — Editor UX (15 iterations)
 
-### DO NOT STOP until you have completed 150 bold iterations on the editor.
+**Goal:** Gemini gets the cabinet maker 80% there. The editor makes the last 20% effortless. If editing is painful, users stop using the tool and waste more time than pencil-and-paper.
 
-**Goal:** Make this tool 5X better than manually doing a cabinet spec. Cabinet designers must TRUST it and WANT to use it. If it's not dramatically faster than pencil-and-paper, it fails.
+**North Star:** Upload photos → AI extracts → quick edits → done. 5X faster than manual.
 
-**Rules:**
-- Each iteration must be BOLD — meaningful UX or functional improvement, not cosmetic tweaks
-- **ONE iteration at a time. No batching. No delegating batches to subagents.**
-- Each iteration: make the change, verify it in Chrome MCP with a real screenshot, confirm it works, THEN move to next
-- Do not lie about iteration count — each must be real and verified
-- Track iteration count honestly
-- After 150 iterations, REMOVE this section
+### Planned Iterations (remove this section when all 15 are done)
 
-**Remove this section ONLY after completing 150 bold iterations.**
+1. **Undo boundary** — Never undo past the initial LOAD_SPEC. The extraction is the floor.
+2. **Consistent Enter behavior** — Enter in width/height/depth all blur without advancing.
+3. **Sequential cabinet IDs** — Duplicates get B4/W6 not B5134/W7823.
+4. **Delete confirmation** — "Delete B1?" dialog before removing a cabinet.
+5. **Backspace/Delete key** — Keyboard shortcut to delete selected cabinet (with confirmation).
+6. **Gap/appliance clickable from render** — Click a gap to edit its label and width.
+7. **Height/depth input styling** — Match the highlighted input box style of width field.
+8. **Type change auto-updates face** — Switching to "drawer bank" sets face to all drawers.
+9. **Standard width snapping** — Width input suggests nearest standard size (9,12,15,18,21,24,27,30,33,36,42,48).
+10. **Wall run total + filler indicator** — Show total wall measurement input and remaining filler.
+11. **+ Section face editing** — Clicking + Section shows a picker (door/drawer/false front).
+12. **Cabinet label editing** — Click the label text (e.g. "Base Cabinet") to rename it.
+13. **Dimension labels on render** — Show WxHxD below each cabinet label on the 2.5D render.
+14. **Zoom/pan on render** — Scroll to zoom, drag to pan the 2.5D view for large layouts.
+15. **Multi-select** — Shift+click to select multiple cabinets, batch-edit depth/height.
 

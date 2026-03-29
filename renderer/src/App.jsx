@@ -271,6 +271,7 @@ function EditorApp({ roomId, projectId, projectName, onBack }) {
   const [selectedId, setSelectedId] = useState(null);
   const [selectedGapItem, setSelectedGapItem] = useState(null);
   const [renderCtxMenu, setRenderCtxMenu] = useState(null); // { x, y, id, row }
+  const [pendingDelete, setPendingDelete] = useState(null); // cabinet id to confirm delete
   const [isDragging, setIsDragging] = useState(false);
   const [jsonOpen, setJsonOpen] = useState(false);
   const [exampleHover, setExampleHover] = useState(false);
@@ -383,7 +384,7 @@ function EditorApp({ roomId, projectId, projectName, onBack }) {
       }
       if (e.key === "Escape") { setSelectedId(null); setSelectedGapItem(null); return; }
       if (e.key === "Delete" || e.key === "Backspace") {
-        dispatch({ type: "DELETE_CABINET", id: selectedId }); setSelectedId(null); return;
+        setPendingDelete(selectedId); return;
       }
       if (e.key === "Tab") {
         e.preventDefault();
@@ -401,7 +402,7 @@ function EditorApp({ roomId, projectId, projectName, onBack }) {
         e.preventDefault();
         const cabMap2 = {}; (spec.cabinets || []).forEach(c => { cabMap2[c.id] = c; });
         const sel2 = cabMap2[selectedId]; if (!sel2) return;
-        const newId = sel2.row === "base" ? `B${Date.now() % 10000}` : `W${Date.now() % 10000}`;
+        const newId = generateId(sel2.row, spec);
         dispatch({ type: "DUPLICATE_CABINET", id: selectedId, newId });
         setSelectedId(newId);
         return;
@@ -781,11 +782,11 @@ function EditorApp({ roomId, projectId, projectName, onBack }) {
                   const ctxCab=cabMap2[renderCtxMenu.id];
                   if(!ctxCab) return null;
                   const items=[
-                    {label:"Duplicate (⌘D)",action:()=>{const newId=ctxCab.row==="base"?`B${Date.now()%10000}`:`W${Date.now()%10000}`;dispatch({type:"DUPLICATE_CABINET",id:renderCtxMenu.id,newId});setSelectedId(newId);setRenderCtxMenu(null);}},
+                    {label:"Duplicate (⌘D)",action:()=>{const newId=generateId(ctxCab.row,spec);dispatch({type:"DUPLICATE_CABINET",id:renderCtxMenu.id,newId});setSelectedId(newId);setRenderCtxMenu(null);}},
                     {label:"Set Width…",action:()=>{setSelectedId(renderCtxMenu.id);setRenderCtxMenu(null);setTimeout(()=>{if(widthInputRef.current){widthInputRef.current.focus();widthInputRef.current.select();}},50);}},
                     {label:"+ Space Left",action:()=>{const layout=spec[ctxCab.row==="base"?"base_layout":"wall_layout"]||[];const pos=layout.findIndex(i=>i.ref===renderCtxMenu.id);dispatch({type:"ADD_GAP",row:ctxCab.row,position:Math.max(pos,0),gap:{type:"filler",label:"Filler",width:3}});setRenderCtxMenu(null);}},
                     {label:"+ Space Right",action:()=>{const layout=spec[ctxCab.row==="base"?"base_layout":"wall_layout"]||[];const pos=layout.findIndex(i=>i.ref===renderCtxMenu.id);dispatch({type:"ADD_GAP",row:ctxCab.row,position:pos+1,gap:{type:"filler",label:"Filler",width:3}});setRenderCtxMenu(null);}},
-                    {label:"Delete",action:()=>{dispatch({type:"DELETE_CABINET",id:renderCtxMenu.id});setSelectedId(null);setRenderCtxMenu(null);},color:"#e04040"},
+                    {label:"Delete",action:()=>{setPendingDelete(renderCtxMenu.id);setRenderCtxMenu(null);},color:"#e04040"},
                   ];
                   return <div style={{position:"fixed",left:renderCtxMenu.x,top:renderCtxMenu.y,background:"#1a1a2a",border:"1px solid #2a2a3a",borderRadius:8,padding:4,zIndex:9999,minWidth:160,boxShadow:"0 8px 24px rgba(0,0,0,0.5)"}}
                     onClick={e=>e.stopPropagation()}>
@@ -811,7 +812,7 @@ function EditorApp({ roomId, projectId, projectName, onBack }) {
                   onSelectId={setSelectedId}
                   onMoveLeft={() => dispatch({ type: "NUDGE_CABINET", id: sel.id, amount: -3 })}
                   onMoveRight={() => dispatch({ type: "NUDGE_CABINET", id: sel.id, amount: 3 })}
-                  onDelete={() => { dispatch({type:"DELETE_CABINET",id:sel.id}); setSelectedId(null); }}
+                  onDelete={() => setPendingDelete(sel.id)}
                   onAddGap={() => {
                     const layout=spec[sel.row==="base"?"base_layout":"wall_layout"]||[];
                     const pos=layout.findIndex(i=>i.ref===sel.id);
@@ -951,7 +952,7 @@ function EditorApp({ roomId, projectId, projectName, onBack }) {
                     if(idx!==-1&&idx<allRefs.length-1){setSelectedId(allRefs[idx+1].ref);setTimeout(()=>{if(widthInputRef.current){widthInputRef.current.focus();widthInputRef.current.select();}},50);}
                   }}
                   onSelectId={setSelectedId}
-                  onDelete={() => { dispatch({type:"DELETE_CABINET",id:sel.id}); setSelectedId(null); }}
+                  onDelete={() => setPendingDelete(sel.id)}
                   onAddGap={() => {
                     const layout=spec[sel.row==="base"?"base_layout":"wall_layout"]||[];
                     const pos=layout.findIndex(i=>i.ref===sel.id);
@@ -1006,6 +1007,29 @@ function EditorApp({ roomId, projectId, projectName, onBack }) {
           </div>
         )}
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {pendingDelete && (
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999}}
+          onClick={(e) => { if(e.target === e.currentTarget) setPendingDelete(null); }}>
+          <div style={{background:"#1a1a2a",border:"1px solid #333",borderRadius:12,padding:"28px 32px",maxWidth:360,width:"90%",textAlign:"center"}}>
+            <div style={{fontSize:15,fontWeight:700,color:"#eee",marginBottom:8}}>Delete {pendingDelete}?</div>
+            <div style={{fontSize:13,color:"#888",marginBottom:20}}>This cabinet will be removed from the layout.</div>
+            <div style={{display:"flex",gap:10,justifyContent:"center"}}>
+              <button onClick={() => setPendingDelete(null)}
+                style={{padding:"10px 24px",borderRadius:8,fontSize:13,fontWeight:600,cursor:"pointer",
+                  background:"transparent",color:"#888",border:"1px solid #333",fontFamily:"inherit"}}>
+                Cancel
+              </button>
+              <button onClick={() => { dispatch({type:"DELETE_CABINET",id:pendingDelete}); setSelectedId(null); setPendingDelete(null); }}
+                style={{padding:"10px 24px",borderRadius:8,fontSize:13,fontWeight:600,cursor:"pointer",
+                  background:"#e04040",color:"#fff",border:"none",fontFamily:"inherit"}}>
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
