@@ -81,6 +81,18 @@ export default function CabinetEditBar({ cab, spec, dispatch, selColor, widthInp
       {/* Row 1: Identity + Dimensions */}
       <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", borderBottom: "1px solid #111118" }}>
         <span style={{ color: selColor, fontWeight: 700, fontSize: 16, fontFamily: MONO }}>{cab.id}</span>
+        <input
+          key={cab.id + "-label"}
+          type="text"
+          defaultValue={cab.label || ""}
+          placeholder="add label..."
+          onBlur={e => { const v = e.target.value.trim(); if (v !== (cab.label || "")) dispatch({ type: "SET_LABEL", id: cab.id, label: v }); }}
+          onKeyDown={e => { if (e.key === "Enter") e.target.blur(); if (e.key === "Escape") { e.target.value = cab.label || ""; e.target.blur(); } }}
+          style={{ width: 100, height: 24, background: "transparent", border: "1px solid transparent", borderRadius: 4, color: "#888", fontSize: 11, fontFamily: MONO, padding: "0 4px", cursor: "text" }}
+          onFocus={e => { e.target.style.borderColor = "#2a2a3a"; e.target.style.background = "#14141e"; }}
+          onMouseEnter={e => { if (document.activeElement !== e.target) e.target.style.borderColor = "#1a1a2a"; }}
+          onMouseLeave={e => { if (document.activeElement !== e.target) e.target.style.borderColor = "transparent"; }}
+        />
 
         {/* Type pills */}
         <div style={{ display: "flex", gap: 3 }}>

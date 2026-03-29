@@ -156,6 +156,12 @@ export default function specReducer(state, action) {
       return spec;
     }
 
+    case "SET_LABEL": {
+      const cab = spec.cabinets.find((c) => c.id === action.id);
+      if (cab) cab.label = action.label;
+      return spec;
+    }
+
     case "CHANGE_TYPE": {
       const cab = spec.cabinets.find((c) => c.id === action.id);
       if (!cab) return spec;
