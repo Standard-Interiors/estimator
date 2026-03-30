@@ -251,7 +251,7 @@ function Render({ spec }) {
 // ═══════════════════════════════════════════════════════════
 const EMPTY_SPEC = { base_layout: [], wall_layout: [], alignment: [], cabinets: [] };
 
-function EditorApp({ roomId, projectId, projectName, onBack }) {
+function EditorApp({ roomId, projectId, projectName, rooms, onRoomChange, onBack }) {
   const { spec, dispatch, undo, redo, canUndo, canRedo } = useSpecState(EMPTY_SPEC);
   const [tab, setTab] = useState("render");
   const [jsonInput, setJsonInput] = useState("");
@@ -540,6 +540,14 @@ function EditorApp({ roomId, projectId, projectName, onBack }) {
             {saveState === "saving" && <span style={{fontSize:10,color:"#888",fontFamily:"'JetBrains Mono',monospace"}}>Saving...</span>}
             {saveState === "saved" && <span style={{fontSize:10,color:"#22c55e",opacity:0.6,fontFamily:"'JetBrains Mono',monospace"}}>✓ Saved</span>}
             {saveState === "error" && <span style={{fontSize:10,color:"#e04040",fontFamily:"'JetBrains Mono',monospace"}}>Save failed</span>}
+            {rooms?.length > 1 && rooms.map((r, i) => (
+              <button key={r.id} onClick={() => onRoomChange?.(r.id)} style={{
+                padding:"2px 8px",borderRadius:3,fontSize:10,fontWeight:600,cursor:"pointer",
+                background:r.id===roomId?"#2a2a3a":"transparent",
+                border:`1px solid ${r.id===roomId?"#3a3a4a":"#222"}`,
+                color:r.id===roomId?"#eee":"#555",fontFamily:"'JetBrains Mono',monospace"
+              }}>R{i+1}</button>
+            ))}
           </div>
         ) : (
           <h1 style={{fontSize:16,fontWeight:700,margin:0,letterSpacing:"-0.02em",color:"#eee"}}>Cabinet Spec Tool</h1>
@@ -1115,6 +1123,8 @@ function ProjectEditorWrapper() {
       roomId={activeRoomId}
       projectId={projectId}
       projectName={project.name}
+      rooms={project.rooms}
+      onRoomChange={setActiveRoomId}
       onBack={() => navigate("/")}
     />
   );
