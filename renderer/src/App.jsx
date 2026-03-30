@@ -525,6 +525,7 @@ function EditorApp({ roomId, projectId, projectName, onBack }) {
           body{background:#fff !important}
           [data-noprint]{display:none !important}
           [data-printable]{background:#fff !important;overflow:visible !important;height:auto !important;position:static !important}
+          [data-printonly]{display:block !important}
           svg{max-width:100% !important}
         }
       `}</style>
@@ -779,6 +780,16 @@ function EditorApp({ roomId, projectId, projectName, onBack }) {
 
               {/* Interactive 3D Render */}
               <div data-printable style={{flex:"1 1 auto",overflow:"auto",background:"#fff",position:"relative"}} onClick={()=>setRenderCtxMenu(null)}>
+                {/* Print-only header — hidden on screen, visible when printing */}
+                <div data-printonly style={{display:"none",padding:"12px 16px 8px",borderBottom:"2px solid #333",marginBottom:8}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline"}}>
+                    <span style={{fontSize:18,fontWeight:700,fontFamily:"monospace",color:"#111"}}>{projectName}</span>
+                    <span style={{fontSize:11,fontFamily:"monospace",color:"#555"}}>{new Date().toLocaleDateString()}</span>
+                  </div>
+                  <div style={{fontSize:11,fontFamily:"monospace",color:"#444",marginTop:2}}>
+                    {cabCount} cabinets · Base: {baseRun}" · Wall: {wallRun}"
+                  </div>
+                </div>
                 {/* Photo reference overlay */}
                 {photoPreview && (
                   <div onClick={(e)=>e.stopPropagation()} style={{position:"absolute",top:8,right:8,zIndex:5,cursor:"pointer"}}
