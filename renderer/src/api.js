@@ -106,10 +106,9 @@ export const extractForRoom = (roomId) =>
 // ---------------------------------------------------------------------------
 // Legacy extraction (no project context, for "Try the Example")
 // ---------------------------------------------------------------------------
-export const extractRaw = (wireframeFile, photoFile) => {
+export const extractRaw = (photoFile) => {
   const formData = new FormData();
-  formData.append("image", wireframeFile);
-  if (photoFile) formData.append("photo", photoFile);
+  formData.append("photo", photoFile);
   return fetch(`${BASE}/api/extract`, {
     method: "POST",
     body: formData,

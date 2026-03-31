@@ -85,6 +85,40 @@ def get_mime_from_bytes(data):
     return 'image/png'
 
 
+def generate_wireframe(photo_bytes, api_key):
+    """Generate a 2.5D wireframe image from a photo using Gemini image generation."""
+    from google import genai
+    from google.genai import types
+
+    client = genai.Client(api_key=api_key)
+    mime = get_mime_from_bytes(photo_bytes)
+
+    resp = client.models.generate_content(
+        model='gemini-3-pro-image-preview',
+        contents=[
+            types.Part.from_bytes(data=photo_bytes, mime_type=mime),
+            "create a SIMPLE 2.5D wire frame of the cabinets in this photo",
+        ],
+        config=types.GenerateContentConfig(
+            response_modalities=['TEXT', 'IMAGE'],
+        ),
+    )
+
+    for part in resp.candidates[0].content.parts:
+        if hasattr(part, 'inline_data') and part.inline_data and part.inline_data.data:
+            return part.inline_data.data
+
+    raise ValueError("Wireframe generation failed: no image in response")
+
+
+def extract_from_photo(photo_bytes, api_key, model="gemini-3.1-pro-preview"):
+    """Full pipeline: photo → generate wireframe → extract spec from both images."""
+    wireframe_bytes = generate_wireframe(photo_bytes, api_key)
+    spec = extract_from_bytes(wireframe_bytes, api_key, model=model, photo_bytes=photo_bytes)
+    spec["_wireframe_bytes"] = wireframe_bytes
+    return spec
+
+
 def extract_from_bytes(image_bytes, api_key, model="gemini-3.1-pro-preview", photo_bytes=None):
     """Extract cabinet spec from raw image bytes using Google Gemini. Returns dict (UCS JSON spec).
     If photo_bytes is provided, sends both the photo and wireframe for better accuracy."""

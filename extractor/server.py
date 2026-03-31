@@ -20,7 +20,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
 
-from extract_cabinets import extract_from_bytes, PROMPT
+from extract_cabinets import extract_from_bytes, extract_from_photo, PROMPT
 import db
 
 # ---------------------------------------------------------------------------
@@ -48,30 +48,24 @@ app.mount("/images", StaticFiles(directory=str(db.IMAGE_DIR)), name="images")
 # ===========================================================================
 @app.post("/api/extract")
 async def extract_cabinets_raw(
-    image: UploadFile = File(...),
-    photo: UploadFile = File(None),
+    photo: UploadFile = File(...),
     model: str = "gemini-3.1-pro-preview"
 ):
-    """Extract cabinet spec from wireframe image (standalone, no project context)."""
-    image_bytes = await image.read()
-    if len(image_bytes) < 100:
+    """Extract cabinet spec from photo: auto-generates wireframe, then extracts."""
+    photo_bytes = await photo.read()
+    if len(photo_bytes) < 100:
         raise HTTPException(400, "Image too small or empty")
-
-    photo_bytes = None
-    if photo:
-        photo_bytes = await photo.read()
-        if len(photo_bytes) < 100:
-            photo_bytes = None
 
     api_key = os.environ.get("GOOGLE_API_KEY", "")
     if not api_key:
         raise HTTPException(500, "API key not set")
 
     try:
-        spec = extract_from_bytes(image_bytes, api_key, model=model, photo_bytes=photo_bytes)
+        spec = extract_from_photo(photo_bytes, api_key, model=model)
     except Exception as e:
         raise HTTPException(500, f"Extraction failed: {str(e)}")
 
+    spec.pop("_wireframe_bytes", None)
     return spec
 
 
@@ -290,62 +284,75 @@ async def upload_image(
 # ===========================================================================
 @app.post("/api/rooms/{rid}/extract")
 async def extract_for_room(rid: str):
-    """Run extraction using the room's uploaded images, save result."""
+    """Run extraction using the room's photo: auto-generates wireframe, then extracts."""
     room = db.get_room(rid)
     if not room:
         raise HTTPException(404, "Room not found")
 
-    if not room.get("wireframe_id"):
-        raise HTTPException(400, "Room has no wireframe image. Upload one first.")
+    if not room.get("photo_id"):
+        raise HTTPException(400, "Room has no photo. Upload one first.")
 
     api_key = os.environ.get("GOOGLE_API_KEY", "")
     if not api_key:
         raise HTTPException(500, "API key not set")
 
-    # Load wireframe bytes
+    # Load photo bytes
     with db.engine.connect() as conn:
-        wire_row = conn.execute(
-            db.images.select().where(db.images.c.id == room["wireframe_id"])
+        photo_row = conn.execute(
+            db.images.select().where(db.images.c.id == room["photo_id"])
         ).mappings().first()
-        photo_row = None
-        if room.get("photo_id"):
-            photo_row = conn.execute(
-                db.images.select().where(db.images.c.id == room["photo_id"])
-            ).mappings().first()
 
-    if not wire_row:
-        raise HTTPException(400, "Wireframe image not found in database")
+    if not photo_row:
+        raise HTTPException(400, "Photo image not found in database")
 
-    wire_path = db.IMAGE_DIR / wire_row["file_path"]
-    if not wire_path.exists():
-        raise HTTPException(400, "Wireframe image file missing from disk")
+    photo_path = db.IMAGE_DIR / photo_row["file_path"]
+    if not photo_path.exists():
+        raise HTTPException(400, "Photo image file missing from disk")
 
-    wire_bytes = wire_path.read_bytes()
-    photo_bytes = None
-    if photo_row:
-        photo_path = db.IMAGE_DIR / photo_row["file_path"]
-        if photo_path.exists():
-            photo_bytes = photo_path.read_bytes()
+    photo_bytes = photo_path.read_bytes()
 
-    # Run extraction
+    # Run extraction (generates wireframe + extracts spec)
     model = "gemini-3.1-pro-preview"
     start_time = time.time()
     error_msg = None
     status = "success"
     spec = None
     try:
-        spec = extract_from_bytes(wire_bytes, api_key, model=model, photo_bytes=photo_bytes)
+        spec = extract_from_photo(photo_bytes, api_key, model=model)
     except Exception as e:
         error_msg = str(e)
         status = "failed"
 
     duration_ms = int((time.time() - start_time) * 1000)
 
+    # Save auto-generated wireframe to disk/DB
+    wireframe_id = room.get("wireframe_id")
+    if spec and "_wireframe_bytes" in spec:
+        wireframe_bytes = spec.pop("_wireframe_bytes")
+        file_id = uuid.uuid4().hex[:12]
+        project_id = room["project_id"]
+        img_dir = db.IMAGE_DIR / project_id / rid
+        img_dir.mkdir(parents=True, exist_ok=True)
+        file_path = f"{project_id}/{rid}/{file_id}.png"
+        (db.IMAGE_DIR / file_path).write_bytes(wireframe_bytes)
+        thumb_path = None
+        thumb_bytes = _generate_thumbnail(wireframe_bytes)
+        if thumb_bytes:
+            (img_dir / "thumbs").mkdir(exist_ok=True)
+            thumb_path = f"{project_id}/{rid}/thumbs/{file_id}.jpg"
+            (db.IMAGE_DIR / thumb_path).write_bytes(thumb_bytes)
+        img_record = db.save_image(
+            room_id=rid, img_type="wireframe",
+            filename=f"auto_wireframe_{file_id}.png",
+            mime_type="image/png", file_path=file_path, thumb_path=thumb_path
+        )
+        wireframe_id = img_record.get("id")
+
     # Save extraction record
     db.save_extraction(
         room_id=rid,
         photo_id=room.get("photo_id"),
-        wireframe_id=room.get("wireframe_id"),
+        wireframe_id=wireframe_id,
         model=model,
         raw_response=json.dumps(spec) if spec else None,
         extracted_spec=spec,
@@ -359,7 +366,6 @@ async def extract_for_room(rid: str):
 
     # Auto-save extracted spec to room
     spec_str = json.dumps(spec)
-    cab_count = len(spec.get("cabinets", [])) if spec else 0
     db.save_room_spec(rid, spec_str, room.get("spec_version", 0))
 
     return spec

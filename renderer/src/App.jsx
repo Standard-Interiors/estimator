@@ -269,10 +269,8 @@ function EditorApp({ roomId, projectId, projectName, rooms, onRoomChange, onRoom
   const [wireframePreview, setWireframePreview] = useState(null);
   const [photoFile, setPhotoFile] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(null);
-  const [wireframeFile, setWireframeFile] = useState(null);
-  const [dragTarget, setDragTarget] = useState(null); // "photo" | "wireframe" | null
+  const [dragTarget, setDragTarget] = useState(null); // "photo" | null
   const photoInputRef = useRef(null);
-  const wireInputRef = useRef(null);
 
   const [selectedId, setSelectedId] = useState(null);
   const [selectedGapItem, setSelectedGapItem] = useState(null);
@@ -463,17 +461,8 @@ function EditorApp({ roomId, projectId, projectName, rooms, onRoomChange, onRoom
     if (roomId) api.uploadImage(roomId, file, "photo").catch(err => console.error("Photo upload:", err));
   };
 
-  const handleWireframeUpload = (e) => {
-    const file = e.target?.files?.[0] || e;
-    if (!file || !(file instanceof File)) return;
-    setWireframeFile(file);
-    setWireframePreview(URL.createObjectURL(file));
-    setUploadStatus(""); // Clear any previous error
-    if (roomId) api.uploadImage(roomId, file, "wireframe").catch(err => console.error("Wireframe upload:", err));
-  };
-
   const handleExtract = () => {
-    if (wireframeFile && photoFile) runExtraction(wireframeFile, photoFile);
+    if (photoFile) runExtraction(photoFile);
   };
 
   const handleCardDrop = (which) => (e) => {
@@ -481,24 +470,21 @@ function EditorApp({ roomId, projectId, projectName, rooms, onRoomChange, onRoom
     const file = e.dataTransfer.files[0];
     if (!file || !file.type.startsWith("image/")) return;
     if (which === "photo") handlePhotoUpload(file);
-    else handleWireframeUpload(file);
   };
 
   const handleCardDragOver = (e) => { e.preventDefault(); e.stopPropagation(); };
   const handleCardDragEnter = (which) => (e) => { e.preventDefault(); e.stopPropagation(); setDragTarget(which); };
   const handleCardDragLeave = (which) => (e) => { e.preventDefault(); e.stopPropagation(); if (dragTarget === which) setDragTarget(null); };
 
-  const runExtraction = async (wireframe, photo) => {
-    if (!wireframe) return;
+  const runExtraction = async (photo) => {
+    if (!photo) return;
     setUploading(true);
-    setUploadStatus("Uploading...");
+    setUploadStatus("Generating wireframe & extracting cabinets...");
     setJsonError(null);
     setExtractionError(null);
     try {
-      setUploadStatus(photo ? "Analyzing photo + wireframe with AI..." : "Analyzing wireframe with AI...");
       const formData = new FormData();
-      formData.append("image", wireframe);
-      if (photo) formData.append("photo", photo);
+      formData.append("photo", photo);
       const resp = await fetch("http://localhost:8001/api/extract", { method: "POST", body: formData });
       if (!resp.ok) {
         let detail = "";
@@ -516,7 +502,7 @@ function EditorApp({ roomId, projectId, projectName, rooms, onRoomChange, onRoom
 
   const reset = () => {
     dispatch({ type: "LOAD_SPEC", spec: { base_layout: [], wall_layout: [], alignment: [], cabinets: [] } });
-    setMode("home"); setJsonInput(""); setJsonError(null); setWireframePreview(null); setWireframeFile(null); setPhotoFile(null); setPhotoPreview(null); setUploadStatus(""); setDragTarget(null);
+    setMode("home"); setJsonInput(""); setJsonError(null); setWireframePreview(null); setPhotoFile(null); setPhotoPreview(null); setUploadStatus(""); setDragTarget(null);
     setSelectedId(null); setSelectedGapItem(null);
   };
 
@@ -651,7 +637,7 @@ function EditorApp({ roomId, projectId, projectName, rooms, onRoomChange, onRoom
             {/* Hero */}
             <div style={{textAlign:"center",paddingTop:40,paddingBottom:24}}>
               <div style={{fontSize:22,fontWeight:700,color:"#eee",letterSpacing:"-0.03em",marginBottom:6}}>New Extraction</div>
-              <div style={{fontSize:13,color:"#555"}}>Upload both images to extract cabinet specs</div>
+              <div style={{fontSize:13,color:"#555"}}>Upload a photo to extract cabinet specs</div>
             </div>
 
             {/* Step indicators */}
@@ -666,29 +652,20 @@ function EditorApp({ roomId, projectId, projectName, rooms, onRoomChange, onRoom
               <span style={{color:"#333",margin:"0 12px",alignSelf:"center"}}>→</span>
               <div style={{display:"flex",alignItems:"center",gap:6}}>
                 <span style={{width:22,height:22,borderRadius:"50%",display:"inline-flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,
-                  background:wireframePreview?"#22c55e":"#1a1a2a",color:wireframePreview?"#000":"#555",border:!wireframePreview?"1px solid #2a2a3a":"none"}}>
-                  {wireframePreview?"✓":"2"}
-                </span>
-                <span style={{color:wireframePreview?"#22c55e":"#888",fontWeight:600}}>Wireframe</span>
-              </div>
-              <span style={{color:"#333",margin:"0 12px",alignSelf:"center"}}>→</span>
-              <div style={{display:"flex",alignItems:"center",gap:6}}>
-                <span style={{width:22,height:22,borderRadius:"50%",display:"inline-flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,
                   background:uploading?"#D94420":"#1a1a2a",color:uploading?"#fff":"#555",border:!uploading?"1px solid #2a2a3a":"none"}}>
-                  3
+                  2
                 </span>
                 <span style={{color:uploading?"#D94420":"#888",fontWeight:600}}>Extract</span>
               </div>
             </div>
 
-            {/* Two upload cards */}
-            <div style={{display:"flex",gap:14,marginBottom:16,flexWrap:"wrap"}}>
-              {/* Photo Card */}
+            {/* Photo upload card */}
+            <div style={{maxWidth:480,margin:"0 auto",marginBottom:16}}>
               <div
                 onClick={()=>!uploading && photoInputRef.current?.click()}
                 onDragOver={handleCardDragOver} onDragEnter={handleCardDragEnter("photo")} onDragLeave={handleCardDragLeave("photo")} onDrop={handleCardDrop("photo")}
                 style={{
-                  flex:1,minWidth:240,minHeight:220,background:"#0c0c14",cursor:"pointer",
+                  minHeight:220,background:"#0c0c14",cursor:"pointer",
                   border:photoPreview?"2px solid #22c55e":dragTarget==="photo"?"2px dashed #D94420":"2px dashed #2a2a3a",
                   borderRadius:12,padding:"20px 16px",textAlign:"center",
                   display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
@@ -698,7 +675,7 @@ function EditorApp({ roomId, projectId, projectName, rooms, onRoomChange, onRoom
                 <input ref={photoInputRef} type="file" accept="image/*" onChange={handlePhotoUpload} disabled={uploading} style={{display:"none"}} />
                 {photoPreview ? (
                   <>
-                    <img src={photoPreview} style={{maxWidth:"100%",maxHeight:140,borderRadius:8,border:"1px solid #2a2a3a",objectFit:"cover",boxShadow:"0 2px 8px rgba(0,0,0,0.3)"}} />
+                    <img src={photoPreview} style={{maxWidth:"100%",maxHeight:180,borderRadius:8,border:"1px solid #2a2a3a",objectFit:"cover",boxShadow:"0 2px 8px rgba(0,0,0,0.3)"}} />
                     <div style={{marginTop:8,fontSize:11,color:"#22c55e",fontWeight:600}}>✓ Photo ready</div>
                     <div onClick={(e)=>{e.stopPropagation();setPhotoFile(null);setPhotoPreview(null);}} style={{marginTop:4,fontSize:10,color:"#666",textDecoration:"underline",cursor:"pointer"}}>Change</div>
                   </>
@@ -711,41 +688,7 @@ function EditorApp({ roomId, projectId, projectName, rooms, onRoomChange, onRoom
                     </svg>
                     <div style={{fontSize:13,fontWeight:600,color:dragTarget==="photo"?"#D94420":"#bbb"}}>Drop photo here</div>
                     <div style={{fontSize:11,color:"#555",marginTop:4}}>or click to browse</div>
-                    <div style={{fontSize:10,color:"#444",marginTop:10,fontFamily:"'JetBrains Mono',monospace"}}>Original room photo</div>
-                  </>
-                )}
-              </div>
-
-              {/* Wireframe Card */}
-              <div
-                onClick={()=>!uploading && wireInputRef.current?.click()}
-                onDragOver={handleCardDragOver} onDragEnter={handleCardDragEnter("wireframe")} onDragLeave={handleCardDragLeave("wireframe")} onDrop={handleCardDrop("wireframe")}
-                style={{
-                  flex:1,minWidth:240,minHeight:220,background:"#0c0c14",cursor:"pointer",
-                  border:wireframePreview?"2px solid #22c55e":dragTarget==="wireframe"?"2px dashed #D94420":"2px dashed #2a2a3a",
-                  borderRadius:12,padding:"20px 16px",textAlign:"center",
-                  display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
-                  transition:"border-color 0.15s"
-                }}
-              >
-                <input ref={wireInputRef} type="file" accept="image/*" onChange={handleWireframeUpload} disabled={uploading} style={{display:"none"}} />
-                {wireframePreview ? (
-                  <>
-                    <img src={wireframePreview} style={{maxWidth:"100%",maxHeight:140,borderRadius:8,border:"1px solid #2a2a3a",objectFit:"cover",boxShadow:"0 2px 8px rgba(0,0,0,0.3)"}} />
-                    <div style={{marginTop:8,fontSize:11,color:"#22c55e",fontWeight:600}}>✓ Wireframe ready</div>
-                    <div onClick={(e)=>{e.stopPropagation();setWireframeFile(null);setWireframePreview(null);}} style={{marginTop:4,fontSize:10,color:"#666",textDecoration:"underline",cursor:"pointer"}}>Change</div>
-                  </>
-                ) : (
-                  <>
-                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" style={{marginBottom:10,opacity:0.5}}>
-                      <rect x="3" y="3" width="18" height="18" rx="2" stroke={dragTarget==="wireframe"?"#D94420":"#666"} strokeWidth="1.5"/>
-                      <line x1="3" y1="9" x2="21" y2="9" stroke={dragTarget==="wireframe"?"#D94420":"#666"} strokeWidth="1"/>
-                      <line x1="9" y1="9" x2="9" y2="21" stroke={dragTarget==="wireframe"?"#D94420":"#666"} strokeWidth="1"/>
-                      <line x1="15" y1="9" x2="15" y2="21" stroke={dragTarget==="wireframe"?"#D94420":"#666"} strokeWidth="1"/>
-                    </svg>
-                    <div style={{fontSize:13,fontWeight:600,color:dragTarget==="wireframe"?"#D94420":"#bbb"}}>Drop wireframe here</div>
-                    <div style={{fontSize:11,color:"#555",marginTop:4}}>or click to browse</div>
-                    <div style={{fontSize:10,color:"#444",marginTop:10,fontFamily:"'JetBrains Mono',monospace"}}>Cabinet layout drawing</div>
+                    <div style={{fontSize:10,color:"#444",marginTop:10,fontFamily:"'JetBrains Mono',monospace"}}>Photo of cabinets in the space</div>
                   </>
                 )}
               </div>
@@ -757,15 +700,15 @@ function EditorApp({ roomId, projectId, projectName, rooms, onRoomChange, onRoom
                 <div style={{fontSize:13,fontWeight:600,color:"#D94420",animation:"pulse 1.5s infinite"}}>{uploadStatus}</div>
               </div>
             ) : (
-              <button onClick={handleExtract} disabled={!photoFile || !wireframeFile || uploading}
+              <button onClick={handleExtract} disabled={!photoFile || uploading}
                 style={{
-                  width:"100%",padding:"14px 0",borderRadius:10,fontSize:14,fontWeight:700,cursor:photoFile&&wireframeFile?"pointer":"default",
+                  width:"100%",padding:"14px 0",borderRadius:10,fontSize:14,fontWeight:700,cursor:photoFile?"pointer":"default",
                   fontFamily:"inherit",border:"none",marginBottom:16,transition:"all 0.15s",letterSpacing:"-0.01em",
-                  background:photoFile&&wireframeFile?"#D94420":"#1a1a2a",
-                  color:photoFile&&wireframeFile?"#fff":"#444",
-                  opacity:photoFile&&wireframeFile?1:0.6
+                  background:photoFile?"#D94420":"#1a1a2a",
+                  color:photoFile?"#fff":"#444",
+                  opacity:photoFile?1:0.6
                 }}>
-                {photoFile && wireframeFile ? "Extract Cabinets with AI" : "Upload both images to continue"}
+                {photoFile ? "Extract Cabinets with AI" : "Upload a photo to continue"}
               </button>
             )}
 
