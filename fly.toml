@@ -1,20 +1,31 @@
 app = 'cabinet-estimator'
-primary_region = 'sjc'
+primary_region = 'dfw'
 
-[build]
+[env]
+  DATA_DIR = "/data"
+  PORT = "8001"
 
 [http_service]
-  internal_port = 8000
+  internal_port = 8001
   force_https = true
   auto_stop_machines = 'stop'
   auto_start_machines = true
   min_machines_running = 0
   processes = ['app']
 
+[checks]
+  [checks.health]
+    port = 8001
+    type = "http"
+    interval = "15s"
+    timeout = "5s"
+    path = "/health"
+
+[mounts]
+  source = "estimator_data"
+  destination = "/data"
+
 [[vm]]
-  memory = '512mb'
+  memory = '1gb'
   cpu_kind = 'shared'
   cpus = 1
-
-[env]
-  PYTHONPATH = "/app/src"

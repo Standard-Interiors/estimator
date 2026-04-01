@@ -24,12 +24,26 @@ from extract_cabinets import extract_from_bytes, extract_from_photo, PROMPT
 import db
 
 # ---------------------------------------------------------------------------
+# Load .env (needed when run via CMD in Docker, not just __main__)
+# ---------------------------------------------------------------------------
+_env_path = Path(__file__).parent.parent / ".env"
+if _env_path.exists():
+    for line in _env_path.read_text().strip().splitlines():
+        if "=" in line and not line.startswith("#"):
+            key, val = line.split("=", 1)
+            if not os.environ.get(key.strip()):
+                os.environ[key.strip()] = val.strip()
+
+# ---------------------------------------------------------------------------
 # App setup
 # ---------------------------------------------------------------------------
 app = FastAPI(title="Cabinet Spec Tool API")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:3000"],
+    allow_origins=[
+        "http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:3000",
+        "https://cabinet-estimator.fly.dev",
+    ],
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -202,7 +216,28 @@ def _get_mime(data: bytes) -> str:
         return "image/jpeg"
     if data[:4] == b'RIFF' and data[8:12] == b'WEBP':
         return "image/webp"
+    # HEIC/HEIF detection (ftyp box with heic/heix/mif1 brands)
+    if len(data) >= 12 and data[4:8] == b'ftyp':
+        brand = data[8:12]
+        if brand in (b'heic', b'heix', b'mif1', b'hevc'):
+            return "image/heic"
     return "image/jpeg"  # fallback
+
+
+def _convert_heic_to_jpeg(image_bytes: bytes) -> bytes:
+    """Convert HEIC/HEIF image to JPEG bytes using Pillow."""
+    from PIL import Image
+    try:
+        import pillow_heif
+        pillow_heif.register_heif_opener()
+    except ImportError:
+        pass
+    img = Image.open(BytesIO(image_bytes))
+    if img.mode in ("RGBA", "P"):
+        img = img.convert("RGB")
+    buf = BytesIO()
+    img.save(buf, format="JPEG", quality=90)
+    return buf.getvalue()
 
 
 def _generate_thumbnail(image_bytes: bytes, max_width: int = 300) -> bytes | None:
@@ -245,6 +280,13 @@ async def upload_image(
         raise HTTPException(400, "Image too large (max 10MB)")
 
     mime = _get_mime(image_bytes)
+    # Convert HEIC to JPEG so browsers can display it
+    if mime == "image/heic":
+        try:
+            image_bytes = _convert_heic_to_jpeg(image_bytes)
+            mime = "image/jpeg"
+        except Exception as e:
+            raise HTTPException(400, f"Failed to convert HEIC image: {e}")
     if mime not in ("image/jpeg", "image/png", "image/webp"):
         raise HTTPException(400, "Invalid image format")
 
@@ -372,13 +414,8 @@ async def extract_for_room(rid: str):
 
 
 # ===========================================================================
-# EXISTING — Test endpoints
+# Health check
 # ===========================================================================
-@app.get("/")
-async def root():
-    return {"status": "ok", "service": "cabinet-spec-tool"}
-
-
 @app.get("/health")
 async def health():
     api_key = os.environ.get("GOOGLE_API_KEY", "")
@@ -389,32 +426,28 @@ async def health():
     }
 
 
-@app.get("/test-wireframe")
-async def test_wireframe():
+# ---------------------------------------------------------------------------
+# Frontend SPA serving (production: built React app)
+# ---------------------------------------------------------------------------
+_frontend_dist = Path(__file__).parent.parent / "renderer" / "dist"
+if _frontend_dist.exists():
     from fastapi.responses import FileResponse
-    path = "/Users/william/Downloads/Gemini_Generated_Image_xwr94dxwr94dxwr9.png"
-    if os.path.exists(path):
-        return FileResponse(path, media_type="image/png")
-    return {"error": "No test wireframe found"}
 
+    # Serve static assets (JS, CSS, images)
+    app.mount("/assets", StaticFiles(directory=str(_frontend_dist / "assets")), name="frontend-assets")
 
-@app.get("/test-photo")
-async def test_photo():
-    from fastapi.responses import FileResponse
-    path = "/Users/william/Downloads/original_photo.jpg"
-    if os.path.exists(path):
-        return FileResponse(path, media_type="image/jpeg")
-    return {"error": "No test photo found"}
+    # SPA fallback: serve index.html for any non-API, non-image route
+    @app.get("/{path:path}")
+    async def spa_fallback(path: str):
+        # Serve actual files if they exist (favicon, icons, etc.)
+        file_path = _frontend_dist / path
+        if path and file_path.exists() and file_path.is_file():
+            return FileResponse(file_path)
+        # Otherwise serve index.html for client-side routing
+        return FileResponse(_frontend_dist / "index.html")
 
 
 if __name__ == "__main__":
     import uvicorn
-    # Load .env
-    env_path = Path(__file__).parent.parent / ".env"
-    if env_path.exists():
-        for line in env_path.read_text().strip().splitlines():
-            if "=" in line and not line.startswith("#"):
-                key, val = line.split("=", 1)
-                if not os.environ.get(key.strip()):
-                    os.environ[key.strip()] = val.strip()
-    uvicorn.run(app, host="0.0.0.0", port=8001)
+    port = int(os.environ.get("PORT", 8001))
+    uvicorn.run(app, host="0.0.0.0", port=port)

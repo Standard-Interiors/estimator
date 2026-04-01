@@ -16,7 +16,7 @@ from sqlalchemy import (
 # ---------------------------------------------------------------------------
 # Database path
 # ---------------------------------------------------------------------------
-DATA_DIR = Path(__file__).parent.parent / "data"
+DATA_DIR = Path(os.environ.get("DATA_DIR", str(Path(__file__).parent.parent / "data")))
 DATA_DIR.mkdir(exist_ok=True)
 DB_PATH = DATA_DIR / "estimator.db"
 IMAGE_DIR = DATA_DIR / "images"

@@ -2,7 +2,7 @@
  * API client — all fetch wrappers for the backend.
  * Base URL defaults to http://localhost:8001.
  */
-const BASE = "http://localhost:8001";
+const BASE = window.location.hostname === "localhost" ? "http://localhost:8001" : "";
 
 async function _fetch(path, opts = {}) {
   const url = `${BASE}${path}`;

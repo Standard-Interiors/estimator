@@ -485,7 +485,8 @@ function EditorApp({ roomId, projectId, projectName, rooms, onRoomChange, onRoom
     try {
       const formData = new FormData();
       formData.append("photo", photo);
-      const resp = await fetch("http://localhost:8001/api/extract", { method: "POST", body: formData });
+      const apiBase = window.location.hostname === "localhost" ? "http://localhost:8001" : "";
+      const resp = await fetch(`${apiBase}/api/extract`, { method: "POST", body: formData });
       if (!resp.ok) {
         let detail = "";
         try { const j = await resp.json(); detail = j.detail || JSON.stringify(j); } catch { detail = await resp.text(); }

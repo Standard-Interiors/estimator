@@ -2,25 +2,25 @@
 set -e
 
 echo "=== Cabinet Estimator Deployment ==="
+cd /Users/william/estimator
 
-# Step 1: Set secrets (only needs to be done once or when keys change)
-if [ -n "$OPENAI_API_KEY" ]; then
-  echo "Setting OPENAI_API_KEY secret..."
-  flyctl secrets set OPENAI_API_KEY="$OPENAI_API_KEY" -a cabinet-estimator
-else
-  echo "Note: OPENAI_API_KEY not set in environment. Set it with:"
-  echo "  flyctl secrets set OPENAI_API_KEY=sk-... -a cabinet-estimator"
+# Set secrets (only needed once or when keys change)
+if [ -n "$GOOGLE_API_KEY" ]; then
+  echo "Setting GOOGLE_API_KEY secret..."
+  flyctl secrets set GOOGLE_API_KEY="$GOOGLE_API_KEY" -a cabinet-estimator
 fi
 
-# Step 2: Deploy
-echo "Deploying to Fly.io..."
-flyctl deploy --remote-only -a cabinet-estimator
+# Create volume if first deploy
+flyctl volumes list -a cabinet-estimator | grep -q estimator_data || \
+  flyctl volumes create estimator_data --region dfw --size 10 -a cabinet-estimator
 
-# Step 3: Health check
+# Deploy
+echo "Deploying to Fly.io..."
+flyctl deploy --now -a cabinet-estimator
+
+# Health check
 echo "Checking deployment..."
 sleep 5
-curl -s https://cabinet-estimator.fly.dev/ | head -c 200
+curl -sf https://cabinet-estimator.fly.dev/health && echo " OK" || echo " FAILED"
 echo ""
-echo ""
-echo "=== Deployment complete ==="
 echo "App URL: https://cabinet-estimator.fly.dev"
