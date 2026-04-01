@@ -452,13 +452,36 @@ function EditorApp({ roomId, projectId, projectName, rooms, onRoomChange, onRoom
     } catch(e) { setJsonError(String(e.message)); }
   };
 
-  const handlePhotoUpload = (e) => {
+  const handlePhotoUpload = async (e) => {
     const file = e.target?.files?.[0] || e;
     if (!file || !(file instanceof File)) return;
     setPhotoFile(file);
-    setPhotoPreview(URL.createObjectURL(file));
     setUploadStatus(""); // Clear any previous error
-    if (roomId) api.uploadImage(roomId, file, "photo").catch(err => console.error("Photo upload:", err));
+
+    // HEIC files can't be previewed natively in most browsers.
+    // Detect by extension or MIME and use server-converted JPEG for preview.
+    const isHeic = /\.hei[cf]$/i.test(file.name) || file.type === "image/heic" || file.type === "image/heif";
+
+    if (!isHeic) {
+      setPhotoPreview(URL.createObjectURL(file));
+    }
+
+    if (roomId) {
+      try {
+        const result = await api.uploadImage(roomId, file, "photo");
+        // Use the server-converted image for HEIC preview
+        if (isHeic && result?.file_path) {
+          const apiBase = window.location.hostname === "localhost" ? "http://localhost:8001" : "";
+          setPhotoPreview(`${apiBase}/images/${result.file_path}`);
+        }
+      } catch (err) {
+        console.error("Photo upload:", err);
+      }
+    } else if (isHeic) {
+      // No room yet — show a placeholder; extraction will still work with the raw file
+      setPhotoPreview(null);
+      setUploadStatus("HEIC photo selected — preview available after extraction");
+    }
   };
 
   const handleExtract = () => {
@@ -468,7 +491,10 @@ function EditorApp({ roomId, projectId, projectName, rooms, onRoomChange, onRoom
   const handleCardDrop = (which) => (e) => {
     e.preventDefault(); e.stopPropagation(); setDragTarget(null);
     const file = e.dataTransfer.files[0];
-    if (!file || !file.type.startsWith("image/")) return;
+    if (!file) return;
+    // Accept image/* types and also HEIC files (which may report empty type on some browsers)
+    const isImage = file.type.startsWith("image/") || /\.(jpe?g|png|webp|gif|hei[cf])$/i.test(file.name);
+    if (!isImage) return;
     if (which === "photo") handlePhotoUpload(file);
   };
 
@@ -645,10 +671,10 @@ function EditorApp({ roomId, projectId, projectName, rooms, onRoomChange, onRoom
             <div style={{display:"flex",justifyContent:"center",gap:0,marginBottom:24,fontFamily:"'JetBrains Mono',monospace",fontSize:12}}>
               <div style={{display:"flex",alignItems:"center",gap:6}}>
                 <span style={{width:22,height:22,borderRadius:"50%",display:"inline-flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,
-                  background:photoPreview?"#22c55e":"#1a1a2a",color:photoPreview?"#000":"#555",border:!photoPreview?"1px solid #2a2a3a":"none"}}>
-                  {photoPreview?"✓":"1"}
+                  background:(photoPreview||photoFile)?"#22c55e":"#1a1a2a",color:(photoPreview||photoFile)?"#000":"#555",border:!(photoPreview||photoFile)?"1px solid #2a2a3a":"none"}}>
+                  {(photoPreview||photoFile)?"✓":"1"}
                 </span>
-                <span style={{color:photoPreview?"#22c55e":"#888",fontWeight:600}}>Photo</span>
+                <span style={{color:(photoPreview||photoFile)?"#22c55e":"#888",fontWeight:600}}>Photo</span>
               </div>
               <span style={{color:"#333",margin:"0 12px",alignSelf:"center"}}>→</span>
               <div style={{display:"flex",alignItems:"center",gap:6}}>
@@ -667,16 +693,17 @@ function EditorApp({ roomId, projectId, projectName, rooms, onRoomChange, onRoom
                 onDragOver={handleCardDragOver} onDragEnter={handleCardDragEnter("photo")} onDragLeave={handleCardDragLeave("photo")} onDrop={handleCardDrop("photo")}
                 style={{
                   minHeight:220,background:"#0c0c14",cursor:"pointer",
-                  border:photoPreview?"2px solid #22c55e":dragTarget==="photo"?"2px dashed #D94420":"2px dashed #2a2a3a",
+                  border:(photoPreview||photoFile)?"2px solid #22c55e":dragTarget==="photo"?"2px dashed #D94420":"2px dashed #2a2a3a",
                   borderRadius:12,padding:"20px 16px",textAlign:"center",
                   display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
                   transition:"border-color 0.15s"
                 }}
               >
-                <input ref={photoInputRef} type="file" accept="image/*" onChange={handlePhotoUpload} disabled={uploading} style={{display:"none"}} />
-                {photoPreview ? (
+                <input ref={photoInputRef} type="file" accept="image/*,.heic,.heif" onChange={handlePhotoUpload} disabled={uploading} style={{display:"none"}} />
+                {(photoPreview || photoFile) ? (
                   <>
-                    <img src={photoPreview} style={{maxWidth:"100%",maxHeight:180,borderRadius:8,border:"1px solid #2a2a3a",objectFit:"cover",boxShadow:"0 2px 8px rgba(0,0,0,0.3)"}} />
+                    {photoPreview && <img src={photoPreview} style={{maxWidth:"100%",maxHeight:180,borderRadius:8,border:"1px solid #2a2a3a",objectFit:"cover",boxShadow:"0 2px 8px rgba(0,0,0,0.3)"}} />}
+                    {!photoPreview && photoFile && <div style={{fontSize:24,marginBottom:8}}>📷</div>}
                     <div style={{marginTop:8,fontSize:11,color:"#22c55e",fontWeight:600}}>✓ Photo ready</div>
                     <div onClick={(e)=>{e.stopPropagation();setPhotoFile(null);setPhotoPreview(null);}} style={{marginTop:4,fontSize:10,color:"#666",textDecoration:"underline",cursor:"pointer"}}>Change</div>
                   </>
