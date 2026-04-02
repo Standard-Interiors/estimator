@@ -583,6 +583,11 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
         extracted = await resp.json();
       }
       setUploadStatus(`Extracted ${extracted.cabinets?.length || 0} cabinets`);
+      // Sync spec version from server so auto-save doesn't conflict
+      if (extracted._spec_version != null) {
+        specVersionRef.current = extracted._spec_version;
+        delete extracted._spec_version;
+      }
       extracted.cabinets?.forEach(c => { if(!c.depth) c.depth = c.row==="wall"?12:24; if(!c.height) c.height = c.row==="wall"?30:34.5; if(!c.width) c.width=24; });
       dispatch({ type: "LOAD_SPEC", spec: extracted });
       setMode("loaded"); setTab("render");
