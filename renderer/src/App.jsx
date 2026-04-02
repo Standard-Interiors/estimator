@@ -1083,6 +1083,32 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
         </div>
       )}
 
+      {/* Extraction processing modal — blocks all interaction */}
+      {uploading && (
+        <div style={{
+          position:"fixed",inset:0,zIndex:99999,
+          background:"rgba(0,0,0,0.85)",backdropFilter:"blur(8px)",
+          display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
+        }}>
+          {/* Glowing spinner */}
+          <div style={{
+            width:80,height:80,borderRadius:"50%",
+            border:"3px solid #1a1a2a",
+            borderTopColor:"#D94420",
+            animation:"spin 1s linear infinite",
+            boxShadow:"0 0 30px rgba(217,68,32,0.4), 0 0 60px rgba(217,68,32,0.2)",
+            marginBottom:28,
+          }}/>
+          <div style={{fontSize:18,fontWeight:700,color:"#eee",marginBottom:8,letterSpacing:"-0.02em"}}>
+            AI is processing...
+          </div>
+          <div style={{fontSize:13,color:"#666",maxWidth:320,textAlign:"center",lineHeight:1.5}}>
+            Generating wireframe and extracting cabinets. Please do not navigate away.
+          </div>
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        </div>
+      )}
+
     </div>
   );
 }
