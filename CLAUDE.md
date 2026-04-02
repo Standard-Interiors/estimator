@@ -98,11 +98,12 @@ If the answer to those three questions is yes, the extraction is good. Everythin
 
 ## HARD CONSTRAINT — Chrome MCP Verification Before Every Commit
 
-**NEVER commit code without verifying it works in Chrome MCP first.** Every change that touches UI or API must be tested with a real screenshot or API call before `git commit`. No exceptions.
+**NEVER commit code without verifying it works in Chrome MCP first.** Every change that touches UI or API must be tested via Chrome MCP — never curl. No exceptions.
 
 - If you changed frontend code: take a Chrome MCP screenshot proving the change works
-- If you changed backend code: curl the endpoint or trigger it from the UI and verify
+- If you changed backend code: trigger it from the UI in Chrome MCP and verify with a screenshot
 - If you changed both: verify the full flow end-to-end in Chrome MCP
+- **NEVER use curl for testing.** Always test through the real UI in Chrome MCP. Curl is lazy and misses UI integration bugs.
 - A build passing (`vite build`) is NOT sufficient — you must verify runtime behavior
 - If Chrome MCP is unavailable, explicitly tell the user you could not verify
 

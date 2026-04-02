@@ -100,6 +100,15 @@ export const imageUrl = (path) => (path ? `${BASE}${path}` : null);
 // ---------------------------------------------------------------------------
 // Extraction (project-aware)
 // ---------------------------------------------------------------------------
+// Start extraction — returns { task_id } immediately
+export const startExtraction = (roomId) =>
+  _fetch(`/api/rooms/${roomId}/extract`, { method: "POST" });
+
+// Poll task status — returns { status, progress, steps, result?, error? }
+export const getTaskStatus = (taskId) =>
+  _fetch(`/api/tasks/${taskId}`);
+
+// Legacy blocking extraction (kept for backward compat)
 export const extractForRoom = (roomId) =>
   _fetch(`/api/rooms/${roomId}/extract`, { method: "POST" });
 

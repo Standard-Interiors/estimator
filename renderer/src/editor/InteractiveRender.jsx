@@ -6,6 +6,15 @@ const IDX = 0.42;
 const IDY = -0.32;
 function dp(depth) { const v = depth || 0; return { x: v * SC * IDX, y: v * SC * IDY }; }
 
+// Confidence → visual style
+const CONF_STROKE = { low: "#e07020", medium: "#c0a030", high: null };
+const CONF_DASH = { low: "4,3", medium: "6,2", high: "" };
+function confStyle(cab) {
+  const conf = cab?.confidence;
+  if (!conf || conf === "high") return {};
+  return { stroke: CONF_STROKE[conf], dash: CONF_DASH[conf] };
+}
+
 function Box3D({ cx, cy, w, h, depth, front, top, side, stroke, sw, dash }) {
   const cw = Math.max((w || 1) * SC, 1), ch = Math.max((h || 1) * SC, 1);
   const dd = dp(depth);
@@ -186,13 +195,14 @@ export default function InteractiveRender({ spec, selectedId, onSelect, onDouble
           const isSelected = selectedId === bi.id;
           const isDragging = drag?.started && drag.id === bi.id;
           const dragTx = isDragging ? `translate(${drag.dx / (svgRef.current ? svgRef.current.getBoundingClientRect().width / svgW : 1)}, 0)` : undefined;
+          const cs = confStyle(c);
           return (<g key={`b-${bi.id}`} onClick={!drag?.started ? handleClick(bi.id) : undefined} onDoubleClick={handleDblClick(bi.id)} onContextMenu={handleContextMenu(bi.id, "base")} onPointerDown={onPointerDown(bi.id, "base")} style={{ cursor: isDragging ? "grabbing" : "grab" }} transform={dragTx}>
             <rect x={bi.x} y={cy - 4} width={c.width * SC} height={ch * SC + 8 + TOE + 30} fill="transparent" />
             {isSelected && highlightRect(bi.x, cy, c.width, ch, "base")}
-            <Box3D cx={bi.x} cy={cy} w={c.width} h={ch} depth={d} />
+            <Box3D cx={bi.x} cy={cy} w={c.width} h={ch} depth={d} stroke={cs.stroke} dash={cs.dash} />
             <rect x={bi.x + 2 * SC} y={FLOOR - TOE} width={Math.max(0, c.width * SC - 4 * SC)} height={TOE} fill="none" stroke="#ccc" strokeWidth={0.4} />
             <Face cab={c} cx={bi.x} cy={cy} w={c.width} h={ch} />
-            <text x={bi.x + c.width * SC / 2} y={FLOOR + 13} textAnchor="middle" fontSize={9} fill="#D94420" fontWeight={700} fontFamily="monospace">{bi.id}</text>
+            <text x={bi.x + c.width * SC / 2} y={FLOOR + 13} textAnchor="middle" fontSize={9} fill={cs.stroke || "#D94420"} fontWeight={700} fontFamily="monospace">{bi.id}</text>
             <text x={bi.x + c.width * SC / 2} y={FLOOR + 23} textAnchor="middle" fontSize={6.5} fill="#888" fontFamily="monospace">{c.width < 21 ? `${c.width}w` : `${c.width}w ${ch}h ${d}d`}</text>
             {isDragging && <text x={bi.x + c.width * SC / 2} y={cy - 8} textAnchor="middle" fontSize={10} fill="#D94420" fontWeight={700} fontFamily="monospace">{drag.dxInches > 0 ? "+" : ""}{drag.dxInches}"</text>}
           </g>);
@@ -223,12 +233,13 @@ export default function InteractiveRender({ spec, selectedId, onSelect, onDouble
           const svgScale = svgRef.current ? svgRef.current.getBoundingClientRect().width / svgW : 1;
           const dragTx = isDragging ? `translate(${drag.dx / svgScale}, ${drag.dy / svgScale})` : undefined;
           const midX = wi.x + c.width * SC / 2;
+          const cs = confStyle(c);
           return (<g key={`w-${wi.id}`} onClick={!drag?.started ? handleClick(wi.id) : undefined} onDoubleClick={handleDblClick(wi.id)} onContextMenu={handleContextMenu(wi.id, "wall")} onPointerDown={onPointerDown(wi.id, "wall")} style={{ cursor: isDragging ? "grabbing" : "grab" }} transform={dragTx}>
             <rect x={wi.x} y={wcy - 20} width={c.width * SC} height={ch * SC + 28} fill="transparent" />
             {isSelected && highlightRect(wi.x, wcy, c.width, ch, "wall")}
-            <Box3D cx={wi.x} cy={wcy} w={c.width} h={ch} depth={d} front="#fff" top="#eee" side="#ddd" />
+            <Box3D cx={wi.x} cy={wcy} w={c.width} h={ch} depth={d} front="#fff" top="#eee" side="#ddd" stroke={cs.stroke} dash={cs.dash} />
             <Face cab={c} cx={wi.x} cy={wcy} w={c.width} h={ch} />
-            <text x={midX} y={wcy - 5} textAnchor="middle" fontSize={9} fill="#1a6fbf" fontWeight={700} fontFamily="monospace">{wi.id}</text>
+            <text x={midX} y={wcy - 5} textAnchor="middle" fontSize={9} fill={cs.stroke || "#1a6fbf"} fontWeight={700} fontFamily="monospace">{wi.id}</text>
             <text x={midX} y={wcy - 15} textAnchor="middle" fontSize={6.5} fill="#888" fontFamily="monospace">{c.width < 21 ? `${c.width}w` : `${c.width}x${ch}x${d}`}</text>
             {isDragging && (drag.dxInches !== 0 || drag.dyInches !== 0) && <text x={midX} y={wcy - 22} textAnchor="middle" fontSize={10} fill="#1a6fbf" fontWeight={700} fontFamily="monospace">{drag.dxInches !== 0 ? `${drag.dxInches > 0 ? "+" : ""}${drag.dxInches}"` : ""}{drag.dxInches !== 0 && drag.dyInches !== 0 ? " " : ""}{drag.dyInches !== 0 ? `${drag.dyInches > 0 ? "↓" : "↑"}${Math.abs(drag.dyInches)}"` : ""}</text>}
           </g>);

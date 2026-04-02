@@ -21,7 +21,9 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
 
 from extract_cabinets import extract_from_bytes, extract_from_photo, PROMPT
+from pipeline import run_pipeline
 import db
+import tasks
 
 # ---------------------------------------------------------------------------
 # Load .env (needed when run via CMD in Docker, not just __main__)
@@ -326,8 +328,8 @@ async def upload_image(
 # ROOM EXTRACTION (project-aware)
 # ===========================================================================
 @app.post("/api/rooms/{rid}/extract")
-async def extract_for_room(rid: str):
-    """Run extraction using the room's photo: auto-generates wireframe, then extracts."""
+async def extract_for_room(rid: str, pipeline: bool = Query(default=True)):
+    """Run extraction in background. Returns task_id for polling."""
     room = db.get_room(rid)
     if not room:
         raise HTTPException(404, "Room not found")
@@ -353,24 +355,117 @@ async def extract_for_room(rid: str):
         raise HTTPException(400, "Photo image file missing from disk")
 
     photo_bytes = photo_path.read_bytes()
-
-    # Run extraction (generates wireframe + extracts spec)
     model = "gemini-3.1-pro-preview"
+
+    # Create task and run in background
+    task = tasks.create_task(rid)
+    if pipeline:
+        tasks.run_in_background(task, _run_pipeline_task,
+                                rid, room, photo_bytes, api_key, model)
+    else:
+        tasks.run_in_background(task, _run_legacy_task,
+                                rid, room, photo_bytes, api_key, model)
+    return {"task_id": task.id}
+
+
+@app.get("/api/tasks/{task_id}")
+async def get_task_status(task_id: str):
+    """Poll task status. Returns result when done."""
+    task = tasks.get_task(task_id)
+    if not task:
+        raise HTTPException(404, "Task not found")
+    return task.to_dict()
+
+
+def _run_pipeline_task(task, rid, room, photo_bytes, api_key, model):
+    """Background task: structured pipeline extraction with progress updates."""
+    def on_progress(step, msg):
+        task.update(step, msg, step=step)
+
+    spec, step_results, wireframe_bytes = run_pipeline(
+        photo_bytes, api_key, model=model, on_progress=on_progress)
+
+    # Save per-step extraction records
+    wireframe_id = room.get("wireframe_id")
+    for r in step_results:
+        raw = None
+        if r.data and r.step not in ("wireframe",) and isinstance(r.data, dict):
+            raw = json.dumps(r.data)
+        db.save_extraction(
+            room_id=rid,
+            photo_id=room.get("photo_id"),
+            wireframe_id=wireframe_id,
+            model=model,
+            raw_response=raw,
+            extracted_spec=r.data if r.step == "extract" and isinstance(r.data, dict) else None,
+            duration_ms=r.duration_ms,
+            error_message=r.error,
+            status="success" if r.ok else "failed",
+            step=r.step,
+        )
+
+    if spec is None:
+        failed = next((r for r in step_results if not r.ok), None)
+        msg = failed.error if failed else "Pipeline failed"
+        task.fail(msg)
+        return
+
+    # Save wireframe
+    if wireframe_bytes:
+        file_id = uuid.uuid4().hex[:12]
+        project_id = room["project_id"]
+        img_dir = db.IMAGE_DIR / project_id / rid
+        img_dir.mkdir(parents=True, exist_ok=True)
+        file_path = f"{project_id}/{rid}/{file_id}.png"
+        (db.IMAGE_DIR / file_path).write_bytes(wireframe_bytes)
+        thumb_path = None
+        thumb_b = _generate_thumbnail(wireframe_bytes)
+        if thumb_b:
+            (img_dir / "thumbs").mkdir(exist_ok=True)
+            thumb_path = f"{project_id}/{rid}/thumbs/{file_id}.jpg"
+            (db.IMAGE_DIR / thumb_path).write_bytes(thumb_b)
+        db.save_image(
+            room_id=rid, img_type="wireframe",
+            filename=f"auto_wireframe_{file_id}.png",
+            mime_type="image/png", file_path=file_path, thumb_path=thumb_path
+        )
+
+    # Save spec to room
+    spec_str = json.dumps(spec)
+    save_result = db.save_room_spec(rid, spec_str, room.get("spec_version", 0))
+    spec["_spec_version"] = save_result.get("version", 1) if save_result else 1
+
+    # Build safe pipeline metadata
+    def _safe_step(r):
+        d = {"step": r.step, "duration_ms": r.duration_ms, "error": r.error}
+        if r.step == "count" and isinstance(r.data, dict):
+            d["data"] = r.data
+        elif r.step == "validate" and isinstance(r.data, dict):
+            d["data"] = r.data
+        return d
+    spec["_pipeline"] = {
+        "steps": [_safe_step(r) for r in step_results],
+        "total_duration_ms": sum(r.duration_ms for r in step_results),
+    }
+
+    task.complete(spec)
+
+
+def _run_legacy_task(task, rid, room, photo_bytes, api_key, model):
+    """Background task: legacy single-call extraction."""
+    task.update("extracting", "Generating wireframe & extracting cabinets...")
+
     start_time = time.time()
-    error_msg = None
-    status = "success"
-    spec = None
     try:
         spec = extract_from_photo(photo_bytes, api_key, model=model)
     except Exception as e:
-        error_msg = str(e)
-        status = "failed"
+        task.fail(str(e))
+        return
 
     duration_ms = int((time.time() - start_time) * 1000)
 
-    # Save auto-generated wireframe to disk/DB
     wireframe_id = room.get("wireframe_id")
-    if spec and "_wireframe_bytes" in spec:
+    if "_wireframe_bytes" in spec:
         wireframe_bytes = spec.pop("_wireframe_bytes")
         file_id = uuid.uuid4().hex[:12]
         project_id = room["project_id"]
@@ -379,41 +474,27 @@ async def extract_for_room(rid: str):
         file_path = f"{project_id}/{rid}/{file_id}.png"
         (db.IMAGE_DIR / file_path).write_bytes(wireframe_bytes)
         thumb_path = None
-        thumb_bytes = _generate_thumbnail(wireframe_bytes)
-        if thumb_bytes:
+        thumb_b = _generate_thumbnail(wireframe_bytes)
+        if thumb_b:
             (img_dir / "thumbs").mkdir(exist_ok=True)
             thumb_path = f"{project_id}/{rid}/thumbs/{file_id}.jpg"
-            (db.IMAGE_DIR / thumb_path).write_bytes(thumb_bytes)
-        img_record = db.save_image(
+            (db.IMAGE_DIR / thumb_path).write_bytes(thumb_b)
+        db.save_image(
             room_id=rid, img_type="wireframe",
             filename=f"auto_wireframe_{file_id}.png",
             mime_type="image/png", file_path=file_path, thumb_path=thumb_path
         )
-        wireframe_id = img_record.get("id")
 
-    # Save extraction record
     db.save_extraction(
-        room_id=rid,
-        photo_id=room.get("photo_id"),
-        wireframe_id=wireframe_id,
-        model=model,
-        raw_response=json.dumps(spec) if spec else None,
-        extracted_spec=spec,
-        duration_ms=duration_ms,
-        error_message=error_msg,
-        status=status,
+        room_id=rid, photo_id=room.get("photo_id"), wireframe_id=wireframe_id,
+        model=model, raw_response=json.dumps(spec), extracted_spec=spec,
+        duration_ms=duration_ms, status="success",
     )
 
-    if status == "failed":
-        raise HTTPException(500, f"Extraction failed: {error_msg}")
-
-    # Auto-save extracted spec to room
     spec_str = json.dumps(spec)
     save_result = db.save_room_spec(rid, spec_str, room.get("spec_version", 0))
-
-    # Include the new version so frontend can sync
     spec["_spec_version"] = save_result.get("version", 1) if save_result else 1
-    return spec
+    task.complete(spec)
 
 
 # ===========================================================================
