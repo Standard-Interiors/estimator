@@ -902,7 +902,7 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
               {/* Render + optional Photo sidebar */}
               <div style={{display:"flex",flex:"1 1 auto",overflow:"hidden"}}>
               {/* Interactive 3D Render */}
-              <div data-printable style={{flex:"1 1 auto",overflow:"auto",background:"#fff",position:"relative"}} onClick={()=>{setRenderCtxMenu(null);setShowMoreMenu(false);}}>
+              <div data-printable style={{flex:"1 1 auto",overflow:"auto",background:"#fff",position:"relative",display:"flex",flexDirection:"column",justifyContent:"center",minHeight:0}} onClick={()=>{setRenderCtxMenu(null);setShowMoreMenu(false);}}>
                 {/* Print-only header — hidden on screen, visible when printing */}
                 <div data-printonly style={{display:"none",padding:"12px 16px 8px",borderBottom:"2px solid #333",marginBottom:8}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline"}}>
