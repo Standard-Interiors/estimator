@@ -271,6 +271,10 @@ function EditorApp({ roomId, projectId, projectName, rooms, onRoomChange, onRoom
   const [photoPreview, setPhotoPreview] = useState(null);
   const [dragTarget, setDragTarget] = useState(null); // "photo" | null
   const photoInputRef = useRef(null);
+  const cameraInputRef = useRef(null);
+  const videoRef = useRef(null);
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const [cameraStream, setCameraStream] = useState(null);
 
   const [selectedId, setSelectedId] = useState(null);
   const [selectedGapItem, setSelectedGapItem] = useState(null);
@@ -484,6 +488,51 @@ function EditorApp({ roomId, projectId, projectName, rooms, onRoomChange, onRoom
     }
   };
 
+  const openCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } }
+      });
+      setCameraStream(stream);
+      setCameraOpen(true);
+      // Attach stream to video element after render
+      setTimeout(() => { if (videoRef.current) videoRef.current.srcObject = stream; }, 50);
+    } catch (err) {
+      console.error("Camera access denied:", err);
+      if (err.name === "NotAllowedError") {
+        alert("Camera access blocked. Click the camera icon in your browser's address bar to allow access, then try again.");
+      } else if (err.name === "NotFoundError") {
+        alert("No camera found on this device. Use 'Choose File' instead.");
+      } else {
+        // Fallback to file picker with capture (works on mobile)
+        cameraInputRef.current?.click();
+      }
+    }
+  };
+
+  const capturePhoto = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext("2d").drawImage(video, 0, 0);
+    canvas.toBlob((blob) => {
+      if (!blob) return;
+      const file = new File([blob], `capture-${Date.now()}.jpg`, { type: "image/jpeg" });
+      handlePhotoUpload(file);
+      closeCamera();
+    }, "image/jpeg", 0.92);
+  };
+
+  const closeCamera = () => {
+    if (cameraStream) {
+      cameraStream.getTracks().forEach(t => t.stop());
+      setCameraStream(null);
+    }
+    setCameraOpen(false);
+  };
+
   const handleExtract = () => {
     if (photoFile) runExtraction(photoFile);
   };
@@ -689,7 +738,6 @@ function EditorApp({ roomId, projectId, projectName, rooms, onRoomChange, onRoom
             {/* Photo upload card */}
             <div style={{maxWidth:480,margin:"0 auto",marginBottom:16}}>
               <div
-                onClick={()=>!uploading && photoInputRef.current?.click()}
                 onDragOver={handleCardDragOver} onDragEnter={handleCardDragEnter("photo")} onDragLeave={handleCardDragLeave("photo")} onDrop={handleCardDrop("photo")}
                 style={{
                   minHeight:220,background:"#0c0c14",cursor:"pointer",
@@ -699,7 +747,26 @@ function EditorApp({ roomId, projectId, projectName, rooms, onRoomChange, onRoom
                   transition:"border-color 0.15s"
                 }}
               >
+                <input ref={cameraInputRef} type="file" accept="image/*,.heic,.heif" capture="environment" onChange={handlePhotoUpload} disabled={uploading} style={{display:"none"}} />
                 <input ref={photoInputRef} type="file" accept="image/*,.heic,.heif" onChange={handlePhotoUpload} disabled={uploading} style={{display:"none"}} />
+
+                {/* Live camera overlay */}
+                {cameraOpen && (
+                  <div style={{position:"fixed",inset:0,zIndex:9999,background:"#000",display:"flex",flexDirection:"column"}}>
+                    <video ref={videoRef} autoPlay playsInline muted style={{flex:1,objectFit:"cover",width:"100%"}} />
+                    <div style={{position:"absolute",bottom:0,left:0,right:0,padding:"24px",display:"flex",justifyContent:"center",alignItems:"center",gap:24,background:"linear-gradient(transparent, rgba(0,0,0,0.8))"}}>
+                      <button onClick={closeCamera}
+                        style={{width:48,height:48,borderRadius:"50%",border:"2px solid #fff",background:"rgba(255,255,255,0.15)",color:"#fff",fontSize:18,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/></svg>
+                      </button>
+                      <button onClick={capturePhoto}
+                        style={{width:72,height:72,borderRadius:"50%",border:"4px solid #fff",background:"#D94420",cursor:"pointer",boxShadow:"0 4px 20px rgba(217,68,32,0.5)"}}>
+                      </button>
+                      <div style={{width:48,height:48}} /> {/* spacer for centering */}
+                    </div>
+                  </div>
+                )}
+
                 {(photoPreview || photoFile) ? (
                   <>
                     {photoPreview && <img src={photoPreview} style={{maxWidth:"100%",maxHeight:180,borderRadius:8,border:"1px solid #2a2a3a",objectFit:"cover",boxShadow:"0 2px 8px rgba(0,0,0,0.3)"}} />}
@@ -714,9 +781,19 @@ function EditorApp({ roomId, projectId, projectName, rooms, onRoomChange, onRoom
                       <circle cx="8.5" cy="8.5" r="2" stroke={dragTarget==="photo"?"#D94420":"#666"} strokeWidth="1.5"/>
                       <path d="M3 16l5-5 4 4 3-3 6 6" stroke={dragTarget==="photo"?"#D94420":"#666"} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                     </svg>
-                    <div style={{fontSize:13,fontWeight:600,color:dragTarget==="photo"?"#D94420":"#bbb"}}>Drop photo here</div>
-                    <div style={{fontSize:11,color:"#555",marginTop:4}}>or click to browse</div>
-                    <div style={{fontSize:10,color:"#444",marginTop:10,fontFamily:"'JetBrains Mono',monospace"}}>Photo of cabinets in the space</div>
+                    <div style={{display:"flex",gap:12,marginTop:4}}>
+                      <button onClick={(e)=>{e.stopPropagation();openCamera();}} disabled={uploading}
+                        style={{padding:"10px 20px",borderRadius:8,border:"none",background:"#D94420",color:"#fff",fontWeight:600,fontSize:13,cursor:"pointer",display:"flex",alignItems:"center",gap:6}}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><circle cx="12" cy="13" r="4" stroke="currentColor" strokeWidth="2"/></svg>
+                        Take Photo
+                      </button>
+                      <button onClick={(e)=>{e.stopPropagation();photoInputRef.current?.click();}} disabled={uploading}
+                        style={{padding:"10px 20px",borderRadius:8,border:"1px solid #333",background:"transparent",color:"#bbb",fontWeight:600,fontSize:13,cursor:"pointer",display:"flex",alignItems:"center",gap:6}}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                        Choose File
+                      </button>
+                    </div>
+                    <div style={{fontSize:10,color:"#444",marginTop:10}}>or drag &amp; drop a photo</div>
                   </>
                 )}
               </div>
