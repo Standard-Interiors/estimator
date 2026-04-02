@@ -114,27 +114,3 @@ If the answer to those three questions is yes, the extraction is good. Everythin
 
 ---
 
-## CURRENT ITERATION BLOCK — Editor UX (15 iterations)
-
-**Goal:** Gemini gets the cabinet maker 80% there. The editor makes the last 20% effortless. If editing is painful, users stop using the tool and waste more time than pencil-and-paper.
-
-**North Star:** Upload photos → AI extracts → quick edits → done. 5X faster than manual.
-
-### Planned Iterations (remove this section when all 15 are done)
-
-1. **Undo boundary** — Never undo past the initial LOAD_SPEC. The extraction is the floor.
-2. **Consistent Enter behavior** — Enter in width/height/depth all blur without advancing.
-3. **Sequential cabinet IDs** — Duplicates get B4/W6 not B5134/W7823.
-4. **Delete confirmation** — "Delete B1?" dialog before removing a cabinet.
-5. **Backspace/Delete key** — Keyboard shortcut to delete selected cabinet (with confirmation).
-6. **Gap/appliance clickable from render** — Click a gap to edit its label and width.
-7. **Height/depth input styling** — Match the highlighted input box style of width field.
-8. **Type change auto-updates face** — Switching to "drawer bank" sets face to all drawers.
-9. **Standard width snapping** — Width input suggests nearest standard size (9,12,15,18,21,24,27,30,33,36,42,48).
-10. **Wall run total + filler indicator** — Show total wall measurement input and remaining filler.
-11. **+ Section face editing** — Clicking + Section shows a picker (door/drawer/false front).
-12. **Cabinet label editing** — Click the label text (e.g. "Base Cabinet") to rename it.
-13. **Dimension labels on render** — Show WxHxD below each cabinet label on the 2.5D render.
-14. **Zoom/pan on render** — Scroll to zoom, drag to pan the 2.5D view for large layouts.
-15. **Multi-select** — Shift+click to select multiple cabinets, batch-edit depth/height.
-
