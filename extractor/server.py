@@ -409,8 +409,10 @@ async def extract_for_room(rid: str):
 
     # Auto-save extracted spec to room
     spec_str = json.dumps(spec)
-    db.save_room_spec(rid, spec_str, room.get("spec_version", 0))
+    save_result = db.save_room_spec(rid, spec_str, room.get("spec_version", 0))
 
+    # Include the new version so frontend can sync
+    spec["_spec_version"] = save_result.get("version", 1) if save_result else 1
     return spec
 
 
