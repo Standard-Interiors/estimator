@@ -53,10 +53,10 @@ export const duplicateProject = (id) =>
 // ---------------------------------------------------------------------------
 // Rooms
 // ---------------------------------------------------------------------------
-export const createRoom = (projectId, name) =>
+export const createRoom = (projectId, name, roomName) =>
   _fetch(`/api/projects/${projectId}/rooms`, {
     method: "POST",
-    body: JSON.stringify({ name }),
+    body: JSON.stringify({ name, room_name: roomName || "" }),
   });
 
 export const getRoom = (id) => _fetch(`/api/rooms/${id}`);
