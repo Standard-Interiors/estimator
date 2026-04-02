@@ -534,7 +534,26 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
   };
 
   const handleExtract = () => {
-    if (photoFile) runExtraction(photoFile);
+    if (photoFile) {
+      runExtraction(photoFile);
+    } else if (roomId && photoPreview) {
+      // Photo already on server from previous session — use server-side extraction
+      runServerExtraction();
+    }
+  };
+
+  const runServerExtraction = async () => {
+    setUploading(true);
+    setUploadStatus("Extracting cabinets from saved photo...");
+    setExtractionError(null);
+    try {
+      const extracted = await api.extractForRoom(roomId);
+      setUploadStatus(`Extracted ${extracted.cabinets?.length || 0} cabinets`);
+      extracted.cabinets?.forEach(c => { if(!c.depth) c.depth = c.row==="wall"?12:24; if(!c.height) c.height = c.row==="wall"?30:34.5; if(!c.width) c.width=24; });
+      dispatch({ type: "LOAD_SPEC", spec: extracted });
+      setMode("loaded"); setTab("render");
+    } catch(err) { setExtractionError(err.message); setUploadStatus(""); }
+    finally { setUploading(false); }
   };
 
   const handleCardDrop = (which) => (e) => {
@@ -775,15 +794,15 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
                 <div style={{fontSize:13,fontWeight:600,color:"#D94420",animation:"pulse 1.5s infinite"}}>{uploadStatus}</div>
               </div>
             ) : (
-              <button onClick={handleExtract} disabled={!photoFile || uploading}
+              <button onClick={handleExtract} disabled={(!photoFile && !photoPreview) || uploading}
                 style={{
-                  width:"100%",padding:"14px 0",borderRadius:10,fontSize:14,fontWeight:700,cursor:photoFile?"pointer":"default",
+                  width:"100%",padding:"14px 0",borderRadius:10,fontSize:14,fontWeight:700,cursor:(photoFile||photoPreview)?"pointer":"default",
                   fontFamily:"inherit",border:"none",marginBottom:16,transition:"all 0.15s",letterSpacing:"-0.01em",
-                  background:photoFile?"#D94420":"#1a1a2a",
-                  color:photoFile?"#fff":"#444",
-                  opacity:photoFile?1:0.6
+                  background:(photoFile||photoPreview)?"#D94420":"#1a1a2a",
+                  color:(photoFile||photoPreview)?"#fff":"#444",
+                  opacity:(photoFile||photoPreview)?1:0.6
                 }}>
-                {photoFile ? "Extract Cabinets with AI" : "Upload a photo to continue"}
+                {(photoFile||photoPreview) ? "Extract Cabinets with AI" : "Upload a photo to continue"}
               </button>
             )}
 
