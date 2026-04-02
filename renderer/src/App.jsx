@@ -537,23 +537,9 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
     if (photoFile) {
       runExtraction(photoFile);
     } else if (roomId && photoPreview) {
-      // Photo already on server from previous session — use server-side extraction
-      runServerExtraction();
+      // Photo already on server — run server-side extraction directly
+      runExtraction(null);
     }
-  };
-
-  const runServerExtraction = async () => {
-    setUploading(true);
-    setUploadStatus("Extracting cabinets from saved photo...");
-    setExtractionError(null);
-    try {
-      const extracted = await api.extractForRoom(roomId);
-      setUploadStatus(`Extracted ${extracted.cabinets?.length || 0} cabinets`);
-      extracted.cabinets?.forEach(c => { if(!c.depth) c.depth = c.row==="wall"?12:24; if(!c.height) c.height = c.row==="wall"?30:34.5; if(!c.width) c.width=24; });
-      dispatch({ type: "LOAD_SPEC", spec: extracted });
-      setMode("loaded"); setTab("render");
-    } catch(err) { setExtractionError(err.message); setUploadStatus(""); }
-    finally { setUploading(false); }
   };
 
   const handleCardDrop = (which) => (e) => {
@@ -571,22 +557,33 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
   const handleCardDragLeave = (which) => (e) => { e.preventDefault(); e.stopPropagation(); if (dragTarget === which) setDragTarget(null); };
 
   const runExtraction = async (photo) => {
-    if (!photo) return;
+    if (!photo && !roomId) return;
     setUploading(true);
     setUploadStatus("Generating wireframe & extracting cabinets...");
     setJsonError(null);
     setExtractionError(null);
     try {
-      const formData = new FormData();
-      formData.append("photo", photo);
-      const apiBase = window.location.hostname === "localhost" ? "http://localhost:8001" : "";
-      const resp = await fetch(`${apiBase}/api/extract`, { method: "POST", body: formData });
-      if (!resp.ok) {
-        let detail = "";
-        try { const j = await resp.json(); detail = j.detail || JSON.stringify(j); } catch { detail = await resp.text(); }
-        throw new Error(detail || `Server error ${resp.status}`);
+      let extracted;
+      if (roomId) {
+        // Room-aware extraction: server saves spec + wireframe to DB
+        // If photo isn't uploaded yet, upload it first
+        if (photo && (!photoPreview || photoPreview.startsWith("blob:"))) {
+          await api.uploadImage(roomId, photo, "photo");
+        }
+        extracted = await api.extractForRoom(roomId);
+      } else {
+        // Legacy: no room context
+        const formData = new FormData();
+        formData.append("photo", photo);
+        const apiBase = window.location.hostname === "localhost" ? "http://localhost:8001" : "";
+        const resp = await fetch(`${apiBase}/api/extract`, { method: "POST", body: formData });
+        if (!resp.ok) {
+          let detail = "";
+          try { const j = await resp.json(); detail = j.detail || JSON.stringify(j); } catch { detail = await resp.text(); }
+          throw new Error(detail || `Server error ${resp.status}`);
+        }
+        extracted = await resp.json();
       }
-      const extracted = await resp.json();
       setUploadStatus(`Extracted ${extracted.cabinets?.length || 0} cabinets`);
       extracted.cabinets?.forEach(c => { if(!c.depth) c.depth = c.row==="wall"?12:24; if(!c.height) c.height = c.row==="wall"?30:34.5; if(!c.width) c.width=24; });
       dispatch({ type: "LOAD_SPEC", spec: extracted });
