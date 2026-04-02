@@ -8,6 +8,7 @@ import { imageUrl } from "../api";
 export default function ProjectCard({ project, onClick, onRename, onDuplicate, onDelete }) {
   const [hover, setHover] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [slideIndex, setSlideIndex] = useState(0);
   const [renaming, setRenaming] = useState(false);
   const [renameVal, setRenameVal] = useState(project.name);
   const menuRef = useRef(null);
@@ -53,6 +54,12 @@ export default function ProjectCard({ project, onClick, onRename, onDuplicate, o
 
   const sc = statusColors[project.status] || statusColors.draft;
   const thumbSrc = imageUrl(project.thumb_url);
+  const thumbUrls = (project.thumb_urls || []).map(u => imageUrl(u)).filter(Boolean);
+  const hasMultiple = thumbUrls.length > 1;
+
+  const prevSlide = (e) => { e.stopPropagation(); setSlideIndex(i => (i - 1 + thumbUrls.length) % thumbUrls.length); };
+  const nextSlide = (e) => { e.stopPropagation(); setSlideIndex(i => (i + 1) % thumbUrls.length); };
+  const goToSlide = (e, idx) => { e.stopPropagation(); setSlideIndex(idx); };
 
   const handleRename = () => {
     const val = renameVal.trim();
@@ -76,19 +83,79 @@ export default function ProjectCard({ project, onClick, onRename, onDuplicate, o
         position: "relative",
       }}
     >
-      {/* Thumbnail */}
+      {/* Thumbnail / Carousel */}
       <div style={{
         width: "100%",
-        paddingBottom: "62.5%", // 16:10 aspect ratio
+        paddingBottom: "62.5%",
         background: "#08080e",
         position: "relative",
         overflow: "hidden",
       }}>
-        {thumbSrc ? (
-          <img src={thumbSrc} style={{
-            position: "absolute", top: 0, left: 0, width: "100%", height: "100%",
-            objectFit: "cover",
-          }} />
+        {thumbUrls.length > 0 ? (
+          <>
+            {/* Sliding track */}
+            <div style={{
+              position: "absolute", top: 0, left: 0, width: `${thumbUrls.length * 100}%`, height: "100%",
+              display: "flex",
+              transform: `translateX(-${slideIndex * (100 / thumbUrls.length)}%)`,
+              transition: "transform 0.35s cubic-bezier(0.4, 0, 0.2, 1)",
+            }}>
+              {thumbUrls.map((src, i) => (
+                <img key={i} src={src} style={{
+                  width: `${100 / thumbUrls.length}%`, height: "100%",
+                  objectFit: "cover", flexShrink: 0,
+                }} />
+              ))}
+            </div>
+
+            {/* Left arrow */}
+            {hasMultiple && hover && (
+              <button onClick={prevSlide} style={{
+                position: "absolute", top: "50%", left: 6, transform: "translateY(-50%)",
+                width: 32, height: 32, borderRadius: "50%",
+                background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                cursor: "pointer", border: "none", padding: 0, zIndex: 3,
+              }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                  <polyline points="15,4 7,12 15,20" stroke="#ddd" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </button>
+            )}
+
+            {/* Right arrow */}
+            {hasMultiple && hover && (
+              <button onClick={nextSlide} style={{
+                position: "absolute", top: "50%", right: 6, transform: "translateY(-50%)",
+                width: 32, height: 32, borderRadius: "50%",
+                background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                cursor: "pointer", border: "none", padding: 0, zIndex: 3,
+              }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                  <polyline points="9,4 17,12 9,20" stroke="#ddd" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </button>
+            )}
+
+            {/* Dot indicators */}
+            {hasMultiple && (
+              <div onClick={(e) => e.stopPropagation()} style={{
+                position: "absolute", bottom: 8, left: "50%", transform: "translateX(-50%)",
+                display: "flex", gap: 6, padding: "4px 10px",
+                borderRadius: 10, background: "rgba(0,0,0,0.4)", backdropFilter: "blur(4px)",
+                zIndex: 2, cursor: "default",
+              }}>
+                {thumbUrls.map((_, i) => (
+                  <div key={i} onClick={(e) => goToSlide(e, i)} style={{
+                    width: 7, height: 7, borderRadius: "50%", cursor: "pointer",
+                    background: i === slideIndex ? "#eee" : "rgba(255,255,255,0.35)",
+                    transition: "background 0.2s",
+                  }} />
+                ))}
+              </div>
+            )}
+          </>
         ) : (
           <div style={{
             position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)",

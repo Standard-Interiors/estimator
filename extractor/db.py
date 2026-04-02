@@ -179,6 +179,7 @@ def get_project(pid: str) -> dict | None:
         p["total_cabinets"] = sum(r.get("cabinet_count") or 0 for r in p["rooms"])
         # Resolve per-room thumb_url and has_spec flag
         p["thumb_url"] = None
+        p["thumb_urls"] = []
         for r in p["rooms"]:
             r["thumb_url"] = None
             r["has_spec"] = bool(r.get("spec_json"))
@@ -188,6 +189,7 @@ def get_project(pid: str) -> dict | None:
                 ).mappings().first()
                 if img and img.get("thumb_path"):
                     r["thumb_url"] = f"/images/{img['thumb_path']}"
+                    p["thumb_urls"].append(r["thumb_url"])
                     if not p["thumb_url"]:
                         p["thumb_url"] = r["thumb_url"]
         return p
@@ -208,16 +210,19 @@ def list_projects(include_deleted: bool = False) -> list[dict]:
             ).mappings().all()
             p["room_count"] = len(room_rows)
             p["total_cabinets"] = sum(r.get("cabinet_count") or 0 for r in room_rows)
-            # Thumbnail
+            # Thumbnails
             p["thumb_url"] = None
+            p["thumb_urls"] = []
             for r in room_rows:
                 if r.get("photo_id"):
                     img = conn.execute(
                         images.select().where(images.c.id == r["photo_id"])
                     ).mappings().first()
                     if img and img.get("thumb_path"):
-                        p["thumb_url"] = f"/images/{img['thumb_path']}"
-                        break
+                        url = f"/images/{img['thumb_path']}"
+                        p["thumb_urls"].append(url)
+                        if not p["thumb_url"]:
+                            p["thumb_url"] = url
             result.append(p)
         return result
 
