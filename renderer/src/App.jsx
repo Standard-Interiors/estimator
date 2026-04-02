@@ -2,7 +2,6 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { Routes, Route, useParams, useNavigate } from "react-router-dom";
 import useSpecState from "./state/useSpecState";
 import InteractiveRender from "./editor/InteractiveRender";
-import GridEditor from "./editor/GridEditor";
 import CabinetEditBar from "./editor/CabinetEditBar";
 import { defaultCabinet, generateId } from "./state/specHelpers";
 import ProjectList from "./pages/ProjectList";
@@ -257,7 +256,6 @@ const EMPTY_SPEC = { base_layout: [], wall_layout: [], alignment: [], cabinets: 
 function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack }) {
   const { spec, dispatch, undo, redo, canUndo, canRedo } = useSpecState(EMPTY_SPEC);
   const [tab, setTab] = useState("render");
-  const [showPlanPanel, setShowPlanPanel] = useState(false);
   const [showPhotoSidebar, setShowPhotoSidebar] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [jsonInput, setJsonInput] = useState("");
@@ -649,7 +647,7 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
         </div>
         {hasSpec && (
           <div style={{display:"flex",gap:3,alignItems:"center"}}>
-            {[["render","Render"],["plan","Plan"]].map(([key,label])=>(
+            {[["render","Render"]].map(([key,label])=>(
               <button key={key} onClick={()=>{setTab(key);setShowMoreMenu(false);}} style={{
                 background:tab===key?"#1a1a2a":"transparent",color:tab===key?"#fff":"#555",
                 border:`1px solid ${tab===key?"#2a2a3a":"transparent"}`,
@@ -667,8 +665,8 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
             {/* More menu */}
             <div style={{position:"relative"}}>
               <button onClick={()=>setShowMoreMenu(!showMoreMenu)} style={{
-                background:showMoreMenu||(tab!=="render"&&tab!=="plan")?"#1a1a2a":"transparent",
-                color:showMoreMenu||(tab!=="render"&&tab!=="plan")?"#fff":"#555",
+                background:showMoreMenu||tab!=="render"?"#1a1a2a":"transparent",
+                color:showMoreMenu||tab!=="render"?"#fff":"#555",
                 border:`1px solid ${showMoreMenu?"#2a2a3a":"transparent"}`,
                 padding:"4px 8px",borderRadius:5,fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:"inherit",letterSpacing:1,
               }}>···</button>
@@ -1039,122 +1037,6 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
                     dispatch({type:"ADD_CABINET",row:"wall",position:(spec.wall_layout||[]).length,cabinet:cab});setSelectedId(id);
                   }} style={{height:32,padding:"0 10px",borderRadius:6,background:"#1a1a2a",border:"1px solid #2a2a3a",color:"#1a6fbf",fontWeight:600,fontSize:11,cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>+ Wall</button>
                   <button onClick={reset} style={{height:32,padding:"0 10px",borderRadius:6,background:"transparent",border:"1px solid #2a2a3a",color:"#555",fontWeight:600,fontSize:11,cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>Start Over</button>
-                </div>
-              )}
-            </div>
-          );
-        })()}
-
-        {hasSpec && tab === "plan" && (() => {
-          const cabMap = {};
-          (spec.cabinets || []).forEach(c => { cabMap[c.id] = c; });
-          const sel = selectedId ? cabMap[selectedId] : null;
-          const selColor = sel?.row === "wall" ? "#1a6fbf" : "#D94420";
-          const baseRun = (spec.base_layout||[]).reduce((s,i)=>s+(i.ref?cabMap[i.ref]?.width||0:i.width||0),0);
-          const wallRun = (spec.wall_layout||[]).reduce((s,i)=>s+(i.ref?cabMap[i.ref]?.width||0:i.width||0),0);
-
-          return (
-            <div style={{display:"flex",flexDirection:"column",height:"calc(100vh - 50px)",margin:"-14px -20px 0",padding:0}}>
-              {/* Toolbar — compact */}
-              <div style={{display:"flex",alignItems:"center",gap:6,padding:"5px 10px",background:"#06060c",borderBottom:"1px solid #1a1a2a",flexShrink:0,fontSize:11,fontFamily:"'JetBrains Mono',monospace"}}>
-                <button onClick={undo} disabled={!canUndo} style={{background:canUndo?"#1a1a2a":"transparent",border:"1px solid #2a2a3a",color:canUndo?"#e0e0e0":"#333",padding:"4px 10px",borderRadius:4,fontSize:11,cursor:canUndo?"pointer":"default",fontWeight:600}}>Undo</button>
-                <button onClick={redo} disabled={!canRedo} style={{background:canRedo?"#1a1a2a":"transparent",border:"1px solid #2a2a3a",color:canRedo?"#e0e0e0":"#333",padding:"4px 10px",borderRadius:4,fontSize:11,cursor:canRedo?"pointer":"default",fontWeight:600}}>Redo</button>
-                <span style={{flex:1}}/>
-                {/* #3: Cabinet count */}
-                <span style={{color:"#555",fontWeight:600}}>{cabCount} cabs</span>
-                <span style={{color:"#333"}}>|</span>
-                <span style={{color:"#D94420",fontWeight:600}}>B:{baseRun}"</span>
-                <span style={{color:"#333"}}>|</span>
-                <span style={{color:"#1a6fbf",fontWeight:600}}>W:{wallRun}"</span>
-              </div>
-
-              {/* Grid — the editor. Click to select. Drag to reorder. Edge-drag to resize. */}
-              <div style={{flex:"1 1 auto",overflow:"auto"}}>
-                <GridEditor
-                  spec={spec}
-                  selectedId={selectedId}
-                  onSelect={handleSelect}
-                  dispatch={dispatch}
-                  widthInputRef={widthInputRef}
-                  onGapSelect={handleGapSelect}
-                  selectedGapItem={selectedGapItem}
-                  undo={undo}
-                  redo={redo}
-                />
-              </div>
-
-              {/* Bottom bar — gap selected */}
-              {selectedGapItem && !sel && (
-                <div key={`gap-${selectedGapItem.rowName}-${selectedGapItem.idx}`} style={{flexShrink:0,background:"#0c0c14",borderTop:"1px solid #1a1a2a",padding:"8px 10px",display:"flex",alignItems:"center",gap:8}}>
-                  <input
-                    type="text"
-                    defaultValue={selectedGapItem.entry?.label||"Opening"}
-                    onFocus={e=>e.target.select()}
-                    onBlur={e=>{const v=e.target.value.trim();if(v)dispatch({type:"UPDATE_GAP",row:selectedGapItem.rowName,position:selectedGapItem.idx,updates:{label:v}});}}
-                    onKeyDown={e=>{if(e.key==="Enter"){e.target.blur();}if(e.key==="Escape")setSelectedGapItem(null);}}
-                    style={{width:100,height:36,background:"#14141e",border:"1px solid #2a2a3a",borderRadius:6,color:"#888",fontSize:13,textAlign:"center",fontFamily:"'JetBrains Mono',monospace",fontWeight:700}}
-                  />
-                  <input
-                    type="number"
-                    defaultValue={selectedGapItem.w||0}
-                    onFocus={e=>e.target.select()}
-                    onKeyDown={e=>{
-                      if(e.key==="Enter"){const v=parseFloat(e.target.value);if(!isNaN(v)&&v>0){dispatch({type:"UPDATE_GAP",row:selectedGapItem.rowName,position:selectedGapItem.idx,updates:{width:v}});e.target.blur();}}
-                      if(e.key==="Escape")setSelectedGapItem(null);
-                    }}
-                    onBlur={e=>{const v=parseFloat(e.target.value);if(!isNaN(v)&&v>0)dispatch({type:"UPDATE_GAP",row:selectedGapItem.rowName,position:selectedGapItem.idx,updates:{width:v}});}}
-                    style={{width:64,height:36,background:"#14141e",border:"2px solid #555",borderRadius:6,color:"#fff",fontSize:16,textAlign:"center",fontFamily:"'JetBrains Mono',monospace",fontWeight:700}}
-                  />
-                  <span style={{color:"#555",fontSize:14,fontFamily:"'JetBrains Mono',monospace"}}>w</span>
-                  <span style={{flex:1}}/>
-                  <button onClick={()=>{dispatch({type:"DELETE_GAP",row:selectedGapItem.rowName,position:selectedGapItem.idx});setSelectedGapItem(null);}} style={{height:32,padding:"0 10px",borderRadius:6,background:"#1a1a2a",border:"1px solid #2a2a3a",color:"#e04040",fontWeight:600,fontSize:11,cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>Del</button>
-                  <button onClick={()=>setSelectedGapItem(null)} style={{height:32,padding:"0 10px",borderRadius:6,background:"#1a1a2a",border:"1px solid #2a2a3a",color:"#666",fontWeight:600,fontSize:11,cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>Close</button>
-                </div>
-              )}
-
-              {/* Bottom bar — cabinet selected */}
-              {sel && !selectedGapItem && (
-                <CabinetEditBar
-                  cab={sel}
-                  spec={spec}
-                  dispatch={dispatch}
-                  selColor={selColor}
-                  widthInputRef={widthInputRef}
-                  onSelectNext={() => {
-                    const allRefs=[...(spec.base_layout||[]),...(spec.wall_layout||[])].filter(i=>i.ref);
-                    const idx=allRefs.findIndex(i=>i.ref===sel.id);
-                    if(idx!==-1&&idx<allRefs.length-1){setSelectedId(allRefs[idx+1].ref);setTimeout(()=>{if(widthInputRef.current){widthInputRef.current.focus();widthInputRef.current.select();}},50);}
-                  }}
-                  onSelectId={setSelectedId}
-                  onDelete={() => setPendingDelete(sel.id)}
-                  onAddGap={() => {
-                    const layout=spec[sel.row==="base"?"base_layout":"wall_layout"]||[];
-                    const pos=layout.findIndex(i=>i.ref===sel.id);
-                    dispatch({type:"ADD_GAP",row:sel.row,position:Math.max(pos,0),gap:{type:"filler",label:"Filler",width:3}});
-                  }}
-                  onAddCab={() => {
-                    const id=generateId(sel.row,spec),cab=defaultCabinet(sel.row);cab.id=id;
-                    const layout=spec[sel.row==="base"?"base_layout":"wall_layout"]||[];
-                    const pos=layout.findIndex(i=>i.ref===sel.id);
-                    dispatch({type:"ADD_CABINET",row:sel.row,position:pos+1,cabinet:cab});setSelectedId(id);
-                  }}
-                />
-              )}
-
-              {/* Bottom bar — nothing selected */}
-              {!sel && !selectedGapItem && (
-                <div style={{flexShrink:0,background:"#0c0c14",borderTop:"1px solid #1a1a2a",padding:"8px 10px",display:"flex",alignItems:"center",gap:8}}>
-                  <span style={{color:"#444",fontSize:12,fontFamily:"'DM Sans',sans-serif"}}>Click to edit. Drag to reorder.</span>
-                  <span style={{color:"#333",fontSize:9,fontFamily:"'JetBrains Mono',monospace"}}>Esc deselect</span>
-                  <span style={{flex:1}}/>
-                  <button onClick={()=>{
-                    const id=generateId("base",spec),cab=defaultCabinet("base");cab.id=id;
-                    dispatch({type:"ADD_CABINET",row:"base",position:(spec.base_layout||[]).length,cabinet:cab});setSelectedId(id);
-                  }} style={{height:32,padding:"0 10px",borderRadius:6,background:"#1a1a2a",border:"1px solid #2a2a3a",color:"#D94420",fontWeight:600,fontSize:11,cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>+ Base</button>
-                  <button onClick={()=>{
-                    const id=generateId("wall",spec),cab=defaultCabinet("wall");cab.id=id;
-                    dispatch({type:"ADD_CABINET",row:"wall",position:(spec.wall_layout||[]).length,cabinet:cab});setSelectedId(id);
-                  }} style={{height:32,padding:"0 10px",borderRadius:6,background:"#1a1a2a",border:"1px solid #2a2a3a",color:"#1a6fbf",fontWeight:600,fontSize:11,cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>+ Wall</button>
                 </div>
               )}
             </div>
