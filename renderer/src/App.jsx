@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Routes, Route, useParams, useNavigate, useSearchParams } from "react-router-dom";
+import { Routes, Route, useParams, useNavigate } from "react-router-dom";
 import useSpecState from "./state/useSpecState";
 import InteractiveRender from "./editor/InteractiveRender";
 import GridEditor from "./editor/GridEditor";
 import CabinetEditBar from "./editor/CabinetEditBar";
 import { defaultCabinet, generateId } from "./state/specHelpers";
 import ProjectList from "./pages/ProjectList";
+import ProjectDetail from "./pages/ProjectDetail";
 import JsonEditor from "./components/JsonEditor";
 import * as api from "./api";
 
@@ -253,13 +254,12 @@ function Render({ spec }) {
 // ═══════════════════════════════════════════════════════════
 const EMPTY_SPEC = { base_layout: [], wall_layout: [], alignment: [], cabinets: [] };
 
-function EditorApp({ roomId, projectId, projectName, rooms, onRoomChange, onRoomDelete, onBack }) {
+function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack }) {
   const { spec, dispatch, undo, redo, canUndo, canRedo } = useSpecState(EMPTY_SPEC);
   const [tab, setTab] = useState("render");
   const [showPlanPanel, setShowPlanPanel] = useState(false);
   const [showPhotoSidebar, setShowPhotoSidebar] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
-  const [pendingRoomDelete, setPendingRoomDelete] = useState(null); // { id, index }
   const [jsonInput, setJsonInput] = useState("");
   const [jsonError, setJsonError] = useState(null);
   const [mode, setMode] = useState("home"); // home | loaded
@@ -620,47 +620,17 @@ function EditorApp({ roomId, projectId, projectName, rooms, onRoomChange, onRoom
       `}</style>
 
       <div data-noprint style={{padding:"16px 20px 12px",borderBottom:"1px solid #1a1a2a",display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
-        {onBack ? (
-          <div style={{display:"flex",alignItems:"center",gap:10}}>
-            <span onClick={onBack} style={{color:"#666",fontSize:12,cursor:"pointer"}}
-              onMouseEnter={e=>e.target.style.color="#ddd"} onMouseLeave={e=>e.target.style.color="#666"}>← Projects</span>
-            <span style={{width:1,height:16,background:"#1a1a2a"}}/>
-            <h1 style={{fontSize:16,fontWeight:700,margin:0,letterSpacing:"-0.02em",color:"#eee"}}>{projectName || "Project"}</h1>
-            {saveState === "saving" && <span style={{fontSize:10,color:"#888",fontFamily:"'JetBrains Mono',monospace"}}>Saving...</span>}
-            {saveState === "saved" && <span style={{fontSize:10,color:"#22c55e",opacity:0.6,fontFamily:"'JetBrains Mono',monospace"}}>✓ Saved</span>}
-            {saveState === "error" && <span style={{fontSize:10,color:"#e04040",fontFamily:"'JetBrains Mono',monospace"}}>Save failed</span>}
-            {rooms?.length > 0 && rooms.map((r, i) => (
-              <div key={r.id} style={{position:"relative",display:"inline-flex",alignItems:"center"}}>
-                <button onClick={() => onRoomChange?.(r.id)}
-                  style={{
-                    padding:"2px 8px",borderRadius:rooms.length>1?"3px 0 0 3px":"3px",fontSize:10,fontWeight:600,cursor:"pointer",
-                    background:r.id===roomId?"#2a2a3a":"transparent",
-                    border:`1px solid ${r.id===roomId?"#3a3a4a":"#222"}`,
-                    borderRight:rooms.length>1?"none":undefined,
-                    color:r.id===roomId?"#eee":"#555",fontFamily:"'JetBrains Mono',monospace"
-                  }}
-                >R{i+1}</button>
-                {rooms.length > 1 && (
-                  <button
-                    onClick={(e)=>{e.stopPropagation();setPendingRoomDelete({id:r.id,index:i+1});}}
-                    style={{
-                      padding:"2px 4px",borderRadius:"0 3px 3px 0",fontSize:9,cursor:"pointer",
-                      background:r.id===roomId?"#2a2a3a":"transparent",
-                      border:`1px solid ${r.id===roomId?"#3a3a4a":"#222"}`,
-                      color:"#444",fontFamily:"'JetBrains Mono',monospace",
-                      lineHeight:1,display:"flex",alignItems:"center",
-                    }}
-                    onMouseEnter={e=>e.target.style.color="#e04040"}
-                    onMouseLeave={e=>e.target.style.color="#444"}
-                    title={`Delete Room ${i+1}`}
-                  >×</button>
-                )}
-              </div>
-            ))}
-          </div>
-        ) : (
-          <h1 style={{fontSize:16,fontWeight:700,margin:0,letterSpacing:"-0.02em",color:"#eee"}}>Cabinet Spec Tool</h1>
-        )}
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          <span onClick={onBack} style={{color:"#666",fontSize:12,cursor:"pointer"}}
+            onMouseEnter={e=>e.target.style.color="#ddd"} onMouseLeave={e=>e.target.style.color="#666"}>← {projectName || "Project"}</span>
+          <span style={{width:1,height:16,background:"#1a1a2a"}}/>
+          {roomName && <span style={{fontSize:13,color:"#888",fontWeight:500}}>{roomName}</span>}
+          {roomName && <span style={{color:"#333",fontSize:11}}>›</span>}
+          <h1 style={{fontSize:16,fontWeight:700,margin:0,letterSpacing:"-0.02em",color:"#eee"}}>{wallName || "Wall"}</h1>
+          {saveState === "saving" && <span style={{fontSize:10,color:"#888",fontFamily:"'JetBrains Mono',monospace"}}>Saving...</span>}
+          {saveState === "saved" && <span style={{fontSize:10,color:"#22c55e",opacity:0.6,fontFamily:"'JetBrains Mono',monospace"}}>✓ Saved</span>}
+          {saveState === "error" && <span style={{fontSize:10,color:"#e04040",fontFamily:"'JetBrains Mono',monospace"}}>Save failed</span>}
+        </div>
         {hasSpec && (
           <div style={{display:"flex",gap:3,alignItems:"center"}}>
             {[["render","Render"],["plan","Plan"]].map(([key,label])=>(
@@ -1215,99 +1185,93 @@ function EditorApp({ roomId, projectId, projectName, rooms, onRoomChange, onRoom
         </div>
       )}
 
-      {/* Room Delete Modal */}
-      {pendingRoomDelete && (
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999}}
-          onClick={(e) => { if(e.target === e.currentTarget) setPendingRoomDelete(null); }}>
-          <div style={{background:"#1a1a2a",border:"1px solid #333",borderRadius:12,padding:"28px 32px",maxWidth:360,width:"90%",textAlign:"center"}}>
-            <div style={{fontSize:15,fontWeight:700,color:"#eee",marginBottom:8}}>Delete Room {pendingRoomDelete.index}?</div>
-            <div style={{fontSize:13,color:"#888",marginBottom:20}}>All cabinets and images in this room will be permanently removed.</div>
-            <div style={{display:"flex",gap:10,justifyContent:"center"}}>
-              <button onClick={() => setPendingRoomDelete(null)}
-                style={{padding:"10px 24px",borderRadius:8,fontSize:13,fontWeight:600,cursor:"pointer",
-                  background:"transparent",color:"#888",border:"1px solid #333",fontFamily:"inherit"}}>
-                Cancel
-              </button>
-              <button onClick={() => { onRoomDelete?.(pendingRoomDelete.id); setPendingRoomDelete(null); }}
-                style={{padding:"10px 24px",borderRadius:8,fontSize:13,fontWeight:600,cursor:"pointer",
-                  background:"#e04040",color:"#fff",border:"none",fontFamily:"inherit"}}>
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
 
 
 // ═══════════════════════════════════════════════════════════
-// PROJECT EDITOR WRAPPER — loads project context, passes to EditorApp
+// ROOM EDITOR WRAPPER — loads project + room context, passes to EditorApp
 // ═══════════════════════════════════════════════════════════
-function ProjectEditorWrapper() {
-  const { projectId } = useParams();
+function RoomEditorWrapper() {
+  const { projectId, roomId } = useParams();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
   const [project, setProject] = useState(null);
-  const [activeRoomId, setActiveRoomId] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
         const p = await api.getProject(projectId);
-        if (cancelled) return;
-        setProject(p);
-        const roomParam = searchParams.get("room");
-        if (roomParam && p.rooms?.some(r => r.id === roomParam)) {
-          setActiveRoomId(roomParam);
-        } else if (p.rooms?.length > 0) {
-          // Prefer the first room that has a spec or images, fallback to first room
-          const bestRoom = p.rooms.find(r => r.spec_json || r.photo_id || r.wireframe_id) || p.rooms[0];
-          setActiveRoomId(bestRoom.id);
-        } else {
-          // Auto-create first room
-          const r = await api.createRoom(projectId);
-          if (cancelled) return;
-          setProject(prev => ({ ...prev, rooms: [r] }));
-          setActiveRoomId(r.id);
-        }
+        if (!cancelled) setProject(p);
       } catch (e) { console.error("Failed to load project:", e); }
     })();
     return () => { cancelled = true; };
   }, [projectId]);
 
-  if (!project || !activeRoomId) {
+  if (!project) {
     return <div style={{minHeight:"100vh",background:"#06060c",color:"#555",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13}}>Loading...</div>;
   }
 
-  const handleRoomDelete = async (roomId) => {
-    try {
-      await api.deleteRoom(roomId);
-      const remaining = project.rooms.filter(r => r.id !== roomId);
-      setProject(prev => ({ ...prev, rooms: remaining }));
-      if (activeRoomId === roomId && remaining.length > 0) {
-        const best = remaining.find(r => r.spec_json || r.photo_id || r.wireframe_id) || remaining[0];
-        setActiveRoomId(best.id);
-      }
-    } catch (e) { console.error("Failed to delete room:", e); }
-  };
+  const wall = project.rooms?.find(r => r.id === roomId);
+  const roomName = wall?.room_name || "";
+  const wallName = wall?.name || "Wall";
 
   return (
     <EditorApp
-      key={activeRoomId}
-      roomId={activeRoomId}
+      key={roomId}
+      roomId={roomId}
       projectId={projectId}
       projectName={project.name}
-      rooms={project.rooms}
-      onRoomChange={setActiveRoomId}
-      onRoomDelete={handleRoomDelete}
-      onBack={() => navigate("/")}
+      roomName={roomName}
+      wallName={wallName}
+      onBack={() => navigate(`/project/${projectId}`)}
     />
   );
 }
 
+
+// ═══════════════════════════════════════════════════════════
+// APP SHELL — shared dark theme wrapper with header
+// ═══════════════════════════════════════════════════════════
+function AppShell({ children }) {
+  return (
+    <div style={{minHeight:"100vh",background:"#07070f",color:"#ddd",fontFamily:"'DM Sans',-apple-system,sans-serif"}}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+        *{box-sizing:border-box}
+        ::-webkit-scrollbar{width:5px}
+        ::-webkit-scrollbar-track{background:transparent}
+        ::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.08);border-radius:3px}
+      `}</style>
+      <div style={{
+        padding:"0",
+        borderBottom:"1px solid rgba(255,255,255,0.06)",
+        background:"linear-gradient(180deg, #0d0d1a 0%, #07070f 100%)",
+      }}>
+        <div style={{maxWidth:1200,margin:"0 auto",padding:"18px 32px",display:"flex",alignItems:"center",gap:14}}>
+          <div style={{
+            width:36,height:36,borderRadius:10,
+            background:"linear-gradient(135deg, #ef5a30 0%, #D94420 100%)",
+            display:"flex",alignItems:"center",justifyContent:"center",
+            boxShadow:"0 4px 16px rgba(217,68,32,0.35), 0 0 0 1px rgba(217,68,32,0.2)",
+          }}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <rect x="2" y="4" width="20" height="16" rx="2" stroke="#fff" strokeWidth="1.8"/>
+              <line x1="2" y1="12" x2="22" y2="12" stroke="#fff" strokeWidth="1.2"/>
+              <line x1="9" y1="12" x2="9" y2="20" stroke="#fff" strokeWidth="1.2"/>
+              <line x1="15" y1="12" x2="15" y2="20" stroke="#fff" strokeWidth="1.2"/>
+            </svg>
+          </div>
+          <h1 style={{fontSize:20,fontWeight:700,margin:0,letterSpacing:"-0.03em",color:"#fff"}}>
+            Cabinet Spec Tool
+          </h1>
+        </div>
+      </div>
+      <div style={{padding:"0 0 40px"}}>{children}</div>
+    </div>
+  );
+}
 
 // ═══════════════════════════════════════════════════════════
 // APP — routing shell
@@ -1315,43 +1279,9 @@ function ProjectEditorWrapper() {
 export default function App() {
   return (
     <Routes>
-      <Route path="/" element={
-        <div style={{minHeight:"100vh",background:"#07070f",color:"#ddd",fontFamily:"'DM Sans',-apple-system,sans-serif"}}>
-          <style>{`
-            @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
-            *{box-sizing:border-box}
-            ::-webkit-scrollbar{width:5px}
-            ::-webkit-scrollbar-track{background:transparent}
-            ::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.08);border-radius:3px}
-          `}</style>
-          <div style={{
-            padding:"0",
-            borderBottom:"1px solid rgba(255,255,255,0.06)",
-            background:"linear-gradient(180deg, #0d0d1a 0%, #07070f 100%)",
-          }}>
-            <div style={{maxWidth:1200,margin:"0 auto",padding:"18px 32px",display:"flex",alignItems:"center",gap:14}}>
-              <div style={{
-                width:36,height:36,borderRadius:10,
-                background:"linear-gradient(135deg, #ef5a30 0%, #D94420 100%)",
-                display:"flex",alignItems:"center",justifyContent:"center",
-                boxShadow:"0 4px 16px rgba(217,68,32,0.35), 0 0 0 1px rgba(217,68,32,0.2)",
-              }}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                  <rect x="2" y="4" width="20" height="16" rx="2" stroke="#fff" strokeWidth="1.8"/>
-                  <line x1="2" y1="12" x2="22" y2="12" stroke="#fff" strokeWidth="1.2"/>
-                  <line x1="9" y1="12" x2="9" y2="20" stroke="#fff" strokeWidth="1.2"/>
-                  <line x1="15" y1="12" x2="15" y2="20" stroke="#fff" strokeWidth="1.2"/>
-                </svg>
-              </div>
-              <h1 style={{fontSize:20,fontWeight:700,margin:0,letterSpacing:"-0.03em",color:"#fff"}}>
-                Cabinet Spec Tool
-              </h1>
-            </div>
-          </div>
-          <div style={{padding:"0 0 40px"}}><ProjectList /></div>
-        </div>
-      } />
-      <Route path="/project/:projectId" element={<ProjectEditorWrapper />} />
+      <Route path="/" element={<AppShell><ProjectList /></AppShell>} />
+      <Route path="/project/:projectId" element={<AppShell><ProjectDetail /></AppShell>} />
+      <Route path="/project/:projectId/room/:roomId" element={<RoomEditorWrapper />} />
     </Routes>
   );
 }

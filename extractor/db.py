@@ -58,7 +58,8 @@ rooms = Table(
     "rooms", metadata,
     Column("id", Text, primary_key=True, default=_gen_id),
     Column("project_id", Text, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False),
-    Column("name", Text, nullable=False, default="Room 1"),
+    Column("room_name", Text, nullable=False, default=""),  # grouping: "Kitchen", "Master Bath"
+    Column("name", Text, nullable=False, default="Wall 1"),  # wall name within room
     Column("sort_order", Integer, nullable=False, default=0),
     Column("spec_json", Text),
     Column("spec_version", Integer, nullable=False, default=0),
@@ -136,6 +137,13 @@ def _set_sqlite_pragmas(dbapi_conn, connection_record):
 def init_db():
     """Create all tables if they don't exist."""
     metadata.create_all(engine)
+    # Migrate: add room_name column if missing (existing DBs)
+    with engine.connect() as conn:
+        try:
+            conn.execute(text("SELECT room_name FROM rooms LIMIT 1"))
+        except Exception:
+            conn.execute(text("ALTER TABLE rooms ADD COLUMN room_name TEXT NOT NULL DEFAULT ''"))
+            conn.commit()
 
 
 # ---------------------------------------------------------------------------
@@ -169,16 +177,19 @@ def get_project(pid: str) -> dict | None:
         # Compute aggregates
         p["room_count"] = len(p["rooms"])
         p["total_cabinets"] = sum(r.get("cabinet_count") or 0 for r in p["rooms"])
-        # Get thumbnail from first room's photo
+        # Resolve per-room thumb_url and has_spec flag
         p["thumb_url"] = None
         for r in p["rooms"]:
+            r["thumb_url"] = None
+            r["has_spec"] = bool(r.get("spec_json"))
             if r.get("photo_id"):
                 img = conn.execute(
                     images.select().where(images.c.id == r["photo_id"])
                 ).mappings().first()
                 if img and img.get("thumb_path"):
-                    p["thumb_url"] = f"/images/{img['thumb_path']}"
-                    break
+                    r["thumb_url"] = f"/images/{img['thumb_path']}"
+                    if not p["thumb_url"]:
+                        p["thumb_url"] = r["thumb_url"]
         return p
 
 
@@ -243,20 +254,20 @@ def duplicate_project(pid: str) -> dict | None:
 # ---------------------------------------------------------------------------
 # CRUD helpers — Rooms
 # ---------------------------------------------------------------------------
-def create_room(project_id: str, name: str = None, sort_order: int = 0) -> dict:
+def create_room(project_id: str, name: str = None, room_name: str = "", sort_order: int = 0) -> dict:
     rid = _gen_id()
     now = _now()
     if not name:
-        # Auto-name: "Room N" based on existing count
+        # Auto-name: "Wall N" based on existing walls in this room group
         with engine.connect() as conn:
             count = conn.execute(
-                text("SELECT COUNT(*) FROM rooms WHERE project_id = :pid"),
-                {"pid": project_id}
+                text("SELECT COUNT(*) FROM rooms WHERE project_id = :pid AND room_name = :rn"),
+                {"pid": project_id, "rn": room_name}
             ).scalar()
-        name = f"Room {count + 1}"
+        name = f"Wall {count + 1}"
     with engine.begin() as conn:
         conn.execute(rooms.insert().values(
-            id=rid, project_id=project_id, name=name, sort_order=sort_order,
+            id=rid, project_id=project_id, room_name=room_name, name=name, sort_order=sort_order,
             spec_version=0, cabinet_count=0, created_at=now, updated_at=now
         ))
         # Touch project updated_at

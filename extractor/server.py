@@ -146,6 +146,7 @@ async def create_room(pid: str, body: dict = None):
     return db.create_room(
         project_id=pid,
         name=body.get("name"),
+        room_name=body.get("room_name", ""),
         sort_order=body.get("sort_order", len(p.get("rooms", [])))
     )
 
