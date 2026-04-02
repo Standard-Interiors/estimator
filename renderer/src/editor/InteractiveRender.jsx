@@ -78,13 +78,12 @@ export default function InteractiveRender({ spec, selectedId, onSelect, onDouble
 
   const maxWH = Math.max(...wallItems.filter(w => w.cab).map(w => (w.cab.height || 30)), 30) * SC;
   const WTOP = WBOT - maxWH;
-  const allDepths = (spec.cabinets || []).map(c => c.depth || (c.row === "wall" ? 12 : 24));
-  const maxDepth = allDepths.length > 0 ? Math.max(...allDepths) : 24;
-  const ddMax = dp(maxDepth);
+  // Cap visual depth at 30" for viewBox sizing — prevents extreme depths from blowing up the layout
+  const ddMax = dp(Math.min(30, Math.max(...(spec.cabinets||[]).map(c=>c.depth||(c.row==="wall"?12:24)), 24)));
   const svgW = Math.max(bx, wx) + PAD + ddMax.x + 20;
 
-  // Tight viewBox: crop unused vertical whitespace, accounting for depth projection
-  const contentTop = (wallItems.some(w => w.cab) ? WTOP - 28 : CTTOP - 12) - ddMax.y;
+  // Tight viewBox: crop unused vertical whitespace
+  const contentTop = wallItems.some(w => w.cab) ? WTOP - 28 : CTTOP - 12;
   const contentBottom = FLOOR + 42;
   const svgH = contentBottom - contentTop;
 
