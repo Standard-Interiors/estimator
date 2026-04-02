@@ -97,6 +97,7 @@ extractions = Table(
     Column("token_input_count", Integer),
     Column("token_output_count", Integer),
     Column("error_message", Text),
+    Column("step", Text),  # pipeline step: count, wireframe, extract, solve, validate
     Column("created_at", Text, nullable=False, default=_now),
 )
 
@@ -143,6 +144,13 @@ def init_db():
             conn.execute(text("SELECT room_name FROM rooms LIMIT 1"))
         except Exception:
             conn.execute(text("ALTER TABLE rooms ADD COLUMN room_name TEXT NOT NULL DEFAULT ''"))
+            conn.commit()
+    # Migrate: add step column to extractions if missing
+    with engine.connect() as conn:
+        try:
+            conn.execute(text("SELECT step FROM extractions LIMIT 1"))
+        except Exception:
+            conn.execute(text("ALTER TABLE extractions ADD COLUMN step TEXT"))
             conn.commit()
 
 
@@ -416,7 +424,7 @@ def save_extraction(room_id: str, photo_id: str, wireframe_id: str,
                     model: str, raw_response: str, extracted_spec: dict,
                     duration_ms: int = None, token_input: int = None,
                     token_output: int = None, error_message: str = None,
-                    status: str = "success") -> dict:
+                    status: str = "success", step: str = None) -> dict:
     eid = _gen_id()
     now = _now()
     cab_count = len(extracted_spec.get("cabinets", [])) if extracted_spec else 0
@@ -428,7 +436,7 @@ def save_extraction(room_id: str, photo_id: str, wireframe_id: str,
             extracted_spec=spec_str, cabinet_count=cab_count,
             duration_ms=duration_ms, token_input_count=token_input,
             token_output_count=token_output, error_message=error_message,
-            created_at=now
+            step=step, created_at=now
         ))
     return {"id": eid, "cabinet_count": cab_count, "status": status}
 

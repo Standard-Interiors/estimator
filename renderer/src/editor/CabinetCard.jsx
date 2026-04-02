@@ -189,6 +189,22 @@ export default function CabinetCard({ cab, color, dispatch, isFirst, isLast }) {
         >
           &rarr;
         </button>
+        {cab.confidence && cab.confidence !== "high" && (
+          <span
+            title={cab.alternatives?.length ? `Alternatives: ${cab.alternatives.join('", "')}\"` : ""}
+            style={{
+              fontSize: 8,
+              fontFamily: "'JetBrains Mono',monospace",
+              padding: "1px 5px",
+              borderRadius: 3,
+              background: cab.confidence === "low" ? "rgba(224,112,32,0.15)" : "rgba(192,160,48,0.15)",
+              color: cab.confidence === "low" ? "#e07020" : "#c0a030",
+            }}
+          >
+            {cab.confidence === "low" ? "low conf" : "med conf"}
+            {cab.alternatives?.length ? ` (${cab.alternatives.join("/")})` : ""}
+          </span>
+        )}
         <div style={{ flex: 1 }} />
         <button
           onClick={handleDelete}

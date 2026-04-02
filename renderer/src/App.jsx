@@ -254,7 +254,7 @@ function Render({ spec }) {
 const EMPTY_SPEC = { base_layout: [], wall_layout: [], alignment: [], cabinets: [] };
 
 function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack }) {
-  const { spec, dispatch, undo, redo, canUndo, canRedo } = useSpecState(EMPTY_SPEC);
+  const { spec, dispatch, undo, redo, canUndo, canRedo, undoLabel, redoLabel } = useSpecState(EMPTY_SPEC);
   const [tab, setTab] = useState("render");
   const [showPhotoSidebar, setShowPhotoSidebar] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
@@ -323,10 +323,21 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
     })();
   }, [roomId]);
 
-  // doSave reads from refs — no spec/version in deps, no re-render cascade
+  // Coalesced save — prevents save storms during rapid edits.
+  // If no save in-flight: debounce 1s then fire.
+  // If save in-flight: stash latest state, fire trailing save on completion.
+  const saveInFlight = useRef(false);
+  const stashedSave = useRef(false);
+
   const doSave = useCallback(async () => {
     if (!roomId || modeRef.current !== "loaded") return;
+    if (saveInFlight.current) {
+      // A save is already running — stash this request for a trailing save
+      stashedSave.current = true;
+      return;
+    }
     pendingSave.current = false;
+    saveInFlight.current = true;
     setSaveState("saving");
     try {
       const result = await api.saveRoomSpec(roomId, specRef.current, specVersionRef.current);
@@ -338,6 +349,13 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
     } catch (e) {
       setSaveState("error");
       console.error("Auto-save failed:", e);
+    } finally {
+      saveInFlight.current = false;
+      // If edits arrived while saving, fire one trailing save with the latest state
+      if (stashedSave.current) {
+        stashedSave.current = false;
+        doSave();
+      }
     }
   }, [roomId]); // only depends on roomId — stable across spec changes
 
@@ -557,20 +575,24 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
   const runExtraction = async (photo) => {
     if (!photo && !roomId) return;
     setUploading(true);
-    setUploadStatus("Generating wireframe & extracting cabinets...");
+    setUploadStatus("Starting extraction...");
     setJsonError(null);
     setExtractionError(null);
     try {
       let extracted;
       if (roomId) {
-        // Room-aware extraction: server saves spec + wireframe to DB
-        // If photo isn't uploaded yet, upload it first
+        // Upload photo if needed
         if (photo && (!photoPreview || photoPreview.startsWith("blob:"))) {
+          setUploadStatus("Uploading photo...");
           await api.uploadImage(roomId, photo, "photo");
         }
-        extracted = await api.extractForRoom(roomId);
+        // Start background extraction — returns task_id immediately
+        const { task_id } = await api.startExtraction(roomId);
+        // Poll for progress
+        extracted = await _pollTask(task_id);
       } else {
-        // Legacy: no room context
+        // Legacy: no room context (blocking call)
+        setUploadStatus("Generating wireframe & extracting cabinets...");
         const formData = new FormData();
         formData.append("photo", photo);
         const apiBase = window.location.hostname === "localhost" ? "http://localhost:8001" : "";
@@ -583,16 +605,30 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
         extracted = await resp.json();
       }
       setUploadStatus(`Extracted ${extracted.cabinets?.length || 0} cabinets`);
-      // Sync spec version from server so auto-save doesn't conflict
       if (extracted._spec_version != null) {
         specVersionRef.current = extracted._spec_version;
         delete extracted._spec_version;
       }
+      delete extracted._pipeline;
       extracted.cabinets?.forEach(c => { if(!c.depth) c.depth = c.row==="wall"?12:24; if(!c.height) c.height = c.row==="wall"?30:34.5; if(!c.width) c.width=24; });
       dispatch({ type: "LOAD_SPEC", spec: extracted });
       setMode("loaded"); setTab("render");
     } catch(err) { setExtractionError(err.message); setUploadStatus(""); }
     finally { setUploading(false); }
+  };
+
+  const _pollTask = async (taskId) => {
+    const POLL_MS = 1500;
+    const MAX_POLLS = 300; // 7.5 min max
+    for (let i = 0; i < MAX_POLLS; i++) {
+      await new Promise(r => setTimeout(r, POLL_MS));
+      const task = await api.getTaskStatus(taskId);
+      // Update progress message for the user
+      setUploadStatus(task.progress || "Processing...");
+      if (task.status === "done") return task.result;
+      if (task.status === "failed") throw new Error(task.error || "Extraction failed");
+    }
+    throw new Error("Extraction timed out");
   };
 
   const reset = () => {
@@ -879,8 +915,8 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
             <div style={{display:"flex",flexDirection:"column",height:"calc(100vh - 50px)",margin:"-14px -20px 0",padding:0}}>
               {/* Toolbar */}
               <div data-noprint style={{display:"flex",alignItems:"center",gap:6,padding:"5px 10px",background:"#06060c",borderBottom:"1px solid #1a1a2a",flexShrink:0,fontSize:11,fontFamily:"'JetBrains Mono',monospace"}}>
-                <button onClick={undo} disabled={!canUndo} style={{background:canUndo?"#1a1a2a":"transparent",border:"1px solid #2a2a3a",color:canUndo?"#e0e0e0":"#333",padding:"4px 10px",borderRadius:4,fontSize:11,cursor:canUndo?"pointer":"default",fontWeight:600}}>Undo</button>
-                <button onClick={redo} disabled={!canRedo} style={{background:canRedo?"#1a1a2a":"transparent",border:"1px solid #2a2a3a",color:canRedo?"#e0e0e0":"#333",padding:"4px 10px",borderRadius:4,fontSize:11,cursor:canRedo?"pointer":"default",fontWeight:600}}>Redo</button>
+                <button onClick={undo} disabled={!canUndo} title={undoLabel ? `Undo: ${undoLabel}` : undefined} style={{background:canUndo?"#1a1a2a":"transparent",border:"1px solid #2a2a3a",color:canUndo?"#e0e0e0":"#333",padding:"4px 10px",borderRadius:4,fontSize:11,cursor:canUndo?"pointer":"default",fontWeight:600}}>Undo</button>
+                <button onClick={redo} disabled={!canRedo} title={redoLabel ? `Redo: ${redoLabel}` : undefined} style={{background:canRedo?"#1a1a2a":"transparent",border:"1px solid #2a2a3a",color:canRedo?"#e0e0e0":"#333",padding:"4px 10px",borderRadius:4,fontSize:11,cursor:canRedo?"pointer":"default",fontWeight:600}}>Redo</button>
                 <span style={{flex:1}}/>
                 <span style={{color:"#555"}}>{cabCount} cabs</span>
                 <span style={{color:"#222"}}>|</span>
@@ -1107,8 +1143,8 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
           <div style={{fontSize:18,fontWeight:700,color:"#eee",marginBottom:8,letterSpacing:"-0.02em"}}>
             AI is processing...
           </div>
-          <div style={{fontSize:13,color:"#666",maxWidth:320,textAlign:"center",lineHeight:1.5}}>
-            Generating wireframe and extracting cabinets. Please do not navigate away.
+          <div style={{fontSize:13,color:"#888",maxWidth:320,textAlign:"center",lineHeight:1.5,fontFamily:"'JetBrains Mono',monospace"}}>
+            {uploadStatus || "Starting extraction..."}
           </div>
           <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
         </div>
