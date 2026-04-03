@@ -246,10 +246,12 @@ def _convert_heic_to_jpeg(image_bytes: bytes) -> bytes:
 def _generate_thumbnail(image_bytes: bytes, max_width: int = 300) -> bytes | None:
     """Generate a JPEG thumbnail. Returns None if Pillow fails."""
     try:
-        from PIL import Image
+        from PIL import Image, ImageOps
         img = Image.open(BytesIO(image_bytes))
         img.verify()  # Validate it's a real image
         img = Image.open(BytesIO(image_bytes))  # Re-open after verify
+        # Apply EXIF orientation (iPhone photos are often rotated/mirrored)
+        img = ImageOps.exif_transpose(img)
         if img.width > max_width:
             ratio = max_width / img.width
             img = img.resize((max_width, int(img.height * ratio)), Image.LANCZOS)
@@ -302,6 +304,20 @@ async def upload_image(
     img_dir.mkdir(parents=True, exist_ok=True)
     thumb_dir = img_dir / "thumbs"
     thumb_dir.mkdir(exist_ok=True)
+
+    # Apply EXIF orientation (iPhone photos are often rotated/mirrored)
+    try:
+        from PIL import Image, ImageOps
+        img = Image.open(BytesIO(image_bytes))
+        img = ImageOps.exif_transpose(img)
+        if img.mode in ("RGBA", "P"):
+            img = img.convert("RGB")
+        buf = BytesIO()
+        fmt = "JPEG" if ext == "jpg" else ext.upper()
+        img.save(buf, format=fmt, quality=92)
+        image_bytes = buf.getvalue()
+    except Exception:
+        pass  # If EXIF fix fails, save original
 
     # Save full image
     file_path = f"{project_id}/{rid}/{file_id}.{ext}"
