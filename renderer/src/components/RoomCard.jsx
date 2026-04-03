@@ -107,11 +107,27 @@ export default function RoomCard({ room, onClick, onRename, onDuplicate, onDelet
             }}
           />
         ) : (
-          <div style={{
-            fontSize: 14, fontWeight: 600, color: "#eee",
-            whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
-          }}>
-            {room.name}
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <div style={{
+              fontSize: 14, fontWeight: 600, color: "#eee",
+              whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+              flex: 1,
+            }}>
+              {room.name}
+            </div>
+            <div
+              onClick={(e) => { e.stopPropagation(); setRenaming(true); setRenameVal(room.name); }}
+              style={{
+                width: 28, height: 28, borderRadius: 6, flexShrink: 0,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                cursor: "pointer", color: "#555",
+              }}
+              title="Rename"
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+                <path d="M17 3a2.83 2.83 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </div>
           </div>
         )}
       </div>
