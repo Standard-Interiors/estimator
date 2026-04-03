@@ -163,7 +163,7 @@ async def get_room(rid: str):
 
 @app.patch("/api/rooms/{rid}")
 async def update_room(rid: str, body: dict):
-    allowed = {"name", "sort_order"}
+    allowed = {"name", "room_name", "sort_order"}
     updates = {k: v for k, v in body.items() if k in allowed}
     r = db.update_room(rid, **updates)
     if not r:
