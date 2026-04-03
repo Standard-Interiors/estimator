@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import useIsMobile from "../hooks/useIsMobile";
 import * as api from "../api";
 import ProjectCard from "../components/ProjectCard";
 
 export default function ProjectList() {
   const navigate = useNavigate();
+  const { isMobile } = useIsMobile();
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
@@ -141,12 +143,12 @@ export default function ProjectList() {
   }
 
   return (
-    <div style={{ maxWidth: 960, margin: "0 auto", padding: "0 20px" }}>
+    <div style={{ maxWidth: 960, margin: "0 auto", padding: isMobile ? "0 10px" : "0 20px" }}>
       {/* Search/filter bar */}
       {showSearchBar && (
         <div style={{
           display: "flex", alignItems: "center", gap: 10,
-          padding: "12px 0",
+          padding: "12px 0", flexWrap: isMobile ? "wrap" : "nowrap",
         }}>
           <input
             value={search}
@@ -154,7 +156,8 @@ export default function ProjectList() {
             placeholder="Search projects..."
             style={{
               background: "#0c0c14", border: "1px solid #1a1a2a", borderRadius: 6,
-              color: "#ddd", padding: "8px 12px", fontSize: 12, flex: "0 1 300px",
+              color: "#ddd", padding: "8px 12px", fontSize: 12,
+              flex: isMobile ? "1 1 100%" : "0 1 300px",
               fontFamily: "inherit", outline: "none",
             }}
           />

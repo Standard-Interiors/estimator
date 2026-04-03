@@ -1,8 +1,10 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Routes, Route, useParams, useNavigate } from "react-router-dom";
 import useSpecState from "./state/useSpecState";
+import useIsMobile from "./hooks/useIsMobile";
 import InteractiveRender from "./editor/InteractiveRender";
 import CabinetEditBar from "./editor/CabinetEditBar";
+import BottomSheet from "./editor/BottomSheet";
 import { defaultCabinet, generateId } from "./state/specHelpers";
 import ProjectList from "./pages/ProjectList";
 import ProjectDetail from "./pages/ProjectDetail";
@@ -255,6 +257,7 @@ const EMPTY_SPEC = { base_layout: [], wall_layout: [], alignment: [], cabinets: 
 
 function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack }) {
   const { spec, dispatch, undo, redo, canUndo, canRedo, undoLabel, redoLabel } = useSpecState(EMPTY_SPEC);
+  const { isMobile, isLandscape } = useIsMobile();
   const [tab, setTab] = useState("render");
   const [showPhotoSidebar, setShowPhotoSidebar] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
@@ -914,25 +917,25 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
           return (
             <div style={{display:"flex",flexDirection:"column",height:"calc(100vh - 50px)",margin:"-14px -20px 0",padding:0}}>
               {/* Toolbar */}
-              <div data-noprint style={{display:"flex",alignItems:"center",gap:6,padding:"5px 10px",background:"#06060c",borderBottom:"1px solid #1a1a2a",flexShrink:0,fontSize:11,fontFamily:"'JetBrains Mono',monospace"}}>
-                <button onClick={undo} disabled={!canUndo} title={undoLabel ? `Undo: ${undoLabel}` : undefined} style={{background:canUndo?"#1a1a2a":"transparent",border:"1px solid #2a2a3a",color:canUndo?"#e0e0e0":"#333",padding:"4px 10px",borderRadius:4,fontSize:11,cursor:canUndo?"pointer":"default",fontWeight:600}}>Undo</button>
-                <button onClick={redo} disabled={!canRedo} title={redoLabel ? `Redo: ${redoLabel}` : undefined} style={{background:canRedo?"#1a1a2a":"transparent",border:"1px solid #2a2a3a",color:canRedo?"#e0e0e0":"#333",padding:"4px 10px",borderRadius:4,fontSize:11,cursor:canRedo?"pointer":"default",fontWeight:600}}>Redo</button>
+              <div data-noprint style={{display:"flex",alignItems:"center",gap:isMobile?4:6,padding:isMobile?"4px 6px":"5px 10px",background:"#06060c",borderBottom:"1px solid #1a1a2a",flexShrink:0,fontSize:11,fontFamily:"'JetBrains Mono',monospace"}}>
+                <button onClick={undo} disabled={!canUndo} title={undoLabel ? `Undo: ${undoLabel}` : undefined} style={{background:canUndo?"#1a1a2a":"transparent",border:"1px solid #2a2a3a",color:canUndo?"#e0e0e0":"#333",padding:isMobile?"6px 8px":"4px 10px",borderRadius:4,fontSize:isMobile?14:11,cursor:canUndo?"pointer":"default",fontWeight:600,minHeight:isMobile?36:undefined}}>{isMobile?"↩":"Undo"}</button>
+                <button onClick={redo} disabled={!canRedo} title={redoLabel ? `Redo: ${redoLabel}` : undefined} style={{background:canRedo?"#1a1a2a":"transparent",border:"1px solid #2a2a3a",color:canRedo?"#e0e0e0":"#333",padding:isMobile?"6px 8px":"4px 10px",borderRadius:4,fontSize:isMobile?14:11,cursor:canRedo?"pointer":"default",fontWeight:600,minHeight:isMobile?36:undefined}}>{isMobile?"↪":"Redo"}</button>
                 <span style={{flex:1}}/>
-                <span style={{color:"#555"}}>{cabCount} cabs</span>
-                <span style={{color:"#222"}}>|</span>
+                <span style={{color:"#555"}}>{cabCount}c</span>
                 <span style={{color:"#D94420",fontWeight:600}}>B:{baseRun}"</span>
                 <span style={{color:"#1a6fbf",fontWeight:600}}>W:{wallRun}"</span>
-                <span style={{color:"#222"}}>|</span>
-                {/* Wall measurement — the key number */}
-                <span style={{color:"#666",fontSize:10}}>wall</span>
-                <input type="number" defaultValue={wallLength||""} placeholder="—"
-                  onBlur={e=>{const v=parseFloat(e.target.value);setWallLength(isNaN(v)||v<=0?null:v);}}
-                  onKeyDown={e=>{if(e.key==="Enter")e.target.blur();}}
-                  style={{width:42,height:24,background:"#0a0a14",border:"1px solid #2a2a3a",borderRadius:4,color:"#ccc",textAlign:"center",fontSize:12,fontFamily:"'JetBrains Mono',monospace",fontWeight:600}}
-                />
-                {wallLength && (()=>{const maxRun=Math.max(baseRun,wallRun);const filler=wallLength-maxRun;return <span style={{color:filler<0?"#e04040":filler>6?"#e0a020":"#22c55e",fontWeight:700,fontSize:11,padding:"2px 6px",background:filler<0?"rgba(224,64,64,0.1)":"rgba(34,197,94,0.1)",borderRadius:3}}>{filler>=0?`+${filler}" filler`:`${filler}" over!`}</span>;})()}
-                <span style={{color:"#222"}}>|</span>
-                <button onClick={()=>window.print()} style={{height:24,padding:"0 10px",borderRadius:4,background:"#1a1a2a",border:"1px solid #2a2a3a",color:"#888",fontSize:10,fontWeight:600,cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>Print</button>
+                {!isMobile && <>
+                  <span style={{color:"#222"}}>|</span>
+                  <span style={{color:"#666",fontSize:10}}>wall</span>
+                  <input type="number" defaultValue={wallLength||""} placeholder="—"
+                    onBlur={e=>{const v=parseFloat(e.target.value);setWallLength(isNaN(v)||v<=0?null:v);}}
+                    onKeyDown={e=>{if(e.key==="Enter")e.target.blur();}}
+                    style={{width:42,height:24,background:"#0a0a14",border:"1px solid #2a2a3a",borderRadius:4,color:"#ccc",textAlign:"center",fontSize:12,fontFamily:"'JetBrains Mono',monospace",fontWeight:600}}
+                  />
+                  {wallLength && (()=>{const maxRun=Math.max(baseRun,wallRun);const filler=wallLength-maxRun;return <span style={{color:filler<0?"#e04040":filler>6?"#e0a020":"#22c55e",fontWeight:700,fontSize:11,padding:"2px 6px",background:filler<0?"rgba(224,64,64,0.1)":"rgba(34,197,94,0.1)",borderRadius:3}}>{filler>=0?`+${filler}" filler`:`${filler}" over!`}</span>;})()}
+                  <span style={{color:"#222"}}>|</span>
+                  <button onClick={()=>window.print()} style={{height:24,padding:"0 10px",borderRadius:4,background:"#1a1a2a",border:"1px solid #2a2a3a",color:"#888",fontSize:10,fontWeight:600,cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>Print</button>
+                </>}
               </div>
 
               {/* Render + optional Photo sidebar */}
@@ -950,7 +953,7 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
                   </div>
                 </div>
                 {/* No overlapping thumbnails — photo is in sidebar, plan is a tab */}
-                <InteractiveRender spec={spec} selectedId={selectedId} onSelect={(id)=>{handleSelect(id);setRenderCtxMenu(null);}}
+                <InteractiveRender spec={spec} selectedId={selectedId} isMobile={isMobile} onSelect={(id)=>{handleSelect(id);setRenderCtxMenu(null);}}
                   onDoubleClick={(id)=>{setSelectedId(id);setTimeout(()=>{if(widthInputRef.current){widthInputRef.current.focus();widthInputRef.current.select();}},50);}}
                   onContextMenu={(ctx)=>setRenderCtxMenu(ctx)}
                   onGapSelect={(item)=>{
@@ -989,7 +992,7 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
               </div>
 
               {/* Photo reference sidebar */}
-              {showPhotoSidebar && photoPreview && (
+              {showPhotoSidebar && photoPreview && !isMobile && (
                 <div style={{
                   flex:"0 0 280px",background:"#08080e",borderLeft:"1px solid #1a1a2a",
                   display:"flex",flexDirection:"column",overflow:"hidden",
@@ -1012,32 +1015,38 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
 
               {/* Bottom bar — cabinet selected */}
               {sel && !selectedGapItem && (
-                <CabinetEditBar
-                  cab={sel} spec={spec} dispatch={dispatch} selColor={selColor}
-                  widthInputRef={widthInputRef}
-                  onSelectNext={() => {
-                    const allRefs=[...(spec.base_layout||[]),...(spec.wall_layout||[])].filter(i=>i.ref);
-                    const idx=allRefs.findIndex(i=>i.ref===sel.id);
-                    if(idx!==-1&&idx<allRefs.length-1){setSelectedId(allRefs[idx+1].ref);setTimeout(()=>{if(widthInputRef.current){widthInputRef.current.focus();widthInputRef.current.select();}},50);}
-                  }}
-                  onSelectId={setSelectedId}
-                  onMoveLeft={() => dispatch({ type: "NUDGE_CABINET", id: sel.id, amount: -3 })}
-                  onMoveRight={() => dispatch({ type: "NUDGE_CABINET", id: sel.id, amount: 3 })}
-                  onMoveUp={sel.row === "wall" ? () => dispatch({ type: "NUDGE_VERTICAL", id: sel.id, amount: -3 }) : undefined}
-                  onMoveDown={sel.row === "wall" ? () => dispatch({ type: "NUDGE_VERTICAL", id: sel.id, amount: 3 }) : undefined}
-                  onDelete={() => setPendingDelete(sel.id)}
-                  onAddGap={() => {
-                    const layout=spec[sel.row==="base"?"base_layout":"wall_layout"]||[];
-                    const pos=layout.findIndex(i=>i.ref===sel.id);
-                    dispatch({type:"ADD_GAP",row:sel.row,position:Math.max(pos,0),gap:{type:"filler",label:"Filler",width:3}});
-                  }}
-                  onAddCab={() => {
-                    const id=generateId(sel.row,spec),cab=defaultCabinet(sel.row);cab.id=id;
-                    const layout=spec[sel.row==="base"?"base_layout":"wall_layout"]||[];
-                    const pos=layout.findIndex(i=>i.ref===sel.id);
-                    dispatch({type:"ADD_CABINET",row:sel.row,position:pos+1,cabinet:cab});setSelectedId(id);
-                  }}
-                />
+                isMobile ? (
+                  <div style={{maxHeight:isLandscape?"40vh":"50vh",overflowY:"auto",WebkitOverflowScrolling:"touch"}}>
+                    <BottomSheet spec={spec} selectedId={selectedId} dispatch={dispatch} onSelect={handleSelect} />
+                  </div>
+                ) : (
+                  <CabinetEditBar
+                    cab={sel} spec={spec} dispatch={dispatch} selColor={selColor}
+                    widthInputRef={widthInputRef}
+                    onSelectNext={() => {
+                      const allRefs=[...(spec.base_layout||[]),...(spec.wall_layout||[])].filter(i=>i.ref);
+                      const idx=allRefs.findIndex(i=>i.ref===sel.id);
+                      if(idx!==-1&&idx<allRefs.length-1){setSelectedId(allRefs[idx+1].ref);setTimeout(()=>{if(widthInputRef.current){widthInputRef.current.focus();widthInputRef.current.select();}},50);}
+                    }}
+                    onSelectId={setSelectedId}
+                    onMoveLeft={() => dispatch({ type: "NUDGE_CABINET", id: sel.id, amount: -3 })}
+                    onMoveRight={() => dispatch({ type: "NUDGE_CABINET", id: sel.id, amount: 3 })}
+                    onMoveUp={sel.row === "wall" ? () => dispatch({ type: "NUDGE_VERTICAL", id: sel.id, amount: -3 }) : undefined}
+                    onMoveDown={sel.row === "wall" ? () => dispatch({ type: "NUDGE_VERTICAL", id: sel.id, amount: 3 }) : undefined}
+                    onDelete={() => setPendingDelete(sel.id)}
+                    onAddGap={() => {
+                      const layout=spec[sel.row==="base"?"base_layout":"wall_layout"]||[];
+                      const pos=layout.findIndex(i=>i.ref===sel.id);
+                      dispatch({type:"ADD_GAP",row:sel.row,position:Math.max(pos,0),gap:{type:"filler",label:"Filler",width:3}});
+                    }}
+                    onAddCab={() => {
+                      const id=generateId(sel.row,spec),cab=defaultCabinet(sel.row);cab.id=id;
+                      const layout=spec[sel.row==="base"?"base_layout":"wall_layout"]||[];
+                      const pos=layout.findIndex(i=>i.ref===sel.id);
+                      dispatch({type:"ADD_CABINET",row:sel.row,position:pos+1,cabinet:cab});setSelectedId(id);
+                    }}
+                  />
+                )
               )}
 
               {/* Bottom bar — gap selected */}
@@ -1066,18 +1075,20 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
 
               {/* Bottom bar — nothing selected */}
               {!sel && !selectedGapItem && (
-                <div data-noprint style={{flexShrink:0,background:"#0c0c14",borderTop:"1px solid #1a1a2a",padding:"8px 10px",display:"flex",alignItems:"center",gap:8}}>
-                  <span style={{color:"#444",fontSize:12,fontFamily:"'DM Sans',sans-serif"}}>Click a cabinet to edit. <span style={{color:"#333"}}>Tab: next · ⌘D: duplicate · Delete: remove · Right-click: more</span></span>
+                <div data-noprint style={{flexShrink:0,background:"#0c0c14",borderTop:"1px solid #1a1a2a",padding:isMobile?"8px 8px":"8px 10px",display:"flex",alignItems:"center",gap:8,flexWrap:isMobile?"wrap":"nowrap"}}>
+                  <span style={{color:"#444",fontSize:12,fontFamily:"'DM Sans',sans-serif"}}>
+                    {isMobile ? "Tap a cabinet to edit" : <>Click a cabinet to edit. <span style={{color:"#333"}}>Tab: next · ⌘D: duplicate · Delete: remove · Right-click: more</span></>}
+                  </span>
                   <span style={{flex:1}}/>
                   <button onClick={()=>{
                     const id=generateId("base",spec),cab=defaultCabinet("base");cab.id=id;
                     dispatch({type:"ADD_CABINET",row:"base",position:(spec.base_layout||[]).length,cabinet:cab});setSelectedId(id);
-                  }} style={{height:32,padding:"0 10px",borderRadius:6,background:"#1a1a2a",border:"1px solid #2a2a3a",color:"#D94420",fontWeight:600,fontSize:11,cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>+ Base</button>
+                  }} style={{height:isMobile?40:32,padding:"0 10px",borderRadius:6,background:"#1a1a2a",border:"1px solid #2a2a3a",color:"#D94420",fontWeight:600,fontSize:11,cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>+ Base</button>
                   <button onClick={()=>{
                     const id=generateId("wall",spec),cab=defaultCabinet("wall");cab.id=id;
                     dispatch({type:"ADD_CABINET",row:"wall",position:(spec.wall_layout||[]).length,cabinet:cab});setSelectedId(id);
-                  }} style={{height:32,padding:"0 10px",borderRadius:6,background:"#1a1a2a",border:"1px solid #2a2a3a",color:"#1a6fbf",fontWeight:600,fontSize:11,cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>+ Wall</button>
-                  <button onClick={reset} style={{height:32,padding:"0 10px",borderRadius:6,background:"transparent",border:"1px solid #2a2a3a",color:"#555",fontWeight:600,fontSize:11,cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>Start Over</button>
+                  }} style={{height:isMobile?40:32,padding:"0 10px",borderRadius:6,background:"#1a1a2a",border:"1px solid #2a2a3a",color:"#1a6fbf",fontWeight:600,fontSize:11,cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>+ Wall</button>
+                  {!isMobile && <button onClick={reset} style={{height:32,padding:"0 10px",borderRadius:6,background:"transparent",border:"1px solid #2a2a3a",color:"#555",fontWeight:600,fontSize:11,cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>Start Over</button>}
                 </div>
               )}
             </div>

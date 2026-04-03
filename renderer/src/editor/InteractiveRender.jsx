@@ -63,7 +63,7 @@ function Face({ cab, cx, cy, w, h }) {
   return <>{els}</>;
 }
 
-export default function InteractiveRender({ spec, selectedId, onSelect, onDoubleClick, onContextMenu: onCtxMenu, onGapSelect, onNudge, onNudgeVertical }) {
+export default function InteractiveRender({ spec, selectedId, isMobile, onSelect, onDoubleClick, onContextMenu: onCtxMenu, onGapSelect, onNudge, onNudgeVertical }) {
   if (!spec?.cabinets?.length) return <div style={{ color: "#555", padding: 20, textAlign: "center" }}>No cabinets loaded</div>;
 
   const cabMap = {}; spec.cabinets.forEach(c => { cabMap[c.id] = c; });
@@ -182,11 +182,16 @@ export default function InteractiveRender({ spec, selectedId, onSelect, onDouble
   };
 
   return (
-    <div style={{ background: "#fff", borderRadius: 10, border: "1px solid rgba(26,26,46,0.12)", padding: 10 }}
+    <div style={{
+      background: "#fff",
+      borderRadius: isMobile ? 0 : 10,
+      border: isMobile ? "none" : "1px solid rgba(26,26,46,0.12)",
+      padding: isMobile ? 2 : 10,
+    }}
       onClick={() => onSelect(null)}>
       <svg ref={svgRef} viewBox={`0 ${contentTop} ${svgW} ${svgH}`}
         onPointerMove={onPointerMove} onPointerUp={onPointerUp}
-        style={{ display: "block", width: "100%", maxWidth: svgW * 2, height: "auto", cursor: drag?.started ? "grabbing" : "pointer" }}>
+        style={{ display: "block", width: "100%", maxWidth: isMobile ? "100%" : svgW * 2, height: "auto", cursor: drag?.started ? "grabbing" : "pointer", touchAction: "none" }}>
         <Box3D cx={PAD} cy={CTTOP} w={ctW} h={1.5} depth={25.5} front="none" top="none" side="none" stroke="#888" sw={0.8} />
 
         {/* Base cabinets first (below gaps in z-order) */}
