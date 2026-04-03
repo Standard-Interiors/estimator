@@ -14,6 +14,9 @@ export default function ProjectDetail() {
   const [newRoomName, setNewRoomName] = useState("");
   const [addingWallTo, setAddingWallTo] = useState(null); // room_name string
   const [newWallName, setNewWallName] = useState("");
+  const [renamingRoom, setRenamingRoom] = useState(null); // room_name being edited
+  const [renameRoomVal, setRenameRoomVal] = useState("");
+  const roomRenameRef = useRef(null);
   const roomInputRef = useRef(null);
   const wallInputRef = useRef(null);
 
@@ -97,6 +100,27 @@ export default function ProjectDetail() {
       }));
     } catch (e) {
       console.error("Failed to rename wall:", e);
+    }
+  };
+
+  const handleRenameRoom = async (oldRoomName, newRoomName) => {
+    if (!newRoomName || newRoomName === oldRoomName) return;
+    try {
+      // Update room_name on all walls in this group
+      const wallsInGroup = (project?.rooms || []).filter(
+        (r) => (r.room_name || "") === oldRoomName
+      );
+      await Promise.all(
+        wallsInGroup.map((w) => api.updateRoom(w.id, { room_name: newRoomName }))
+      );
+      setProject((prev) => ({
+        ...prev,
+        rooms: prev.rooms.map((r) =>
+          (r.room_name || "") === oldRoomName ? { ...r, room_name: newRoomName } : r
+        ),
+      }));
+    } catch (e) {
+      console.error("Failed to rename room:", e);
     }
   };
 
@@ -296,9 +320,45 @@ export default function ProjectDetail() {
             borderBottom: "1px solid #1a1a2a",
             marginBottom: 12,
           }}>
-            <h2 style={{ fontSize: 15, fontWeight: 700, color: "#ddd", margin: 0 }}>
-              {roomName || "Ungrouped"}
-            </h2>
+            {renamingRoom === roomName ? (
+              <input
+                ref={roomRenameRef}
+                autoFocus
+                value={renameRoomVal}
+                onChange={(e) => setRenameRoomVal(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") { handleRenameRoom(roomName, renameRoomVal.trim()); setRenamingRoom(null); }
+                  if (e.key === "Escape") setRenamingRoom(null);
+                }}
+                onBlur={() => { handleRenameRoom(roomName, renameRoomVal.trim()); setRenamingRoom(null); }}
+                style={{
+                  fontSize: 15, fontWeight: 700, color: "#eee", margin: 0,
+                  background: "#0a0a14", border: "1px solid #D94420", borderRadius: 4,
+                  padding: "2px 8px", fontFamily: "inherit", outline: "none",
+                }}
+              />
+            ) : (
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <h2 style={{ fontSize: 15, fontWeight: 700, color: "#ddd", margin: 0 }}>
+                  {roomName || "Ungrouped"}
+                </h2>
+                {roomName && (
+                  <div
+                    onClick={() => { setRenamingRoom(roomName); setRenameRoomVal(roomName); }}
+                    style={{
+                      cursor: "pointer", color: "#555", display: "flex", alignItems: "center",
+                      justifyContent: "center", width: 32, height: 32, borderRadius: 6,
+                      flexShrink: 0,
+                    }}
+                    title="Rename room"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                      <path d="M17 3a2.83 2.83 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </div>
+                )}
+              </div>
+            )}
             <span style={{
               fontSize: 10, color: "#555", fontFamily: "'JetBrains Mono', monospace",
             }}>
