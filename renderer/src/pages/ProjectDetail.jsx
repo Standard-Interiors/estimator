@@ -338,26 +338,19 @@ export default function ProjectDetail() {
                 }}
               />
             ) : (
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <h2 style={{ fontSize: 15, fontWeight: 700, color: "#ddd", margin: 0 }}>
-                  {roomName || "Ungrouped"}
-                </h2>
-                {roomName && (
-                  <div
-                    onClick={() => { setRenamingRoom(roomName); setRenameRoomVal(roomName); }}
-                    style={{
-                      cursor: "pointer", color: "#555", display: "flex", alignItems: "center",
-                      justifyContent: "center", width: 32, height: 32, borderRadius: 6,
-                      flexShrink: 0,
-                    }}
-                    title="Rename room"
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                      <path d="M17 3a2.83 2.83 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                  </div>
-                )}
-              </div>
+              <h2
+                onClick={roomName ? () => { setRenamingRoom(roomName); setRenameRoomVal(roomName); } : undefined}
+                style={{
+                  fontSize: 15, fontWeight: 700, color: "#ddd", margin: 0,
+                  cursor: roomName ? "text" : "default",
+                  borderBottom: "1px dashed transparent",
+                }}
+                onMouseEnter={(e) => { if (roomName) e.currentTarget.style.borderBottomColor = "#333"; }}
+                onMouseLeave={(e) => e.currentTarget.style.borderBottomColor = "transparent"}
+                title={roomName ? "Tap to rename" : undefined}
+              >
+                {roomName || "Ungrouped"}
+              </h2>
             )}
             <span style={{
               fontSize: 10, color: "#555", fontFamily: "'JetBrains Mono', monospace",
