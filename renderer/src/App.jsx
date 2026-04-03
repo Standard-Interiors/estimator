@@ -508,6 +508,12 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
   };
 
   const openCamera = async () => {
+    // On mobile, use the native camera input directly — getUserMedia
+    // often triggers video recording UI instead of photo capture
+    if (isMobile) {
+      cameraInputRef.current?.click();
+      return;
+    }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } }
