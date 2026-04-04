@@ -30,7 +30,7 @@ function sectionSummary(sec) {
   return s;
 }
 
-export default function CabinetEditBar({ cab, spec, dispatch, selColor, widthInputRef, onSelectNext, onSelectId, onDelete, onAddGap, onAddCab, onMoveLeft, onMoveRight, onMoveUp, onMoveDown }) {
+export default function CabinetEditBar({ cab, spec, dispatch, selColor, widthInputRef, onSelectNext, onSelectId, onDelete, onAddGap, onAddCab, onMoveLeft, onMoveRight, onMoveUp, onMoveDown, onSectionClick }) {
   const [editingSec, setEditingSec] = useState(null); // index of section being edited
   const [showSecPicker, setShowSecPicker] = useState(false);
   const sections = cab?.face?.sections || [];
@@ -286,9 +286,9 @@ export default function CabinetEditBar({ cab, spec, dispatch, selColor, widthInp
           const colors = { door: "#22c55e", glass_door: "#06b6d4", drawer: "#f97216", false_front: "#8b5cf6" };
           const c = colors[ds.type] || "#888";
           return (
-            <span key={i} style={{
+            <span key={i} onClick={() => onSectionClick?.(ds.sectionIndex)} style={{
               fontSize: 9, fontFamily: MONO, padding: "1px 6px", borderRadius: 4,
-              background: `${c}1a`, color: c, fontWeight: 600,
+              background: `${c}1a`, color: c, fontWeight: 600, cursor: "pointer",
               border: ds.isOverride ? `1px dashed ${c}` : "none",
             }}>
               {ds.label}

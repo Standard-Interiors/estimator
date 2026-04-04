@@ -4,6 +4,7 @@ import useSpecState from "./state/useSpecState";
 import useIsMobile from "./hooks/useIsMobile";
 import InteractiveRender from "./editor/InteractiveRender";
 import CabinetEditBar from "./editor/CabinetEditBar";
+import DoorDetailView from "./editor/DoorDetailView";
 import BottomSheet from "./editor/BottomSheet";
 import { defaultCabinet, generateId, calcDoorSizes, formatFraction, calcScribeNotes } from "./state/specHelpers";
 import ProjectList from "./pages/ProjectList";
@@ -278,6 +279,7 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
   const [cameraStream, setCameraStream] = useState(null);
 
   const [selectedId, setSelectedId] = useState(null);
+  const [editingSectionIdx, setEditingSectionIdx] = useState(null); // drill-down into door/drawer
   const [selectedGapItem, setSelectedGapItem] = useState(null);
   const [renderCtxMenu, setRenderCtxMenu] = useState(null); // { x, y, id, row }
   const [pendingDelete, setPendingDelete] = useState(null); // cabinet id to confirm delete
@@ -648,6 +650,7 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
 
   const handleSelect = (id) => {
     setSelectedId(id);
+    setEditingSectionIdx(null);
     if (id) setSelectedGapItem(null);
   };
 
@@ -1022,7 +1025,16 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
               </div>{/* end split wrapper */}
 
               {/* Bottom bar — cabinet selected */}
-              {sel && !selectedGapItem && (
+              {sel && !selectedGapItem && editingSectionIdx !== null && (
+                <DoorDetailView
+                  cab={sel} spec={spec} sectionIndex={editingSectionIdx} dispatch={dispatch}
+                  onBack={() => setEditingSectionIdx(null)}
+                  onPrev={() => setEditingSectionIdx(Math.max(0, editingSectionIdx - 1))}
+                  onNext={() => setEditingSectionIdx(Math.min((sel.face?.sections?.length || 1) - 1, editingSectionIdx + 1))}
+                  totalSections={sel.face?.sections?.length || 0}
+                />
+              )}
+              {sel && !selectedGapItem && editingSectionIdx === null && (
                 isMobile ? (
                   <div style={{maxHeight:isLandscape?"40vh":"50vh",overflowY:"auto",WebkitOverflowScrolling:"touch"}}>
                     <BottomSheet spec={spec} selectedId={selectedId} dispatch={dispatch} onSelect={handleSelect} />
@@ -1053,6 +1065,7 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
                       const pos=layout.findIndex(i=>i.ref===sel.id);
                       dispatch({type:"ADD_CABINET",row:sel.row,position:pos+1,cabinet:cab});setSelectedId(id);
                     }}
+                    onSectionClick={(idx) => setEditingSectionIdx(idx)}
                   />
                 )
               )}
