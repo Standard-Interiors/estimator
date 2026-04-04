@@ -1037,7 +1037,7 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
               {sel && !selectedGapItem && editingSectionIdx === null && (
                 isMobile ? (
                   <div style={{maxHeight:isLandscape?"40vh":"50vh",overflowY:"auto",WebkitOverflowScrolling:"touch"}}>
-                    <BottomSheet spec={spec} selectedId={selectedId} dispatch={dispatch} onSelect={handleSelect} />
+                    <BottomSheet spec={spec} selectedId={selectedId} dispatch={dispatch} onSelect={handleSelect} onSectionClick={(idx) => setEditingSectionIdx(idx)} />
                   </div>
                 ) : (
                   <CabinetEditBar

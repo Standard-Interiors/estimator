@@ -3,10 +3,10 @@ import WidthGrid from "./WidthGrid";
 import ActionRow from "./ActionRow";
 import {
   BASE_TYPES, WALL_TYPES, WALL_HEIGHTS, BASE_HEIGHT,
-  BASE_DEPTH, WALL_DEPTH
+  BASE_DEPTH, WALL_DEPTH, calcDoorSizes
 } from "../state/specHelpers";
 
-export default function BottomSheet({ spec, selectedId, dispatch, onSelect, onInsert }) {
+export default function BottomSheet({ spec, selectedId, dispatch, onSelect, onInsert, onSectionClick }) {
   const [showMore, setShowMore] = useState(false);
 
   const cab = selectedId ? spec.cabinets.find(c => c.id === selectedId) : null;
@@ -194,6 +194,32 @@ export default function BottomSheet({ spec, selectedId, dispatch, onSelect, onIn
               }}>FACE SECTIONS</div>
               <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
                 {cab.face.sections.map(sectionBadge)}
+              </div>
+            </div>
+          )}
+
+          {/* Door sizes (clickable → drill into DoorDetailView) */}
+          {cab.face?.sections?.length > 0 && (
+            <div style={{ marginTop: 10 }}>
+              <div style={{
+                fontSize: 10, color: "#666", fontWeight: 600,
+                fontFamily: "'DM Sans',sans-serif", marginBottom: 6, letterSpacing: "0.05em"
+              }}>DOOR SIZES</div>
+              <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                {calcDoorSizes(cab, spec.frame_style || "framed").map((ds, i) => {
+                  const colors = { door: "#22c55e", glass_door: "#06b6d4", drawer: "#f97216", false_front: "#8b5cf6" };
+                  const c = colors[ds.type] || "#888";
+                  return (
+                    <span key={i} onClick={() => onSectionClick?.(ds.sectionIndex)} style={{
+                      fontSize: 10, fontFamily: "'JetBrains Mono',monospace", padding: "4px 8px", borderRadius: 4,
+                      background: `${c}1a`, color: c, fontWeight: 600, cursor: "pointer",
+                      border: ds.isOverride ? `1px dashed ${c}` : "none",
+                    }}>
+                      {ds.label}
+                      {ds.needsVerify && <span style={{ color: "#eab308", marginLeft: 4 }}>!</span>}
+                    </span>
+                  );
+                })}
               </div>
             </div>
           )}
