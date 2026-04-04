@@ -5,7 +5,7 @@ import useIsMobile from "./hooks/useIsMobile";
 import InteractiveRender from "./editor/InteractiveRender";
 import CabinetEditBar from "./editor/CabinetEditBar";
 import BottomSheet from "./editor/BottomSheet";
-import { defaultCabinet, generateId } from "./state/specHelpers";
+import { defaultCabinet, generateId, calcDoorSizes, formatFraction, calcScribeNotes } from "./state/specHelpers";
 import ProjectList from "./pages/ProjectList";
 import ProjectDetail from "./pages/ProjectDetail";
 import JsonEditor from "./components/JsonEditor";
@@ -697,7 +697,7 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
         </div>
         {hasSpec && (
           <div style={{display:"flex",gap:3,alignItems:"center"}}>
-            {[["render","Render"]].map(([key,label])=>(
+            {[["render","Render"],["doors","Doors"]].map(([key,label])=>(
               <button key={key} onClick={()=>{setTab(key);setShowMoreMenu(false);}} style={{
                 background:tab===key?"#1a1a2a":"transparent",color:tab===key?"#fff":"#555",
                 border:`1px solid ${tab===key?"#2a2a3a":"transparent"}`,
@@ -1118,6 +1118,86 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
             <img src={wireframePreview} alt="Wireframe drawing" style={{maxWidth:"100%",maxHeight:"calc(100vh - 160px)",borderRadius:8,objectFit:"contain"}}/>
           </div>
         )}
+
+        {/* Door Schedule Tab */}
+        {hasSpec && tab === "doors" && (()=>{
+          const fs = spec.frame_style || "framed";
+          const allSections = [];
+          const sizeCounts = {};
+          (spec.cabinets || []).forEach(cab => {
+            const sizes = calcDoorSizes(cab, fs);
+            sizes.forEach(ds => {
+              const scribeNote = calcScribeNotes(cab);
+              allSections.push({ cab, ...ds, scribeNote });
+              for (let c = 0; c < ds.count; c++) {
+                const w = ds.count >= 2 && (ds.type === "door" || ds.type === "glass_door") ? ds.perDoorWidth : ds.width;
+                const key = `${formatFraction(w)} x ${formatFraction(ds.height)}`;
+                const label = ds.type === "drawer" ? "drawers" : ds.type === "false_front" ? "false fronts" : "doors";
+                if (!sizeCounts[key]) sizeCounts[key] = { count: 0, label };
+                sizeCounts[key].count += ds.count;
+              }
+            });
+          });
+          const rowColor = (type) => type === "door" || type === "glass_door" ? "#22c55e" : type === "drawer" ? "#f97216" : "#8b5cf6";
+          return (
+            <div style={{padding:isMobile?"10px":"14px 20px",maxHeight:"calc(100vh - 140px)",overflow:"auto"}}>
+              <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}>
+                <h2 style={{fontSize:16,fontWeight:700,color:"#eee",margin:0}}>Door Schedule</h2>
+                <span style={{fontSize:11,color:"#555",fontFamily:"'JetBrains Mono',monospace"}}>{fs === "framed" ? "Framed" : "Frameless"}</span>
+                <span style={{flex:1}}/>
+                <button onClick={()=>window.print()} style={{padding:"6px 14px",borderRadius:6,fontSize:11,fontWeight:600,cursor:"pointer",background:"#1a1a2a",border:"1px solid #2a2a3a",color:"#888",fontFamily:"inherit"}}>Print</button>
+              </div>
+
+              {/* Detail table */}
+              <table style={{width:"100%",borderCollapse:"collapse",fontSize:12,fontFamily:"'JetBrains Mono',monospace"}}>
+                <thead>
+                  <tr style={{borderBottom:"2px solid #2a2a3a"}}>
+                    {["Cab","Type","Section","Qty","Width","Height","Scribe",""].map(h=>(
+                      <th key={h} style={{padding:"8px 6px",textAlign:"left",color:"#666",fontWeight:600,fontSize:10,letterSpacing:"0.05em"}}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {allSections.map((s, i) => {
+                    const w = s.count >= 2 && (s.type === "door" || s.type === "glass_door") ? s.perDoorWidth : s.width;
+                    return (
+                      <tr key={i} style={{borderBottom:"1px solid #1a1a2a",cursor:"pointer"}}
+                        onClick={()=>{setSelectedId(s.cab.id);setTab("render");}}
+                        onMouseEnter={e=>e.currentTarget.style.background="#0a0a14"}
+                        onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                        <td style={{padding:"6px",color:s.cab.row==="base"?"#D94420":"#1a6fbf",fontWeight:700}}>{s.cab.id}</td>
+                        <td style={{padding:"6px",color:"#666"}}>{s.cab.type}</td>
+                        <td style={{padding:"6px",color:rowColor(s.type),fontWeight:600}}>
+                          {s.type === "door" ? "Door" : s.type === "glass_door" ? "Glass" : s.type === "drawer" ? "Drawer" : "False Front"}
+                        </td>
+                        <td style={{padding:"6px",color:"#aaa"}}>{s.count}</td>
+                        <td style={{padding:"6px",color:"#eee",fontWeight:600}}>{formatFraction(w)}"</td>
+                        <td style={{padding:"6px",color:"#eee",fontWeight:600}}>{formatFraction(s.height)}"</td>
+                        <td style={{padding:"6px",color:s.scribeNote?"#eab308":"#333"}}>{s.scribeNote||"—"}</td>
+                        <td style={{padding:"6px"}}>
+                          {s.isOverride && <span style={{color:"#8b5cf6",fontSize:9}}>override</span>}
+                          {s.needsVerify && <span style={{color:"#eab308",fontSize:9}}>verify</span>}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+
+              {/* Cut list summary */}
+              <div style={{marginTop:24,padding:"14px 16px",background:"#0a0a14",borderRadius:8,border:"1px solid #1a1a2a"}}>
+                <div style={{fontSize:12,fontWeight:700,color:"#888",marginBottom:10,letterSpacing:"0.05em"}}>CUT LIST SUMMARY</div>
+                {Object.entries(sizeCounts).map(([size, {count, label}]) => (
+                  <div key={size} style={{display:"flex",gap:10,padding:"4px 0",fontSize:13,fontFamily:"'JetBrains Mono',monospace"}}>
+                    <span style={{color:"#D94420",fontWeight:700,minWidth:30}}>{count}x</span>
+                    <span style={{color:"#eee",fontWeight:600}}>{size}</span>
+                    <span style={{color:"#555"}}>({label})</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
       </div>
 
       {/* Delete Confirmation Modal */}
