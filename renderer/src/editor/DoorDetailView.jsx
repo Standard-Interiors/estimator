@@ -123,8 +123,8 @@ export default function DoorDetailView({ cab, spec, sectionIndex, dispatch, onBa
           ) : (
             <>
               <rect x={doorX} y={doorY} width={doorPxW} height={doorPxH}
-                fill={ds.type === "drawer" ? "#f5e6d0" : "#fff"}
-                stroke={ds.type === "drawer" ? "#f97216" : "#22c55e"} strokeWidth={2} rx={2} />
+                fill={ds.type === "drawer" ? "#f5e6d0" : ds.type === "false_front" ? "#e8dff5" : "#fff"}
+                stroke={ds.type === "drawer" ? "#f97216" : ds.type === "false_front" ? "#8b5cf6" : "#22c55e"} strokeWidth={2} rx={2} />
               {/* Hinge marks for doors */}
               {(ds.type === "door" || ds.type === "glass_door") && (
                 <>
@@ -183,7 +183,7 @@ export default function DoorDetailView({ cab, spec, sectionIndex, dispatch, onBa
             </div>
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
               <input type="number" step="0.0625"
-                defaultValue={Math.round(doorW * 10000) / 10000}
+                key={`w-${cab.id}-${sectionIndex}`} defaultValue={Math.round(doorW * 10000) / 10000}
                 disabled={!overrideMode}
                 onBlur={e => overrideMode && handleOverride("width", e.target.value)}
                 onKeyDown={e => { if (e.key === "Enter") e.target.blur(); }}
@@ -196,7 +196,7 @@ export default function DoorDetailView({ cab, spec, sectionIndex, dispatch, onBa
               <span style={{ color: "#555", fontSize: 11 }}>w</span>
               <span style={{ color: "#333" }}>×</span>
               <input type="number" step="0.0625"
-                defaultValue={Math.round(doorH * 10000) / 10000}
+                key={`h-${cab.id}-${sectionIndex}`} defaultValue={Math.round(doorH * 10000) / 10000}
                 disabled={!overrideMode}
                 onBlur={e => overrideMode && handleOverride("height", e.target.value)}
                 onKeyDown={e => { if (e.key === "Enter") e.target.blur(); }}
