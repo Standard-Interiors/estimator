@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { SECTION_TYPES, BASE_TYPES, WALL_TYPES, TALL_TYPES, STANDARD_WIDTHS, generateId, defaultCabinet } from "../state/specHelpers";
+import { SECTION_TYPES, BASE_TYPES, WALL_TYPES, TALL_TYPES, STANDARD_WIDTHS, generateId, defaultCabinet, calcDoorSizes, formatFraction, calcScribeNotes } from "../state/specHelpers";
 
 const MONO = "'JetBrains Mono',monospace";
 const SANS = "'DM Sans',sans-serif";
@@ -261,6 +261,41 @@ export default function CabinetEditBar({ cab, spec, dispatch, selColor, widthInp
             )}
           </>
         )}
+      </div>
+
+      {/* Row 3: Scribe + Door Sizes */}
+      <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 10px", flexWrap: "wrap" }}>
+        <span style={{ color: "#444", fontSize: 10, fontWeight: 700, fontFamily: MONO, letterSpacing: "0.06em" }}>SCRIBE</span>
+        {["left", "right", "top"].map(side => {
+          const active = cab.scribe?.[side];
+          return (
+            <button key={side} onClick={() => dispatch({ type: "SET_SCRIBE", id: cab.id, updates: { [side]: !active } })}
+              style={{
+                padding: "2px 8px", borderRadius: 6, fontSize: 9, fontWeight: 600, cursor: "pointer",
+                border: "none", fontFamily: MONO,
+                background: active ? "rgba(234,179,8,0.2)" : "transparent",
+                color: active ? "#eab308" : "#555",
+              }}>
+              {side === "left" ? "L" : side === "right" ? "R" : "T"}
+            </button>
+          );
+        })}
+        <span style={{ color: "#222", margin: "0 2px" }}>|</span>
+        <span style={{ color: "#444", fontSize: 10, fontWeight: 700, fontFamily: MONO, letterSpacing: "0.06em" }}>DOORS</span>
+        {calcDoorSizes(cab, spec.frame_style || "framed").map((ds, i) => {
+          const colors = { door: "#22c55e", glass_door: "#06b6d4", drawer: "#f97216", false_front: "#8b5cf6" };
+          const c = colors[ds.type] || "#888";
+          return (
+            <span key={i} style={{
+              fontSize: 9, fontFamily: MONO, padding: "1px 6px", borderRadius: 4,
+              background: `${c}1a`, color: c, fontWeight: 600,
+              border: ds.isOverride ? `1px dashed ${c}` : "none",
+            }}>
+              {ds.label}
+              {ds.needsVerify && <span style={{ color: "#eab308", marginLeft: 4 }}>!</span>}
+            </span>
+          );
+        })}
       </div>
     </div>
   );

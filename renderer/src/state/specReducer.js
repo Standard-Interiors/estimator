@@ -404,6 +404,32 @@ export default function specReducer(state, action) {
       return spec;
     }
 
+    // ── Door sizing ──────────────────────────────────────────────────
+
+    case "SET_FRAME_STYLE": {
+      spec.frame_style = action.value;
+      return spec;
+    }
+
+    case "SET_SCRIBE": {
+      const cab = spec.cabinets.find((c) => c.id === action.id);
+      if (cab) {
+        if (!cab.scribe) cab.scribe = { left: false, right: false, top: false };
+        Object.assign(cab.scribe, action.updates);
+      }
+      return spec;
+    }
+
+    case "SET_SECTION_OVERRIDE": {
+      const cab = spec.cabinets.find((c) => c.id === action.cabId);
+      if (cab?.face?.sections?.[action.sectionIndex]) {
+        const sec = cab.face.sections[action.sectionIndex];
+        if (action.widthOverride !== undefined) sec.width_override = action.widthOverride;
+        if (action.heightOverride !== undefined) sec.height_override = action.heightOverride;
+      }
+      return spec;
+    }
+
     // ── Meta ────────────────────────────────────────────────────────
 
     case "LOAD_SPEC": {

@@ -48,6 +48,12 @@ function actionLabel(action) {
       return `Remove alignment for ${action.wall}`;
     case "REORDER_CABINET":
       return `Reorder ${action.id}`;
+    case "SET_FRAME_STYLE":
+      return `Set frame style to ${action.value}`;
+    case "SET_SCRIBE":
+      return `Set scribe on ${action.id}`;
+    case "SET_SECTION_OVERRIDE":
+      return `Override door size on ${action.cabId}`;
     default:
       return action.type;
   }
