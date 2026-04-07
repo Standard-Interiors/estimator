@@ -24,6 +24,13 @@
 - Ask yourself: "Would a staff engineer approve this?"
 - Run tests, check logs, demonstrate correctness
 
+### 4b. Iterations Mean FULL CYCLES — Not Pre-Planned Checklists
+- An "iteration" is: implement ALL fixes, verify they work, then look with COMPLETELY FRESH EYES and find what's STILL wrong. Repeat.
+- WRONG: Splitting a pre-planned list of fixes into numbered "iterations" (that's theater, not engineering)
+- RIGHT: Each iteration discovers NEW problems that only became visible after the previous round of fixes
+- Each iteration should produce staff-level insight — not just check boxes off a list
+- If you find yourself writing "Iteration 1: do X, Iteration 2: do Y" before starting — you're cheating
+
 ### 5. Demand Elegance (Balanced)
 - For non-trivial changes: pause and ask "is there a more elegant way?"
 - If a fix feels hacky: "Knowing everything I know now, implement the elegant solution"

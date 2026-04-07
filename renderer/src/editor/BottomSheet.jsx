@@ -203,8 +203,9 @@ export default function BottomSheet({ spec, selectedId, dispatch, onSelect, onIn
             <div style={{ marginTop: 10 }}>
               <div style={{
                 fontSize: 10, color: "#666", fontWeight: 600,
-                fontFamily: "'DM Sans',sans-serif", marginBottom: 6, letterSpacing: "0.05em"
-              }}>DOOR SIZES</div>
+                fontFamily: "'DM Sans',sans-serif", marginBottom: 6, letterSpacing: "0.05em",
+                display: "flex", alignItems: "center", gap: 6,
+              }}>FRONT SIZES <span style={{ fontWeight: 400, color: "#444", fontSize: 9, letterSpacing: 0 }}>tap to edit</span></div>
               <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
                 {calcDoorSizes(cab, spec.frame_style || "framed").map((ds, i) => {
                   const colors = { door: "#22c55e", glass_door: "#06b6d4", drawer: "#f97216", false_front: "#8b5cf6" };

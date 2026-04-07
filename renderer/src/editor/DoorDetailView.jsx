@@ -211,21 +211,22 @@ export default function DoorDetailView({ cab, spec, sectionIndex, dispatch, onBa
           </div>
 
           {/* Override toggle */}
-          <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+          <div style={{ display: "flex", gap: 8, marginBottom: 12, alignItems: "center" }}>
             <button onClick={() => { setOverrideMode(false); clearOverrides(); }}
               style={{
-                padding: "4px 10px", borderRadius: 6, fontSize: 10, fontWeight: 600, cursor: "pointer",
-                border: "none", fontFamily: MONO,
-                background: !overrideMode ? "rgba(34,197,94,0.15)" : "transparent",
+                padding: "5px 12px", borderRadius: 6, fontSize: 10, fontWeight: 600, cursor: "pointer",
+                border: !overrideMode ? "1px solid rgba(34,197,94,0.3)" : "1px solid transparent", fontFamily: MONO,
+                background: !overrideMode ? "rgba(34,197,94,0.15)" : "#14141e",
                 color: !overrideMode ? "#22c55e" : "#555",
               }}>Auto-calc</button>
             <button onClick={() => setOverrideMode(true)}
               style={{
-                padding: "4px 10px", borderRadius: 6, fontSize: 10, fontWeight: 600, cursor: "pointer",
-                border: "none", fontFamily: MONO,
-                background: overrideMode ? "rgba(139,92,246,0.15)" : "transparent",
+                padding: "5px 12px", borderRadius: 6, fontSize: 10, fontWeight: 600, cursor: "pointer",
+                border: overrideMode ? "1px solid rgba(139,92,246,0.3)" : "1px solid transparent", fontFamily: MONO,
+                background: overrideMode ? "rgba(139,92,246,0.15)" : "#14141e",
                 color: overrideMode ? "#8b5cf6" : "#555",
-              }}>Override</button>
+              }}>Manual Override</button>
+            {overrideMode && <span style={{ fontSize: 9, color: "#8b5cf6", fontFamily: MONO }}>Edit W/H above</span>}
           </div>
 
           {/* Scribe toggles */}
@@ -264,12 +265,12 @@ export default function DoorDetailView({ cab, spec, sectionIndex, dispatch, onBa
           style={{
             flex: 1, padding: "8px", borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: sectionIndex > 0 ? "pointer" : "default",
             background: "#14141e", border: "1px solid #2a2a3a", color: sectionIndex > 0 ? "#aaa" : "#333", fontFamily: MONO,
-          }}>← Prev Section</button>
+          }}>← Prev ({sectionIndex}/{totalSections})</button>
         <button onClick={onNext} disabled={sectionIndex >= totalSections - 1}
           style={{
             flex: 1, padding: "8px", borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: sectionIndex < totalSections - 1 ? "pointer" : "default",
             background: "#14141e", border: "1px solid #2a2a3a", color: sectionIndex < totalSections - 1 ? "#aaa" : "#333", fontFamily: MONO,
-          }}>Next Section →</button>
+          }}>Next ({sectionIndex + 2}/{totalSections}) →</button>
       </div>
     </div>
   );

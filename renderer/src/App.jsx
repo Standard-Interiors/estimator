@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { Routes, Route, useParams, useNavigate } from "react-router-dom";
 import useSpecState from "./state/useSpecState";
 import useIsMobile from "./hooks/useIsMobile";
@@ -6,10 +6,11 @@ import InteractiveRender from "./editor/InteractiveRender";
 import CabinetEditBar from "./editor/CabinetEditBar";
 import DoorDetailView from "./editor/DoorDetailView";
 import BottomSheet from "./editor/BottomSheet";
-import { defaultCabinet, generateId, calcDoorSizes, formatFraction, calcScribeNotes } from "./state/specHelpers";
+import { defaultCabinet, generateId, calcDoorSizes, formatFraction, calcScribeNotes, loadShopProfile, saveShopProfile, calcFullCutList, calcProjectCutList } from "./state/specHelpers";
 import ProjectList from "./pages/ProjectList";
 import ProjectDetail from "./pages/ProjectDetail";
 import JsonEditor from "./components/JsonEditor";
+import ShopProfile from "./editor/ShopProfile";
 import * as api from "./api";
 
 // ═══════════════════════════════════════════════════════════
@@ -286,6 +287,9 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
   const [isDragging, setIsDragging] = useState(false);
   const [jsonOpen, setJsonOpen] = useState(false);
   const [exampleHover, setExampleHover] = useState(false);
+  const [shopProfile, setShopProfileState] = useState(loadShopProfile);
+  const [showShopProfile, setShowShopProfile] = useState(false);
+  const handleShopProfileChange = (p) => { setShopProfileState(p); saveShopProfile(p); };
   const wallLengthKey = `wallLength_${projectId}_${roomId}`;
   const [wallLength, setWallLengthState] = useState(() => { const s = localStorage.getItem(wallLengthKey); return s ? parseFloat(s) : null; });
   const setWallLength = (v) => { setWallLengthState(v); if (v) localStorage.setItem(wallLengthKey, v); else localStorage.removeItem(wallLengthKey); };
@@ -700,7 +704,7 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
         </div>
         {hasSpec && (
           <div style={{display:"flex",gap:3,alignItems:"center"}}>
-            {[["render","Render"],["doors","Doors"]].map(([key,label])=>(
+            {[["render","3D View"],["doors","Door Schedule"],["cutlist","Cut List"]].map(([key,label])=>(
               <button key={key} onClick={()=>{setTab(key);setShowMoreMenu(false);}} style={{
                 background:tab===key?"#1a1a2a":"transparent",color:tab===key?"#fff":"#555",
                 border:`1px solid ${tab===key?"#2a2a3a":"transparent"}`,
@@ -715,6 +719,16 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
                 padding:"4px 10px",borderRadius:5,fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:"inherit"
               }}>Photo</button>
             )}
+            {/* Shop Profile — visually distinct from tabs */}
+            <span style={{width:1,height:16,background:"#1a1a2a",margin:"0 2px"}}/>
+            <button onClick={()=>setShowShopProfile(true)} title="Shop Profile — material & construction defaults" style={{
+              background:"#14141e",color:"#666",
+              border:"1px solid #1a1a2a",
+              padding:"4px 10px",borderRadius:5,fontSize:10,cursor:"pointer",fontFamily:"inherit",
+              display:"flex",alignItems:"center",gap:4,
+            }}
+            onMouseEnter={e=>{e.currentTarget.style.color="#D94420";e.currentTarget.style.borderColor="#D94420";}}
+            onMouseLeave={e=>{e.currentTarget.style.color="#666";e.currentTarget.style.borderColor="#1a1a2a";}}>⚙ Shop</button>
             {/* More menu */}
             <div style={{position:"relative"}}>
               <button onClick={()=>setShowMoreMenu(!showMoreMenu)} style={{
@@ -1158,14 +1172,24 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
                 <h2 style={{fontSize:16,fontWeight:700,color:"#eee",margin:0}}>Door Schedule</h2>
                 <span style={{fontSize:11,color:"#555",fontFamily:"'JetBrains Mono',monospace"}}>{fs === "framed" ? "Framed" : "Frameless"}</span>
                 <span style={{flex:1}}/>
-                <button onClick={()=>window.print()} style={{padding:"6px 14px",borderRadius:6,fontSize:11,fontWeight:600,cursor:"pointer",background:"#1a1a2a",border:"1px solid #2a2a3a",color:"#888",fontFamily:"inherit"}}>Print</button>
+                <button onClick={()=>{
+                  const csv = ["Cabinet,Type,Component,Qty,Width,Height,Scribe"];
+                  allSections.forEach(s => {
+                    const w = s.count >= 2 && (s.type === "door" || s.type === "glass_door") ? s.perDoorWidth : s.width;
+                    csv.push(`${s.cab.id},${s.cab.type},${s.type},${s.count},${w},${s.height},${s.scribeNote||""}`);
+                  });
+                  const blob = new Blob([csv.join("\n")], { type: "text/csv" });
+                  const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+                  a.download = `doors_${new Date().toISOString().slice(0,10)}.csv`; a.click();
+                }} style={{padding:"5px 10px",borderRadius:6,fontSize:10,fontWeight:600,cursor:"pointer",background:"#1a1a2a",border:"1px solid #2a2a3a",color:"#888",fontFamily:"inherit"}}>Export CSV</button>
+                <button onClick={()=>window.print()} style={{padding:"5px 10px",borderRadius:6,fontSize:10,fontWeight:600,cursor:"pointer",background:"#1a1a2a",border:"1px solid #2a2a3a",color:"#888",fontFamily:"inherit"}}>Print</button>
               </div>
 
               {/* Detail table */}
               <table style={{width:"100%",borderCollapse:"collapse",fontSize:12,fontFamily:"'JetBrains Mono',monospace"}}>
                 <thead>
                   <tr style={{borderBottom:"2px solid #2a2a3a"}}>
-                    {["Cab","Type","Section","Qty","Width","Height","Scribe",""].map(h=>(
+                    {["Cab","Type","Component","Qty","Width","Height","Scribe",""].map(h=>(
                       <th key={h} style={{padding:"8px 6px",textAlign:"left",color:"#666",fontWeight:600,fontSize:10,letterSpacing:"0.05em"}}>{h}</th>
                     ))}
                   </tr>
@@ -1186,10 +1210,10 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
                         <td style={{padding:"6px",color:"#aaa"}}>{s.count}</td>
                         <td style={{padding:"6px",color:"#eee",fontWeight:600}}>{formatFraction(w)}"</td>
                         <td style={{padding:"6px",color:"#eee",fontWeight:600}}>{formatFraction(s.height)}"</td>
-                        <td style={{padding:"6px",color:s.scribeNote?"#eab308":"#333"}}>{s.scribeNote||"—"}</td>
+                        <td style={{padding:"6px",color:s.scribeNote?"#eab308":"#555"}}>{s.scribeNote||"None"}</td>
                         <td style={{padding:"6px"}}>
-                          {s.isOverride && <span style={{color:"#8b5cf6",fontSize:9}}>override</span>}
-                          {s.needsVerify && <span style={{color:"#eab308",fontSize:9}}>verify</span>}
+                          {s.isOverride && <span style={{color:"#8b5cf6",fontSize:9,padding:"2px 6px",background:"rgba(139,92,246,0.1)",borderRadius:3}}>override</span>}
+                          {s.needsVerify && <span style={{color:"#eab308",fontSize:9,padding:"2px 6px",background:"rgba(234,179,8,0.1)",borderRadius:3}}>verify</span>}
                         </td>
                       </tr>
                     );
@@ -1207,6 +1231,126 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
                     <span style={{color:"#555"}}>({label})</span>
                   </div>
                 ))}
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* ═══ Cut List Tab ═══ */}
+        {hasSpec && tab === "cutlist" && (()=>{
+          const fs = spec.frame_style || "framed";
+          const allParts = calcProjectCutList(spec, shopProfile);
+          // Group by material for nesting summary
+          const byMaterial = {};
+          allParts.forEach(p => {
+            const key = p.material || "Unknown";
+            if (!byMaterial[key]) byMaterial[key] = [];
+            byMaterial[key].push(p);
+          });
+          // Total part count
+          const totalParts = allParts.reduce((s, p) => s + p.qty, 0);
+          const catColor = (c) => c === "front" ? "#22c55e" : c === "drawer_box" ? "#f97216" : "#1a6fbf";
+          const catLabel = (c) => c === "front" ? "Front" : c === "drawer_box" ? "Drawer Box" : "Box";
+          return (
+            <div style={{padding:isMobile?"10px":"14px 20px",maxHeight:"calc(100vh - 140px)",overflow:"auto"}}>
+              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8,flexWrap:"wrap"}}>
+                <h2 style={{fontSize:isMobile?14:16,fontWeight:700,color:"#eee",margin:0}}>CNC Cut List</h2>
+                <span style={{fontSize:10,color:"#555",fontFamily:"'JetBrains Mono',monospace"}}>{fs === "framed" ? "Framed" : "Frameless"} · {totalParts} parts · {(spec.cabinets||[]).length} cabinets</span>
+                <span style={{flex:1}}/>
+                <button onClick={()=>setShowShopProfile(true)} style={{padding:"5px 10px",borderRadius:6,fontSize:10,fontWeight:600,cursor:"pointer",background:"#1a1a2a",border:"1px solid #2a2a3a",color:"#888",fontFamily:"inherit"}}>⚙ Shop Profile</button>
+                <button onClick={()=>{
+                  const csv = ["Part_ID,Cabinet,Part,Qty,Length,Width,Thickness,Material,Grain,Edge_Band"];
+                  allParts.forEach(p => {
+                    const l = Math.max(p.width, p.height), w = Math.min(p.width, p.height);
+                    csv.push(`${p.partId||""},${p.cabId},${p.part},${p.qty},${l},${w},${p.thickness||""},${p.material},${p.grain||""},${p.edgeBand}`);
+                  });
+                  const blob = new Blob([csv.join("\n")], { type: "text/csv" });
+                  const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+                  a.download = `cutlist_${new Date().toISOString().slice(0,10)}.csv`; a.click();
+                }} style={{padding:"5px 10px",borderRadius:6,fontSize:10,fontWeight:600,cursor:"pointer",background:"#1a1a2a",border:"1px solid #2a2a3a",color:"#888",fontFamily:"inherit"}}>Export CSV</button>
+                <button onClick={()=>window.print()} style={{padding:"5px 10px",borderRadius:6,fontSize:10,fontWeight:600,cursor:"pointer",background:"#1a1a2a",border:"1px solid #2a2a3a",color:"#888",fontFamily:"inherit"}}>Print</button>
+              </div>
+              {/* Legend with category counts */}
+              {(()=>{
+                const boxCount = allParts.filter(p=>p.category==="box").reduce((s,p)=>s+p.qty,0);
+                const frontCount = allParts.filter(p=>p.category==="front").reduce((s,p)=>s+p.qty,0);
+                const drwCount = allParts.filter(p=>p.category==="drawer_box").reduce((s,p)=>s+p.qty,0);
+                return <div style={{display:"flex",gap:14,marginBottom:14,fontSize:10,color:"#555",fontFamily:"'JetBrains Mono',monospace"}}>
+                  <span><span style={{display:"inline-block",width:7,height:7,borderRadius:2,background:"#1a6fbf",marginRight:4,verticalAlign:"middle"}}/>Box <span style={{color:"#444"}}>{boxCount}</span></span>
+                  <span><span style={{display:"inline-block",width:7,height:7,borderRadius:2,background:"#22c55e",marginRight:4,verticalAlign:"middle"}}/>Fronts <span style={{color:"#444"}}>{frontCount}</span></span>
+                  <span><span style={{display:"inline-block",width:7,height:7,borderRadius:2,background:"#f97216",marginRight:4,verticalAlign:"middle"}}/>Drawer Box <span style={{color:"#444"}}>{drwCount}</span></span>
+                </div>;
+              })()}
+
+              {/* Per-cabinet breakdown */}
+              {(spec.cabinets||[]).map(cab => {
+                const cabParts = allParts.filter(p => p.cabId === cab.id);
+                if (!cabParts.length) return null;
+                return (
+                  <div key={cab.id} style={{marginBottom:20}}>
+                    <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8,padding:"6px 0",borderBottom:"1px solid #1a1a2a",cursor:"pointer"}}
+                      onClick={()=>{setSelectedId(cab.id);setTab("render");}}>
+                      <span style={{color:cab.row==="base"?"#D94420":"#1a6fbf",fontWeight:700,fontSize:13,fontFamily:"'JetBrains Mono',monospace"}}>{cab.id}</span>
+                      <span style={{color:"#666",fontSize:11}}>{cab.type}</span>
+                      <span style={{color:"#555",fontSize:11,fontFamily:"'JetBrains Mono',monospace"}}>{cab.width}" × {cab.height}" × {cab.depth}"</span>
+                      <span style={{flex:1}}/>
+                      <span style={{fontSize:10,color:"#444"}}>{cabParts.reduce((s,p)=>s+p.qty,0)} parts</span>
+                      <span style={{fontSize:9,color:"#555",opacity:0.7}}>view →</span>
+                    </div>
+                    <div style={{overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
+                    <table style={{width:"100%",minWidth:isMobile?600:undefined,borderCollapse:"collapse",fontSize:11,fontFamily:"'JetBrains Mono',monospace"}}>
+                      <thead>
+                        <tr style={{borderBottom:"1px solid #1a1a2a"}}>
+                          {(isMobile?["","ID","Part","Qty","W","H","T","Mat"]:["","ID","Part","Qty","W","H","T","Material","Grain","Edge"]).map(h=>(
+                            <th key={h} style={{padding:"4px 4px",textAlign:"left",color:"#555",fontWeight:600,fontSize:8,letterSpacing:"0.05em",whiteSpace:"nowrap"}}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {cabParts.map((p, i) => {
+                          // Add separator between categories
+                          const prevCat = i > 0 ? cabParts[i-1].category : null;
+                          const showSep = prevCat && prevCat !== p.category;
+                          return (<React.Fragment key={`part-${i}`}>
+                          {showSep && <tr><td colSpan={10} style={{padding:0,height:1,background:"#2a2a3a"}}/></tr>}
+                          <tr style={{borderBottom:"1px solid #0a0a14",background:i%2===0?"transparent":"rgba(255,255,255,0.015)"}}>
+                            <td style={{padding:"3px 4px",width:6}}><span style={{display:"inline-block",width:6,height:6,borderRadius:2,background:catColor(p.category)}} title={catLabel(p.category)}/></td>
+                            <td style={{padding:"3px 4px",color:"#555",fontSize:9,whiteSpace:"nowrap"}}>{p.partId||""}</td>
+                            <td style={{padding:"3px 4px",color:"#ccc",whiteSpace:"nowrap"}}>{p.part}</td>
+                            <td style={{padding:"3px 4px",color:"#888"}}>{p.qty}</td>
+                            <td style={{padding:"3px 4px",color:"#eee",fontWeight:600,whiteSpace:"nowrap"}}>{p.width}"</td>
+                            <td style={{padding:"3px 4px",color:"#eee",fontWeight:600,whiteSpace:"nowrap"}}>{p.height}"</td>
+                            <td style={{padding:"3px 4px",color:"#888",fontSize:9}}>{p.thickness||""}</td>
+                            <td style={{padding:"3px 4px",color:"#666",fontSize:9,whiteSpace:"nowrap"}}>{isMobile?(p.material||"").split('"')[0]+'"':p.material}</td>
+                            {!isMobile && <td style={{padding:"3px 4px",color:p.grain==="V"?"#22c55e":"#1a6fbf",fontSize:9}}>{p.grain||""}</td>}
+                            {!isMobile && <td style={{padding:"3px 4px",color:"#444",fontSize:9}}>{p.edgeBand}</td>}
+                          </tr>
+                          </React.Fragment>);
+                        })}
+                      </tbody>
+                    </table>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* Material summary */}
+              <div style={{marginTop:24,padding:"14px 16px",background:"#0a0a14",borderRadius:8,border:"1px solid #1a1a2a"}}>
+                <div style={{fontSize:12,fontWeight:700,color:"#888",marginBottom:10,letterSpacing:"0.05em"}}>MATERIAL SUMMARY</div>
+                {Object.entries(byMaterial).map(([mat, parts]) => {
+                  const totalQty = parts.reduce((s, p) => s + p.qty, 0);
+                  // Estimate 4×8 sheet usage (48"×96" = 4608 sq in, ~65% yield)
+                  const totalSqIn = parts.reduce((s, p) => s + (p.qty * p.width * p.height), 0);
+                  const sheetsRaw = totalSqIn / (48 * 96 * 0.65);
+                  const sheets = Math.ceil(sheetsRaw * 10) / 10;
+                  return (
+                    <div key={mat} style={{display:"flex",gap:10,padding:"5px 0",fontSize:12,fontFamily:"'JetBrains Mono',monospace",alignItems:"center"}}>
+                      <span style={{color:"#D94420",fontWeight:700,minWidth:36}}>{totalQty}x</span>
+                      <span style={{color:"#eee",fontWeight:600,flex:1}}>{mat}</span>
+                      {sheets > 0.1 && <span style={{color:"#888",fontSize:10,background:"#14141e",padding:"2px 8px",borderRadius:4}}>~{sheets} sheets</span>}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           );
@@ -1234,6 +1378,15 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
             </div>
           </div>
         </div>
+      )}
+
+      {/* Shop Profile Modal */}
+      {showShopProfile && (
+        <ShopProfile
+          profile={shopProfile}
+          onChange={handleShopProfileChange}
+          onClose={() => setShowShopProfile(false)}
+        />
       )}
 
       {/* Extraction processing modal — blocks all interaction */}
