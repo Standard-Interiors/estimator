@@ -248,12 +248,25 @@ export default function DoorDetailView({ cab, spec, sectionIndex, dispatch, onBa
             </div>
           </div>
 
-          {/* Formula */}
+          {/* Formula — broken into readable steps */}
           <div style={{ marginBottom: 12 }}>
-            <div style={{ fontSize: 10, color: "#666", fontWeight: 600, marginBottom: 4, fontFamily: MONO }}>FORMULA</div>
-            <div style={{ fontSize: 10, color: "#888", fontFamily: MONO, lineHeight: 1.6 }}>
-              <div>W: {formulaW}</div>
-              <div>H: {formulaH}</div>
+            <div style={{ fontSize: 10, color: "#666", fontWeight: 600, marginBottom: 6, fontFamily: MONO }}>HOW IT'S CALCULATED</div>
+            <div style={{ fontSize: 10, fontFamily: MONO, lineHeight: 1.8, background: "#08080e", borderRadius: 6, padding: "8px 10px" }}>
+              <div><span style={{color:"#555"}}>Width:</span> <span style={{color:"#aaa"}}>{cab.width}"</span>
+                {offsets.width > 0 && <span style={{color:"#666"}}> − {offsets.width}" frame</span>}
+                {scribe.left && <span style={{color:"#eab308"}}> − {SCRIBE_OFFSETS.side}" L scribe</span>}
+                {scribe.right && <span style={{color:"#eab308"}}> − {SCRIBE_OFFSETS.side}" R scribe</span>}
+                {isDouble && <span style={{color:"#666"}}> − {offsets.centerStile}" stile ÷ 2</span>}
+                <span style={{color:"#22c55e", fontWeight:700}}> = {formatFraction(doorW)}"</span></div>
+              <div><span style={{color:"#555"}}>Height:</span> {ds.type === "drawer" ? (
+                <span style={{color:"#22c55e", fontWeight:700}}>{formatFraction(doorH)}" (set)</span>
+              ) : (<>
+                <span style={{color:"#aaa"}}>{cab.height}"</span>
+                {cab.row === "base" && <span style={{color:"#666"}}> − {offsets.baseDeduct}" base</span>}
+                {offsets.height > 0 && <span style={{color:"#666"}}> − {offsets.height}" frame</span>}
+                {scribe.top && <span style={{color:"#eab308"}}> − {SCRIBE_OFFSETS.top}" top</span>}
+                <span style={{color:"#22c55e", fontWeight:700}}> = {formatFraction(doorH)}"</span>
+              </>)}</div>
             </div>
           </div>
         </div>
