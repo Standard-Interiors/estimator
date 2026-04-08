@@ -207,19 +207,21 @@ export default function CabinetEditBar({ cab, spec, dispatch, selColor, widthInp
               {SECTION_TYPES.map(t => <option key={t} value={t}>{SEC_LABELS[t]}</option>)}
             </select>
 
-            {/* Count */}
+            {/* Count — pill buttons instead of dropdown */}
             {(editSec.type === "door" || editSec.type === "glass_door" || editSec.type === "drawer") && (
               <>
-                <span style={{ color: "#444", fontSize: 10, fontFamily: MONO }}>count</span>
-                <select
-                  value={editSec.count || 1}
-                  onChange={e => dispatch({ type: "UPDATE_SECTION", cabId: cab.id, sectionIndex: editingSec, updates: { count: parseInt(e.target.value) } })}
-                  style={{
-                    height: 28, width: 40, background: "#14141e", border: "1px solid #2a2a3a", borderRadius: 4,
-                    color: "#ddd", fontSize: 11, fontFamily: MONO, textAlign: "center", cursor: "pointer",
-                  }}>
-                  {[1, 2, 3, 4].map(n => <option key={n} value={n}>{n}</option>)}
-                </select>
+                <span style={{ color: "#444", fontSize: 10, fontFamily: MONO }}>qty</span>
+                <div style={{ display: "flex", gap: 2 }}>
+                  {[1, 2, 3, 4].map(n => (
+                    <button key={n} onClick={() => dispatch({ type: "UPDATE_SECTION", cabId: cab.id, sectionIndex: editingSec, updates: { count: n } })}
+                      style={{
+                        width: 26, height: 26, borderRadius: 4, fontSize: 11, fontWeight: 600,
+                        cursor: "pointer", border: "none", fontFamily: MONO,
+                        background: (editSec.count || 1) === n ? "rgba(34,197,94,0.2)" : "#14141e",
+                        color: (editSec.count || 1) === n ? "#22c55e" : "#555",
+                      }}>{n}</button>
+                  ))}
+                </div>
               </>
             )}
 
@@ -270,15 +272,17 @@ export default function CabinetEditBar({ cab, spec, dispatch, selColor, widthInp
         <span style={{ color: "#444", fontSize: 10, fontWeight: 700, fontFamily: MONO, letterSpacing: "0.06em" }}>SCRIBE</span>
         {["left", "right", "top"].map(side => {
           const active = cab.scribe?.[side];
+          const label = side === "left" ? "Left" : side === "right" ? "Right" : "Top";
           return (
             <button key={side} onClick={() => dispatch({ type: "SET_SCRIBE", id: cab.id, updates: { [side]: !active } })}
+              title={`${label} scribe — trim edge to fit against wall`}
               style={{
                 padding: "2px 8px", borderRadius: 6, fontSize: 9, fontWeight: 600, cursor: "pointer",
-                border: "none", fontFamily: MONO,
+                border: active ? "1px solid rgba(234,179,8,0.3)" : "1px solid transparent", fontFamily: MONO,
                 background: active ? "rgba(234,179,8,0.2)" : "transparent",
                 color: active ? "#eab308" : "#555",
               }}>
-              {side === "left" ? "L" : side === "right" ? "R" : "T"}
+              {label}
             </button>
           );
         })}
