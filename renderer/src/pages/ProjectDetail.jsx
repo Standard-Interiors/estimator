@@ -191,7 +191,7 @@ export default function ProjectDetail() {
   function renderHeader() {
     return (
       <div style={{
-        display: "flex", alignItems: "center", gap: 10,
+        display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap",
         padding: "12px 0",
       }}>
         <span
@@ -203,8 +203,7 @@ export default function ProjectDetail() {
         <span style={{ color: "#333" }}>|</span>
         <span style={{ fontSize: 16, fontWeight: 700, color: "#eee" }}>{project.name}</span>
         <span style={{
-          fontSize: 10, color: "#555", padding: "2px 6px", borderRadius: 4,
-          border: "1px solid #2a2a3a", fontFamily: "'JetBrains Mono', monospace",
+          fontSize: 10, color: "#555", fontFamily: "'JetBrains Mono', monospace",
         }}>
           {roomCount} room{roomCount !== 1 ? "s" : ""} · {wallCount} wall{wallCount !== 1 ? "s" : ""}
         </span>
@@ -214,8 +213,8 @@ export default function ProjectDetail() {
             onClick={() => navigate(`/project/${projectId}/cutlist`)}
             style={{
               background: "transparent", color: "#888", border: "1px solid #2a2a3a",
-              padding: "8px 18px", borderRadius: 18, fontSize: 12,
-              fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
+              padding: "6px 14px", borderRadius: 14, fontSize: 11,
+              fontWeight: 600, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap",
             }}
             onMouseEnter={e => { e.target.style.borderColor = "#D94420"; e.target.style.color = "#D94420"; }}
             onMouseLeave={e => { e.target.style.borderColor = "#2a2a3a"; e.target.style.color = "#888"; }}
@@ -227,7 +226,7 @@ export default function ProjectDetail() {
           onClick={() => setCreatingRoom(true)}
           style={{
             background: "#D94420", color: "#fff", border: "none",
-            padding: "8px 18px", borderRadius: 18, fontSize: 12,
+            padding: "6px 14px", borderRadius: 14, fontSize: 11,
             fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
           }}
         >

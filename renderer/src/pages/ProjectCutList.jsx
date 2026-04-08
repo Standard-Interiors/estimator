@@ -102,7 +102,7 @@ export default function ProjectCutList() {
         <span style={{ color: "#333" }}>|</span>
         <h1 style={{ fontSize: 18, fontWeight: 700, margin: 0, color: "#eee" }}>Project Cut List</h1>
         <span style={{ fontSize: 10, color: "#555", fontFamily: MONO }}>
-          {totalParts} parts · {totalCabinets} cabinets · {wallData.length} walls
+          {totalParts} parts · {totalCabinets} cabinet{totalCabinets !== 1 ? "s" : ""} · {wallData.length} wall{wallData.length !== 1 ? "s" : ""}
         </span>
         <span style={{ flex: 1 }} />
         <button onClick={() => setShowShopProfile(true)} style={{

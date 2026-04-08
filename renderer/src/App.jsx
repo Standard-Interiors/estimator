@@ -729,7 +729,7 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
         </div>
         {hasSpec && (
           <div style={{display:"flex",gap:3,alignItems:"center"}}>
-            {[["render","3D View"],["doors","Door Schedule"],["cutlist","Cut List"]].map(([key,label])=>(
+            {[["render",isMobile?"3D":"3D View"],["doors",isMobile?"Doors":"Door Schedule"],["cutlist","Cut List"]].map(([key,label])=>(
               <button key={key} onClick={()=>{setTab(key);setShowMoreMenu(false);}} style={{
                 background:tab===key?"#1a1a2a":"transparent",color:tab===key?"#fff":"#555",
                 border:`1px solid ${tab===key?"#2a2a3a":"transparent"}`,
@@ -971,9 +971,9 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
                 {/* Frame style toggle */}
                 {(()=>{const fs=spec.frame_style||"framed";const pill=(val,label)=>(<button key={val} onClick={()=>dispatch({type:"SET_FRAME_STYLE",value:val})} style={{padding:isMobile?"4px 8px":"3px 8px",borderRadius:10,fontSize:isMobile?10:9,fontWeight:600,cursor:"pointer",border:"none",background:fs===val?"rgba(34,197,94,0.2)":"transparent",color:fs===val?"#22c55e":"#555",fontFamily:"'JetBrains Mono',monospace",minHeight:isMobile?32:undefined}}>{label}</button>);return <div style={{display:"flex",gap:2,background:"#0a0a14",borderRadius:12,padding:"1px 2px",border:"1px solid #1a1a2a"}}>{pill("framed","Framed")}{pill("frameless","Frameless")}</div>;})()}
                 <span style={{flex:1}}/>
-                <span style={{color:"#555"}}>{cabCount}c</span>
-                <span style={{color:"#D94420",fontWeight:600}}>B:{baseRun}"</span>
-                <span style={{color:"#1a6fbf",fontWeight:600}}>W:{wallRun}"</span>
+                <span style={{color:"#555"}}>{cabCount}{isMobile?"":" cabs"}</span>
+                <span style={{color:"#D94420",fontWeight:600}}>{isMobile?"B":"Base"} {baseRun}"</span>
+                <span style={{color:"#1a6fbf",fontWeight:600}}>{isMobile?"W":"Wall"} {wallRun}"</span>
                 {!isMobile && <>
                   <span style={{color:"#222"}}>|</span>
                   <span style={{color:"#666",fontSize:10}}>wall</span>
@@ -1223,12 +1223,12 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
                   {allSections.map((s, i) => {
                     const w = s.count >= 2 && (s.type === "door" || s.type === "glass_door") ? s.perDoorWidth : s.width;
                     return (
-                      <tr key={i} style={{borderBottom:"1px solid #1a1a2a",cursor:"pointer"}}
+                      <tr key={i} style={{borderBottom:"1px solid #1a1a2a",cursor:"pointer",background:i%2===0?"transparent":"rgba(255,255,255,0.015)"}}
                         onClick={()=>{setSelectedId(s.cab.id);setTab("render");}}
-                        onMouseEnter={e=>e.currentTarget.style.background="#0a0a14"}
-                        onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                        onMouseEnter={e=>e.currentTarget.style.background="rgba(217,68,32,0.05)"}
+                        onMouseLeave={e=>e.currentTarget.style.background=i%2===0?"transparent":"rgba(255,255,255,0.015)"}>
                         <td style={{padding:"6px",color:s.cab.row==="base"?"#D94420":"#1a6fbf",fontWeight:700}}>{s.cab.id}</td>
-                        <td style={{padding:"6px",color:"#666"}}>{s.cab.type}</td>
+                        <td style={{padding:"6px",color:"#666"}}>{({base:"Base",base_sink:"Sink",base_drawer_bank:"Drw Bank",base_pullout:"Pullout",base_spice:"Spice",wall:"Wall",wall_bridge:"Bridge",wall_stacker:"Stacker",tall_pantry:"Pantry",tall_oven:"Oven"})[s.cab.type]||s.cab.type}</td>
                         <td style={{padding:"6px",color:rowColor(s.type),fontWeight:600}}>
                           {s.type === "door" ? "Door" : s.type === "glass_door" ? "Glass" : s.type === "drawer" ? "Drawer" : "False Front"}
                         </td>
@@ -1366,7 +1366,7 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
                     <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8,padding:"6px 0",borderBottom:"1px solid #1a1a2a",cursor:"pointer"}}
                       onClick={()=>{setSelectedId(cab.id);setTab("render");}}>
                       <span style={{color:cab.row==="base"?"#D94420":"#1a6fbf",fontWeight:700,fontSize:13,fontFamily:"'JetBrains Mono',monospace"}}>{cab.id}</span>
-                      <span style={{color:"#666",fontSize:11}}>{cab.type}</span>
+                      <span style={{color:"#666",fontSize:11}}>{({base:"Base",base_sink:"Sink",base_drawer_bank:"Drw Bank",base_pullout:"Pullout",base_spice:"Spice",wall:"Wall",wall_bridge:"Bridge",wall_stacker:"Stacker",tall_pantry:"Pantry",tall_oven:"Oven"})[cab.type]||cab.type}</span>
                       <span style={{color:"#555",fontSize:11,fontFamily:"'JetBrains Mono',monospace"}}>{cab.width}" × {cab.height}" × {cab.depth}"</span>
                       <span style={{flex:1}}/>
                       <span style={{fontSize:10,color:"#444"}}>{cabParts.reduce((s,p)=>s+p.qty,0)} parts</span>
