@@ -209,6 +209,20 @@ export default function ProjectDetail() {
           {roomCount} room{roomCount !== 1 ? "s" : ""} · {wallCount} wall{wallCount !== 1 ? "s" : ""}
         </span>
         <span style={{ flex: 1 }} />
+        {wallCount > 0 && (
+          <button
+            onClick={() => navigate(`/project/${projectId}/cutlist`)}
+            style={{
+              background: "transparent", color: "#888", border: "1px solid #2a2a3a",
+              padding: "8px 18px", borderRadius: 18, fontSize: 12,
+              fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
+            }}
+            onMouseEnter={e => { e.target.style.borderColor = "#D94420"; e.target.style.color = "#D94420"; }}
+            onMouseLeave={e => { e.target.style.borderColor = "#2a2a3a"; e.target.style.color = "#888"; }}
+          >
+            Cut List
+          </button>
+        )}
         <button
           onClick={() => setCreatingRoom(true)}
           style={{

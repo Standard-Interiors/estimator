@@ -91,6 +91,28 @@ export function saveShopProfile(profile) {
   } catch {}
 }
 
+/** Check if the user has completed the first-run shop profile setup */
+export function isShopProfileConfigured() {
+  return localStorage.getItem("shop_profile_setup_complete") === "1";
+}
+
+/** Mark the shop profile as configured (first-run dismissed) */
+export function markShopProfileConfigured() {
+  localStorage.setItem("shop_profile_setup_complete", "1");
+}
+
+/**
+ * Resolve the effective shop profile for a spec.
+ * Per-project override in spec.shop_profile_override takes precedence over global defaults.
+ */
+export function resolveShopProfile(spec) {
+  const global = loadShopProfile();
+  if (spec?.shop_profile_override) {
+    return { ...global, ...spec.shop_profile_override };
+  }
+  return global;
+}
+
 // Door sizing offsets by frame style
 export const FRAME_OFFSETS = {
   framed: {

@@ -6,9 +6,10 @@ import InteractiveRender from "./editor/InteractiveRender";
 import CabinetEditBar from "./editor/CabinetEditBar";
 import DoorDetailView from "./editor/DoorDetailView";
 import BottomSheet from "./editor/BottomSheet";
-import { defaultCabinet, generateId, calcDoorSizes, formatFraction, calcScribeNotes, loadShopProfile, saveShopProfile, calcFullCutList, calcProjectCutList } from "./state/specHelpers";
+import { defaultCabinet, generateId, calcDoorSizes, formatFraction, calcScribeNotes, loadShopProfile, saveShopProfile, resolveShopProfile, isShopProfileConfigured, markShopProfileConfigured, calcFullCutList, calcProjectCutList } from "./state/specHelpers";
 import ProjectList from "./pages/ProjectList";
 import ProjectDetail from "./pages/ProjectDetail";
+import ProjectCutList from "./pages/ProjectCutList";
 import JsonEditor from "./components/JsonEditor";
 import ShopProfile from "./editor/ShopProfile";
 import * as api from "./api";
@@ -289,7 +290,26 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
   const [exampleHover, setExampleHover] = useState(false);
   const [shopProfile, setShopProfileState] = useState(loadShopProfile);
   const [showShopProfile, setShowShopProfile] = useState(false);
-  const handleShopProfileChange = (p) => { setShopProfileState(p); saveShopProfile(p); };
+  const [showFirstRunBanner, setShowFirstRunBanner] = useState(false);
+  const [projectOverride, setProjectOverride] = useState(false); // per-project override toggle
+  const handleShopProfileChange = (p) => {
+    if (projectOverride) {
+      // Save override to spec
+      dispatch({ type: "SET_SHOP_OVERRIDE", override: p });
+    } else {
+      setShopProfileState(p); saveShopProfile(p);
+    }
+  };
+  // Effective profile: per-project override > global shop profile
+  const effectiveProfile = spec?.shop_profile_override
+    ? { ...shopProfile, ...spec.shop_profile_override }
+    : shopProfile;
+  // Detect first-run when switching to cutlist tab
+  useEffect(() => {
+    if (tab === "cutlist" && !isShopProfileConfigured()) setShowFirstRunBanner(true);
+  }, [tab]);
+  // Sync projectOverride flag from spec
+  useEffect(() => { setProjectOverride(!!spec?.shop_profile_override); }, [spec?.shop_profile_override]);
   const wallLengthKey = `wallLength_${projectId}_${roomId}`;
   const [wallLength, setWallLengthState] = useState(() => { const s = localStorage.getItem(wallLengthKey); return s ? parseFloat(s) : null; });
   const setWallLength = (v) => { setWallLengthState(v); if (v) localStorage.setItem(wallLengthKey, v); else localStorage.removeItem(wallLengthKey); };
@@ -682,11 +702,16 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
         input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
         textarea{font-family:'JetBrains Mono',monospace}
         @media print {
-          body{background:#fff !important}
+          body{background:#fff !important;color:#000 !important}
+          *{background:transparent !important;color:#000 !important;box-shadow:none !important}
           [data-noprint]{display:none !important}
-          [data-printable]{background:#fff !important;overflow:visible !important;height:auto !important;position:static !important}
+          [data-printable]{overflow:visible !important;height:auto !important;position:static !important;max-height:none !important}
           [data-printonly]{display:block !important}
+          table{border-collapse:collapse !important}
+          td,th{border-bottom:1px solid #ccc !important;padding:4px 6px !important;color:#000 !important}
+          th{border-bottom:2px solid #999 !important}
           svg{max-width:100% !important}
+          .cat-dot{-webkit-print-color-adjust:exact;print-color-adjust:exact}
         }
       `}</style>
 
@@ -1239,7 +1264,7 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
         {/* ═══ Cut List Tab ═══ */}
         {hasSpec && tab === "cutlist" && (()=>{
           const fs = spec.frame_style || "framed";
-          const allParts = calcProjectCutList(spec, shopProfile);
+          const allParts = calcProjectCutList(spec, effectiveProfile);
           // Group by material for nesting summary
           const byMaterial = {};
           allParts.forEach(p => {
@@ -1270,6 +1295,56 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
                 }} style={{padding:"5px 10px",borderRadius:6,fontSize:10,fontWeight:600,cursor:"pointer",background:"#1a1a2a",border:"1px solid #2a2a3a",color:"#888",fontFamily:"inherit"}}>Export CSV</button>
                 <button onClick={()=>window.print()} style={{padding:"5px 10px",borderRadius:6,fontSize:10,fontWeight:600,cursor:"pointer",background:"#1a1a2a",border:"1px solid #2a2a3a",color:"#888",fontFamily:"inherit"}}>Print</button>
               </div>
+              {/* First-run shop profile setup banner */}
+              {showFirstRunBanner && (
+                <div style={{padding:16,marginBottom:14,background:"#14141e",border:"1px solid #D94420",borderRadius:10}}>
+                  <div style={{fontSize:14,fontWeight:700,color:"#eee",marginBottom:4}}>Set up your shop defaults</div>
+                  <div style={{fontSize:11,color:"#888",marginBottom:12}}>These settings control how the cut list is calculated. Set them to match your shop — you can always change them later.</div>
+                  <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:"8px 16px",marginBottom:12}}>
+                    {[
+                      ["box_material","Box Material","text"],
+                      ["box_thickness","Panel Thickness","num"],
+                      ["slide_type","Slide Type","select"],
+                      ["slide_clearance","Slide Clearance (total)","num"],
+                      ["front_material","Door/Drawer Stock","text"],
+                    ].map(([key,label,type])=>(
+                      <div key={key} style={{display:"flex",alignItems:"center",gap:8}}>
+                        <label style={{fontSize:11,color:"#aaa",minWidth:isMobile?100:140,fontFamily:"'DM Sans',sans-serif"}}>{label}</label>
+                        {type==="select"?(
+                          <div style={{display:"flex",gap:4}}>
+                            {[{v:"side_mount",l:"Side Mount"},{v:"undermount",l:"Undermount"}].map(o=>(
+                              <button key={o.v} onClick={()=>handleShopProfileChange({...effectiveProfile,[key]:o.v})} style={{
+                                padding:"4px 8px",borderRadius:4,fontSize:10,fontWeight:600,cursor:"pointer",
+                                border:effectiveProfile[key]===o.v?"1px solid rgba(217,68,32,0.3)":"1px solid transparent",
+                                background:effectiveProfile[key]===o.v?"rgba(217,68,32,0.2)":"#0a0a14",
+                                color:effectiveProfile[key]===o.v?"#D94420":"#555",fontFamily:"'JetBrains Mono',monospace",
+                              }}>{o.l}</button>
+                            ))}
+                          </div>
+                        ):(
+                          <input type={type==="num"?"number":"text"} step={type==="num"?0.0625:undefined}
+                            value={effectiveProfile[key]||""}
+                            onChange={e=>{const v=type==="num"?parseFloat(e.target.value):e.target.value;if(type==="num"&&isNaN(v))return;handleShopProfileChange({...effectiveProfile,[key]:v});}}
+                            style={{flex:1,height:28,background:"#0a0a14",border:"1px solid #2a2a3a",borderRadius:4,color:"#eee",fontSize:11,fontFamily:"'JetBrains Mono',monospace",padding:"0 8px",textAlign:type==="num"?"center":"left"}}
+                          />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                    <button onClick={()=>{markShopProfileConfigured();setShowFirstRunBanner(false);}} style={{padding:"6px 16px",borderRadius:6,fontSize:11,fontWeight:600,cursor:"pointer",background:"#D94420",border:"none",color:"#fff",fontFamily:"inherit"}}>Save &amp; Continue</button>
+                    <button onClick={()=>{markShopProfileConfigured();setShowFirstRunBanner(false);}} style={{padding:"6px 16px",borderRadius:6,fontSize:11,fontWeight:600,cursor:"pointer",background:"transparent",border:"1px solid #2a2a3a",color:"#666",fontFamily:"inherit"}}>Use Defaults</button>
+                    <button onClick={()=>{setShowFirstRunBanner(false);setShowShopProfile(true);markShopProfileConfigured();}} style={{padding:"6px 16px",borderRadius:6,fontSize:11,fontWeight:600,cursor:"pointer",background:"transparent",border:"none",color:"#D94420",fontFamily:"inherit"}}>Configure All Settings →</button>
+                  </div>
+                </div>
+              )}
+              {/* Per-project override indicator */}
+              {spec?.shop_profile_override && (
+                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8,padding:"6px 10px",background:"rgba(139,92,246,0.1)",borderRadius:6,border:"1px solid rgba(139,92,246,0.2)"}}>
+                  <span style={{fontSize:10,color:"#8b5cf6",fontWeight:600}}>Project-specific overrides active</span>
+                  <button onClick={()=>{dispatch({type:"CLEAR_SHOP_OVERRIDE"});setProjectOverride(false);}} style={{fontSize:10,color:"#666",background:"transparent",border:"none",cursor:"pointer",textDecoration:"underline"}}>Clear</button>
+                </div>
+              )}
               {/* Legend with category counts */}
               {(()=>{
                 const boxCount = allParts.filter(p=>p.category==="box").reduce((s,p)=>s+p.qty,0);
@@ -1336,6 +1411,11 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
 
               {/* Material summary */}
               <div style={{marginTop:24,padding:"14px 16px",background:"#0a0a14",borderRadius:8,border:"1px solid #1a1a2a"}}>
+                {/* Print-only header */}
+                <div data-printonly style={{display:"none",marginBottom:16}}>
+                  <div style={{fontSize:16,fontWeight:700}}>{projectName} — {roomName} › {wallName}</div>
+                  <div style={{fontSize:11,color:"#666"}}>Cut List · Generated {new Date().toLocaleDateString()} · {totalParts} parts</div>
+                </div>
                 <div style={{fontSize:12,fontWeight:700,color:"#888",marginBottom:10,letterSpacing:"0.05em"}}>MATERIAL SUMMARY</div>
                 {Object.entries(byMaterial).map(([mat, parts]) => {
                   const totalQty = parts.reduce((s, p) => s + p.qty, 0);
@@ -1383,9 +1463,19 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
       {/* Shop Profile Modal */}
       {showShopProfile && (
         <ShopProfile
-          profile={shopProfile}
+          profile={effectiveProfile}
           onChange={handleShopProfileChange}
           onClose={() => setShowShopProfile(false)}
+          projectOverride={projectOverride}
+          onToggleOverride={(on) => {
+            if (on) {
+              setProjectOverride(true);
+              dispatch({ type: "SET_SHOP_OVERRIDE", override: { ...shopProfile } });
+            } else {
+              setProjectOverride(false);
+              dispatch({ type: "CLEAR_SHOP_OVERRIDE" });
+            }
+          }}
         />
       )}
 
@@ -1511,6 +1601,7 @@ export default function App() {
     <Routes>
       <Route path="/" element={<AppShell><ProjectList /></AppShell>} />
       <Route path="/project/:projectId" element={<AppShell><ProjectDetail /></AppShell>} />
+      <Route path="/project/:projectId/cutlist" element={<AppShell><ProjectCutList /></AppShell>} />
       <Route path="/project/:projectId/room/:roomId" element={<RoomEditorWrapper />} />
     </Routes>
   );

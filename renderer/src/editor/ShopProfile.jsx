@@ -20,7 +20,7 @@ const JOINT_TYPES = [
  * Shop Profile settings panel — set-once defaults for CNC cut list generation.
  * Changes auto-save on every field edit.
  */
-export default function ShopProfile({ profile, onChange, onClose }) {
+export default function ShopProfile({ profile, onChange, onClose, projectOverride, onToggleOverride }) {
   const [expandedSection, setExpandedSection] = useState("box");
   const [confirmReset, setConfirmReset] = useState(false);
 
@@ -176,6 +176,20 @@ export default function ShopProfile({ profile, onChange, onClose }) {
             alignItems: "center", justifyContent: "center",
           }}>×</button>
         </div>
+
+        {/* Per-project override toggle */}
+        {onToggleOverride && (
+          <div style={{ padding: "10px 20px", borderBottom: "1px solid #1a1a2a", display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ fontSize: 11, color: "#aaa", fontFamily: SANS, flex: 1 }}>This project uses different settings</span>
+            <button onClick={() => onToggleOverride(!projectOverride)} style={{
+              padding: "4px 12px", borderRadius: 4, fontSize: 10, fontWeight: 600, cursor: "pointer",
+              fontFamily: MONO,
+              border: projectOverride ? "1px solid rgba(139,92,246,0.3)" : "1px solid #2a2a3a",
+              background: projectOverride ? "rgba(139,92,246,0.15)" : "#14141e",
+              color: projectOverride ? "#8b5cf6" : "#555",
+            }}>{projectOverride ? "Override Active" : "Use Shop Defaults"}</button>
+          </div>
+        )}
 
         {/* Scrollable content */}
         <div style={{ flex: 1, overflow: "auto", padding: "0 20px" }}>

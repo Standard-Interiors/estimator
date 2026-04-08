@@ -430,6 +430,16 @@ export default function specReducer(state, action) {
       return spec;
     }
 
+    case "SET_SHOP_OVERRIDE": {
+      spec.shop_profile_override = action.override;
+      return spec;
+    }
+
+    case "CLEAR_SHOP_OVERRIDE": {
+      delete spec.shop_profile_override;
+      return spec;
+    }
+
     // ── Meta ────────────────────────────────────────────────────────
 
     case "LOAD_SPEC": {
