@@ -1210,6 +1210,13 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
                 <button onClick={()=>window.print()} style={{padding:"5px 10px",borderRadius:6,fontSize:10,fontWeight:600,cursor:"pointer",background:"#1a1a2a",border:"1px solid #2a2a3a",color:"#888",fontFamily:"inherit"}}>Print</button>
               </div>
 
+              {/* Legend */}
+              <div style={{display:"flex",gap:12,marginBottom:10,fontSize:9,color:"#444",fontFamily:"'JetBrains Mono',monospace"}}>
+                <span>Click a row to view in 3D</span>
+                <span><span style={{color:"#eab308"}}>!</span> = verify against drawing</span>
+                <span><span style={{color:"#8b5cf6",padding:"1px 4px",borderRadius:2,border:"1px dashed #8b5cf6",fontSize:8}}>dashed</span> = manual override</span>
+              </div>
+
               {/* Detail table */}
               <table style={{width:"100%",borderCollapse:"collapse",fontSize:12,fontFamily:"'JetBrains Mono',monospace"}}>
                 <thead>

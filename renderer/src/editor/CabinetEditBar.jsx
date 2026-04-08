@@ -160,8 +160,10 @@ export default function CabinetEditBar({ cab, spec, dispatch, selColor, widthInp
               }}>
               {sectionSummary(sec)}
               <span onClick={(e) => { e.stopPropagation(); dispatch({ type: "REMOVE_SECTION", cabId: cab.id, sectionIndex: i }); if (editingSec === i) setEditingSec(null); }}
-                style={{ marginLeft: 2, color: "#555", fontSize: 10, cursor: "pointer", lineHeight: 1 }}
-                title="Remove section">x</span>
+                style={{ marginLeft: 4, color: "#666", fontSize: 12, cursor: "pointer", lineHeight: 1, padding: "0 2px", borderRadius: 2 }}
+                onMouseEnter={e => { e.target.style.color = "#e04040"; e.target.style.background = "rgba(224,64,64,0.15)"; }}
+                onMouseLeave={e => { e.target.style.color = "#666"; e.target.style.background = "transparent"; }}
+                title="Remove this section">×</span>
             </button>
           );
         })}
@@ -280,17 +282,20 @@ export default function CabinetEditBar({ cab, spec, dispatch, selColor, widthInp
             </button>
           );
         })}
-        <span style={{ color: "#222", margin: "0 2px" }}>|</span>
-        <span style={{ color: "#444", fontSize: 10, fontWeight: 700, fontFamily: MONO, letterSpacing: "0.06em" }}>DOORS</span>
+        <span style={{ color: "#222", margin: "0 4px" }}>|</span>
+        <span style={{ color: "#444", fontSize: 10, fontWeight: 700, fontFamily: MONO, letterSpacing: "0.06em" }}>SIZES</span>
+        <span style={{ color: "#333", fontSize: 8 }}>click to edit →</span>
         {calcDoorSizes(cab, spec.frame_style || "framed").map((ds, i) => {
           const colors = { door: "#22c55e", glass_door: "#06b6d4", drawer: "#f97216", false_front: "#8b5cf6" };
           const c = colors[ds.type] || "#888";
           return (
             <span key={i} onClick={() => onSectionClick?.(ds.sectionIndex)} style={{
-              fontSize: 9, fontFamily: MONO, padding: "1px 6px", borderRadius: 4,
+              fontSize: 10, fontFamily: MONO, padding: "3px 8px", borderRadius: 4,
               background: `${c}1a`, color: c, fontWeight: 600, cursor: "pointer",
-              border: ds.isOverride ? `1px dashed ${c}` : "none",
-            }}>
+              border: `1px solid ${c}33`,
+            }}
+            onMouseEnter={e => e.target.style.borderColor = c}
+            onMouseLeave={e => e.target.style.borderColor = c + "33"}>
               {ds.label}
               {ds.needsVerify && <span style={{ color: "#eab308", marginLeft: 4 }}>!</span>}
             </span>

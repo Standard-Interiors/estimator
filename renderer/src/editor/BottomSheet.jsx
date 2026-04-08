@@ -127,12 +127,46 @@ export default function BottomSheet({ spec, selectedId, dispatch, onSelect, onIn
         <WidthGrid currentWidth={cab.width} rowColor={rowColor} onWidthChange={handleWidthChange} />
       </div>
 
+      {/* Face sections + front sizes — ALWAYS visible (critical for tweaking) */}
+      {cab.face?.sections?.length > 0 && (
+        <div style={{ marginBottom: 10 }}>
+          <div style={{
+            fontSize: 10, color: "#666", fontWeight: 600,
+            fontFamily: "'DM Sans',sans-serif", marginBottom: 6, letterSpacing: "0.05em"
+          }}>FACE SECTIONS</div>
+          <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 8 }}>
+            {cab.face.sections.map(sectionBadge)}
+          </div>
+          <div style={{
+            fontSize: 10, color: "#666", fontWeight: 600,
+            fontFamily: "'DM Sans',sans-serif", marginBottom: 6, letterSpacing: "0.05em",
+            display: "flex", alignItems: "center", gap: 6,
+          }}>FRONT SIZES <span style={{ fontWeight: 400, color: "#D94420", fontSize: 9, letterSpacing: 0 }}>tap to edit →</span></div>
+          <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+            {calcDoorSizes(cab, spec.frame_style || "framed").map((ds, i) => {
+              const colors = { door: "#22c55e", glass_door: "#06b6d4", drawer: "#f97216", false_front: "#8b5cf6" };
+              const c = colors[ds.type] || "#888";
+              return (
+                <span key={i} onClick={() => onSectionClick?.(ds.sectionIndex)} style={{
+                  fontSize: 11, fontFamily: "'JetBrains Mono',monospace", padding: "6px 10px", borderRadius: 6,
+                  background: `${c}1a`, color: c, fontWeight: 600, cursor: "pointer",
+                  border: `1px solid ${c}33`,
+                }}>
+                  {ds.label}
+                  {ds.needsVerify && <span style={{ color: "#eab308", marginLeft: 4 }}>!</span>}
+                </span>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Action row */}
       <div style={{ marginBottom: 10 }}>
         <ActionRow cabId={cab.id} spec={spec} dispatch={dispatch} onSelect={onSelect} />
       </div>
 
-      {/* More section */}
+      {/* More section — height, depth, advanced */}
       <button onClick={() => setShowMore(!showMore)} style={{
         width: "100%", minHeight: 36, borderRadius: 8,
         background: "#14141e", border: "1px solid #1a1a2a",
@@ -140,7 +174,7 @@ export default function BottomSheet({ spec, selectedId, dispatch, onSelect, onIn
         fontFamily: "'DM Sans',sans-serif", fontWeight: 600,
         marginBottom: showMore ? 10 : 0
       }}>
-        {showMore ? "Less" : "More"} {showMore ? "\u25B2" : "\u25BC"}
+        {showMore ? "Show Less" : "Height · Depth · More"} {showMore ? "\u25B2" : "\u25BC"}
       </button>
 
       {showMore && (
@@ -184,46 +218,6 @@ export default function BottomSheet({ spec, selectedId, dispatch, onSelect, onIn
               ))}
             </div>
           </div>
-
-          {/* Face sections (read-only) */}
-          {cab.face?.sections?.length > 0 && (
-            <div>
-              <div style={{
-                fontSize: 10, color: "#666", fontWeight: 600,
-                fontFamily: "'DM Sans',sans-serif", marginBottom: 6, letterSpacing: "0.05em"
-              }}>FACE SECTIONS</div>
-              <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-                {cab.face.sections.map(sectionBadge)}
-              </div>
-            </div>
-          )}
-
-          {/* Door sizes (clickable → drill into DoorDetailView) */}
-          {cab.face?.sections?.length > 0 && (
-            <div style={{ marginTop: 10 }}>
-              <div style={{
-                fontSize: 10, color: "#666", fontWeight: 600,
-                fontFamily: "'DM Sans',sans-serif", marginBottom: 6, letterSpacing: "0.05em",
-                display: "flex", alignItems: "center", gap: 6,
-              }}>FRONT SIZES <span style={{ fontWeight: 400, color: "#444", fontSize: 9, letterSpacing: 0 }}>tap to edit</span></div>
-              <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-                {calcDoorSizes(cab, spec.frame_style || "framed").map((ds, i) => {
-                  const colors = { door: "#22c55e", glass_door: "#06b6d4", drawer: "#f97216", false_front: "#8b5cf6" };
-                  const c = colors[ds.type] || "#888";
-                  return (
-                    <span key={i} onClick={() => onSectionClick?.(ds.sectionIndex)} style={{
-                      fontSize: 10, fontFamily: "'JetBrains Mono',monospace", padding: "4px 8px", borderRadius: 4,
-                      background: `${c}1a`, color: c, fontWeight: 600, cursor: "pointer",
-                      border: ds.isOverride ? `1px dashed ${c}` : "none",
-                    }}>
-                      {ds.label}
-                      {ds.needsVerify && <span style={{ color: "#eab308", marginLeft: 4 }}>!</span>}
-                    </span>
-                  );
-                })}
-              </div>
-            </div>
-          )}
         </div>
       )}
     </div>
