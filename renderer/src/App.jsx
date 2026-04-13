@@ -894,13 +894,45 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
             )}
 
             {/* Extraction Error Modal */}
-            {extractionError && (
+            {extractionError && (()=>{
+              // Translate technical errors into user-friendly messages
+              const raw = String(extractionError || "");
+              const isJsonError = /JSON|delimiter|char \d+|line \d+ col|Invalid JSON|invalid response/i.test(raw);
+              const isTimeout = /timeout|timed out|deadline/i.test(raw);
+              const isAuth = /401|403|unauthorized|api.?key/i.test(raw);
+              const isRateLimit = /429|rate.?limit|quota/i.test(raw);
+
+              let friendly, hint;
+              if (isAuth) {
+                friendly = "API key problem";
+                hint = "The server's AI API key isn't working. Contact support.";
+              } else if (isRateLimit) {
+                friendly = "Too many requests";
+                hint = "The AI service is rate-limited. Wait a moment and try again.";
+              } else if (isTimeout) {
+                friendly = "Extraction timed out";
+                hint = "The AI took too long to respond. Try a smaller or clearer photo.";
+              } else if (isJsonError) {
+                friendly = "AI returned a malformed response";
+                hint = "This sometimes happens with complex or unusual photos. Retrying usually works. If it keeps failing, try a different angle or cropped photo.";
+              } else {
+                friendly = "Extraction failed";
+                hint = raw.length > 200 ? raw.slice(0, 200) + "…" : raw;
+              }
+
+              return (
               <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999}}
                 onClick={(e) => { if(e.target === e.currentTarget) setExtractionError(null); }}>
-                <div style={{background:"#1a1a2a",border:"1px solid #333",borderRadius:12,padding:"28px 32px",maxWidth:420,width:"90%",textAlign:"center"}}>
+                <div style={{background:"#1a1a2a",border:"1px solid #333",borderRadius:12,padding:"28px 32px",maxWidth:440,width:"90%",textAlign:"center"}}>
                   <div style={{fontSize:28,marginBottom:12}}>!</div>
-                  <div style={{fontSize:15,fontWeight:700,color:"#e04040",marginBottom:8}}>Extraction Failed</div>
-                  <div style={{fontSize:13,color:"#aaa",marginBottom:20,lineHeight:1.5}}>{extractionError}</div>
+                  <div style={{fontSize:15,fontWeight:700,color:"#e04040",marginBottom:8}}>{friendly}</div>
+                  <div style={{fontSize:13,color:"#aaa",marginBottom:14,lineHeight:1.5}}>{hint}</div>
+                  {isJsonError && (
+                    <details style={{marginBottom:16,textAlign:"left"}}>
+                      <summary style={{fontSize:10,color:"#555",cursor:"pointer",fontFamily:"'JetBrains Mono',monospace"}}>Technical details</summary>
+                      <div style={{fontSize:10,color:"#666",fontFamily:"'JetBrains Mono',monospace",marginTop:8,padding:"6px 10px",background:"#0a0a14",borderRadius:4,wordBreak:"break-word"}}>{raw}</div>
+                    </details>
+                  )}
                   <div style={{display:"flex",gap:10,justifyContent:"center"}}>
                     <button onClick={() => setExtractionError(null)}
                       style={{padding:"10px 24px",borderRadius:8,fontSize:13,fontWeight:600,cursor:"pointer",
@@ -915,7 +947,8 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
                   </div>
                 </div>
               </div>
-            )}
+              );
+            })()}
 
             {/* Divider + secondary options */}
             <div style={{borderTop:"1px solid #1a1a2a",paddingTop:16,display:"flex",gap:10,alignItems:"center",marginBottom:16}}>

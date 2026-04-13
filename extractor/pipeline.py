@@ -10,6 +10,7 @@ retriable steps:
 """
 
 import json
+import re
 import time
 from typing import Optional
 
@@ -82,18 +83,49 @@ def _get_mime(data: bytes) -> str:
 
 
 def _parse_json(raw: str) -> dict:
-    """Extract JSON object from potentially messy Gemini response."""
+    """Extract JSON object from potentially messy AI response.
+
+    Tries multiple strategies:
+    1. Direct parse after stripping markdown fences
+    2. Substring between first { and last }
+    3. Fix common errors (trailing commas, unquoted keys)
+
+    Raises ValueError with raw response preview on failure so
+    callers can log the problematic response for debugging.
+    """
     clean = raw.strip()
     if clean.startswith("```"):
         clean = clean.split("\n", 1)[1] if "\n" in clean else clean[3:]
     if clean.endswith("```"):
         clean = clean[:-3]
     clean = clean.strip()
+
+    # Strategy 1: try parsing as-is
+    try:
+        return json.loads(clean)
+    except json.JSONDecodeError:
+        pass
+
+    # Strategy 2: find first { to last }
     start = clean.find("{")
     end = clean.rfind("}") + 1
     if start < 0 or end <= start:
-        raise ValueError(f"No JSON found in response: {clean[:200]}")
-    return json.loads(clean[start:end])
+        raise ValueError(f"No JSON object found in response. Raw (first 500 chars): {clean[:500]}")
+
+    substring = clean[start:end]
+    try:
+        return json.loads(substring)
+    except json.JSONDecodeError as e1:
+        # Strategy 3: remove trailing commas before } or ]
+        fixed = re.sub(r",(\s*[}\]])", r"\1", substring)
+        try:
+            return json.loads(fixed)
+        except json.JSONDecodeError as e2:
+            # Give up — raise with useful debugging info
+            raise ValueError(
+                f"Invalid JSON from AI: {e2.msg} at line {e2.lineno} col {e2.colno}. "
+                f"Raw response (first 500 chars): {clean[:500]}"
+            ) from e2
 
 
 class StepResult:
@@ -128,25 +160,41 @@ def step_count_cabinets(photo_bytes: bytes, api_key: str,
     try:
         client = _gemini_client(api_key)
         mime = _get_mime(photo_bytes)
-        resp = client.models.generate_content(
-            model=model,
-            contents=[
-                types.Part.from_bytes(data=photo_bytes, mime_type=mime),
-                types.Part.from_text(text="Count every separate cabinet box in this photo."),
-            ],
-            config=types.GenerateContentConfig(
-                system_instruction=COUNT_PROMPT,
-                max_output_tokens=4096,
-                temperature=0.1,
-                response_mime_type="application/json",
-            ),
-        )
-        data = _parse_json(resp.text)
-        data.setdefault("base_count", 0)
-        data.setdefault("wall_count", 0)
-        data.setdefault("tall_count", 0)
-        data.setdefault("descriptions", [])
-        return StepResult("count", data, int((time.time() - t0) * 1000))
+
+        # Retry on JSON parse failure — AI sometimes returns malformed JSON.
+        last_error = None
+        last_raw = None
+        for attempt in range(3):
+            try:
+                temp = 0.1 + (attempt * 0.15)
+                resp = client.models.generate_content(
+                    model=model,
+                    contents=[
+                        types.Part.from_bytes(data=photo_bytes, mime_type=mime),
+                        types.Part.from_text(text="Count every separate cabinet box in this photo."),
+                    ],
+                    config=types.GenerateContentConfig(
+                        system_instruction=COUNT_PROMPT,
+                        max_output_tokens=4096,
+                        temperature=temp,
+                        response_mime_type="application/json",
+                    ),
+                )
+                last_raw = resp.text
+                data = _parse_json(resp.text)
+                data.setdefault("base_count", 0)
+                data.setdefault("wall_count", 0)
+                data.setdefault("tall_count", 0)
+                data.setdefault("descriptions", [])
+                return StepResult("count", data, int((time.time() - t0) * 1000))
+            except (ValueError, json.JSONDecodeError) as e:
+                last_error = e
+                print(f"[count] attempt {attempt+1} failed: {e}", flush=True)
+                if last_raw:
+                    print(f"[count] raw response (first 1000 chars): {last_raw[:1000]}", flush=True)
+                continue
+        err_msg = f"AI returned invalid response after 3 attempts. Last error: {last_error}"
+        return StepResult("count", None, int((time.time() - t0) * 1000), err_msg)
     except Exception as e:
         return StepResult("count", None, int((time.time() - t0) * 1000), str(e))
 
@@ -209,20 +257,36 @@ def step_extract_dimensions(wireframe_bytes: bytes, photo_bytes: bytes,
             types.Part.from_text(text="Extract the complete cabinet specification. Return ONLY JSON."),
         ]
 
-        resp = client.models.generate_content(
-            model=model,
-            contents=parts,
-            config=types.GenerateContentConfig(
-                system_instruction=system_prompt,
-                max_output_tokens=16384,
-                temperature=0.1,
-                response_mime_type="application/json",
-            ),
-        )
-        spec = _parse_json(resp.text)
-        if "cabinets" not in spec or not spec["cabinets"]:
-            raise ValueError("No cabinets found in extraction response")
-        return StepResult("extract", spec, int((time.time() - t0) * 1000))
+        # Retry on JSON parse failure — AI sometimes returns malformed JSON.
+        last_error = None
+        last_raw = None
+        for attempt in range(3):
+            try:
+                temp = 0.1 + (attempt * 0.15)  # slight temperature variation per retry
+                resp = client.models.generate_content(
+                    model=model,
+                    contents=parts,
+                    config=types.GenerateContentConfig(
+                        system_instruction=system_prompt,
+                        max_output_tokens=16384,
+                        temperature=temp,
+                        response_mime_type="application/json",
+                    ),
+                )
+                last_raw = resp.text
+                spec = _parse_json(resp.text)
+                if "cabinets" not in spec or not spec["cabinets"]:
+                    raise ValueError("No cabinets found in extraction response")
+                return StepResult("extract", spec, int((time.time() - t0) * 1000))
+            except (ValueError, json.JSONDecodeError) as e:
+                last_error = e
+                print(f"[extract] attempt {attempt+1} failed: {e}", flush=True)
+                if last_raw:
+                    print(f"[extract] raw response (first 1000 chars): {last_raw[:1000]}", flush=True)
+                continue
+        # All retries exhausted
+        err_msg = f"AI returned invalid response after 3 attempts. Last error: {last_error}"
+        return StepResult("extract", None, int((time.time() - t0) * 1000), err_msg)
     except Exception as e:
         return StepResult("extract", None, int((time.time() - t0) * 1000), str(e))
 
@@ -317,20 +381,32 @@ def _extract_at_temperature(wireframe_bytes, photo_bytes, count_data,
             types.Part.from_bytes(data=wireframe_bytes, mime_type=wire_mime),
             types.Part.from_text(text="Extract the complete cabinet specification. Return ONLY JSON."),
         ]
-        resp = client.models.generate_content(
-            model=model,
-            contents=parts,
-            config=types.GenerateContentConfig(
-                system_instruction=system_prompt,
-                max_output_tokens=16384,
-                temperature=temperature,
-                response_mime_type="application/json",
-            ),
-        )
-        spec = _parse_json(resp.text)
-        if "cabinets" not in spec or not spec["cabinets"]:
-            raise ValueError("No cabinets found")
-        return StepResult("verify_pass", spec, int((time.time() - t0) * 1000))
+        last_error = None
+        last_raw = None
+        for attempt in range(2):
+            try:
+                resp = client.models.generate_content(
+                    model=model,
+                    contents=parts,
+                    config=types.GenerateContentConfig(
+                        system_instruction=system_prompt,
+                        max_output_tokens=16384,
+                        temperature=temperature,
+                        response_mime_type="application/json",
+                    ),
+                )
+                last_raw = resp.text
+                spec = _parse_json(resp.text)
+                if "cabinets" not in spec or not spec["cabinets"]:
+                    raise ValueError("No cabinets found")
+                return StepResult("verify_pass", spec, int((time.time() - t0) * 1000))
+            except (ValueError, json.JSONDecodeError) as e:
+                last_error = e
+                print(f"[verify_pass T={temperature}] attempt {attempt+1} failed: {e}", flush=True)
+                if last_raw:
+                    print(f"[verify_pass] raw (first 500 chars): {last_raw[:500]}", flush=True)
+                continue
+        return StepResult("verify_pass", None, int((time.time() - t0) * 1000), str(last_error))
     except Exception as e:
         return StepResult("verify_pass", None, int((time.time() - t0) * 1000), str(e))
 
