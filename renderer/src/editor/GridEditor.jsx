@@ -416,6 +416,15 @@ export default function GridEditor({ spec, selectedId, onSelect, dispatch, width
         const clamped = Math.max(6, Math.min(60, rawW));
         setDrag(prev => prev ? { ...prev, liveW: clamped } : null);
       } else if (d.type === "move") {
+        // Require a minimum drag distance (6 SVG units, roughly 2-3px on screen)
+        // so a plain click-to-select doesn't register as a drag. Once the
+        // threshold is crossed, activate = true and drag indicators show.
+        const DRAG_THRESHOLD = 6;
+        const activated = d.activated || Math.abs(dx) > DRAG_THRESHOLD;
+        if (!activated) {
+          setDrag(prev => prev ? { ...prev, dx } : null);
+          return;
+        }
         const layout = d.row === "wall" ? wallRow.items : baseRow.items;
         const offsetX = d.origX + dx;
         const centerX = offsetX + (cabMap[d.cabId]?.width || 18) * scale / 2;
@@ -426,23 +435,28 @@ export default function GridEditor({ spec, selectedId, onSelect, dispatch, width
         }
         if (targetIdx > d.idx) targetIdx = Math.min(targetIdx - 1, layout.length - 1);
         else targetIdx = Math.max(targetIdx, 0);
-        setDrag(prev => prev ? { ...prev, liveIdx: targetIdx, dx } : null);
+        setDrag(prev => prev ? { ...prev, liveIdx: targetIdx, dx, activated: true } : null);
       }
     };
-    const handleUp = () => {
+    const handleUp = (e) => {
       const d = dragRef.current;
       if (!d) { setDrag(null); return; }
       if (d.type === "resize" && d.liveW != null) {
-        const snapped = Math.round(d.liveW);
-        dispatch({ type: "SET_DIMENSION", id: d.cabId, field: "width", value: Math.max(3, snapped) });
+        // Default: round to 0.25" (shop cut precision). Shift held = snap to standard.
+        let committed;
+        if (e && e.shiftKey) {
+          committed = snapToStandard(d.liveW);
+        } else {
+          committed = Math.round(d.liveW * 4) / 4;
+        }
+        dispatch({ type: "SET_DIMENSION", id: d.cabId, field: "width", value: Math.max(3, committed) });
       } else if (d.type === "move") {
-        if (d.liveIdx !== d.idx) {
+        // Only reorder if the drag was activated (crossed the threshold) AND
+        // the target position actually differs. A plain click or tiny jitter
+        // below the threshold does nothing — selection already happened on
+        // pointer-down.
+        if (d.activated && d.liveIdx !== d.idx) {
           dispatch({ type: "REORDER_CABINET", id: d.cabId, toIndex: d.liveIdx });
-        } else if (d.dx) {
-          const nudgeInches = Math.round(d.dx / scale);
-          if (nudgeInches !== 0) {
-            dispatch({ type: "NUDGE_CABINET", id: d.cabId, amount: nudgeInches });
-          }
         }
       }
       setDrag(null);
@@ -681,13 +695,20 @@ export default function GridEditor({ spec, selectedId, onSelect, dispatch, width
           onMouseMove={(e) => onBlockMouseMove(e, item)}
           onMouseLeave={onBlockMouseLeave}>
 
-          {/* Block rect */}
-          <rect x={bx} y={rowY} width={displayBw} height={blockH}
-            fill={fill}
-            stroke={isFlashing ? "#fff" : (isSelected ? COLORS.selected : (isHovered ? color : color))}
-            strokeWidth={isFlashing ? 3 : (isSelected ? 2 : (isHovered ? 1.5 : 1))}
-            rx={3}
-            filter={isSelected ? "url(#glowPulse)" : undefined} />
+          {/* Block rect — dashed outline + reduced fill when marked as duplicate
+              (exclude_from_cutlist). Visible in layout, skipped in cut list. */}
+          {(() => {
+            const isDuplicate = !!item.cab?.exclude_from_cutlist;
+            return (
+              <rect x={bx} y={rowY} width={displayBw} height={blockH}
+                fill={isDuplicate ? "rgba(234,179,8,0.08)" : fill}
+                stroke={isFlashing ? "#fff" : (isSelected ? COLORS.selected : (isDuplicate ? "#eab308" : (isHovered ? color : color)))}
+                strokeWidth={isFlashing ? 3 : (isSelected ? 2 : (isHovered ? 1.5 : 1))}
+                strokeDasharray={isDuplicate ? "6,3" : undefined}
+                rx={3}
+                filter={isSelected ? "url(#glowPulse)" : undefined} />
+            );
+          })()}
 
           {/* ID label */}
           <text x={bx + displayBw / 2} y={rowY + blockH / 2 - 5}
@@ -736,13 +757,14 @@ export default function GridEditor({ spec, selectedId, onSelect, dispatch, width
               style={{ cursor: "col-resize" }} />
           )}
 
-          {/* Live resize tooltip */}
+          {/* Live resize tooltip — shows quarter-inch precision (what will commit).
+              Hold Shift to snap to standard widths on release. */}
           {isResizing && drag.liveW != null && (
             <text x={bx + displayBw + 8} y={rowY + blockH / 2 + 4}
               fill={COLORS.tooltip} fontSize={11} fontWeight={700}
               fontFamily="'JetBrains Mono',monospace"
               style={{ pointerEvents: "none" }}>
-              {"\u2192"} {Math.round(drag.liveW)}"
+              {"\u2192"} {(Math.round(drag.liveW * 4) / 4)}"
             </text>
           )}
         </g>

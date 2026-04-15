@@ -412,15 +412,25 @@ def _extract_at_temperature(wireframe_bytes, photo_bytes, count_data,
 
 
 def step_solve_to_standard(spec: dict) -> StepResult:
-    """Step 4: Snap widths to nearest standard size + fill defaults. Pure code."""
+    """Step 4: Fill defaults + round widths to shop precision (0.25").
+
+    CRITICAL CHANGE (feature/editor-flexibility): previously this step SNAPPED
+    widths to the nearest STANDARD_WIDTHS value (9,12,15,18,21,24,27,30,33,
+    36,42,48). That silently destroyed correct AI output whenever a real
+    cabinet was 20", 26", 31", etc. Cabinet makers measure real dimensions
+    and the pipeline must preserve them. We keep the function name for
+    backwards-compatibility with existing callers but it no longer snaps."""
     t0 = time.time()
     try:
         for c in spec.get("cabinets", []):
-            # Snap width to nearest standard
+            # Round width to 0.25" shop precision (preserves real measurements).
             w = c.get("width", 24)
-            c["width"] = min(STANDARD_WIDTHS, key=lambda s: abs(s - w))
+            try:
+                c["width"] = round(float(w) * 4) / 4
+            except (TypeError, ValueError):
+                c["width"] = 24
 
-            # Fill defaults
+            # Fill defaults (unchanged)
             c.setdefault("depth", 12 if c.get("row") == "wall" else 24)
             c.setdefault("height", 30 if c.get("row") == "wall" else 34.5)
             c.setdefault("face", {"sections": [{"type": "door", "count": 1}]})

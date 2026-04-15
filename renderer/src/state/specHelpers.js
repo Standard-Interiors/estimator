@@ -579,6 +579,10 @@ export function calcProjectCutList(spec, shop) {
   const fs = spec.frame_style || "framed";
   const allParts = [];
   for (const cab of spec.cabinets) {
+    // Skip cabinets explicitly marked as duplicates of ones in other photos —
+    // they stay in the layout view for spatial context but must not
+    // double-count material in the cut list.
+    if (cab.exclude_from_cutlist) continue;
     allParts.push(...calcFullCutList(cab, fs, shop));
   }
   return allParts;

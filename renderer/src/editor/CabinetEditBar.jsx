@@ -42,6 +42,28 @@ export default function CabinetEditBar({ cab, spec, dispatch, selColor, widthInp
 
   const types = TYPE_MAP[cab.row] || BASE_TYPES;
 
+  // Merge neighbors — compute from layout so we can show "Merge ← B2" / "Merge B4 →"
+  const layoutKey = cab.row === "base" ? "base_layout" : cab.row === "wall" ? "wall_layout" : null;
+  const layout = layoutKey ? (spec[layoutKey] || []) : [];
+  const myRefIdx = layout.findIndex(item => item.ref === cab.id);
+  const leftNeighborRef = myRefIdx > 0 ? layout[myRefIdx - 1] : null;
+  const rightNeighborRef = myRefIdx >= 0 && myRefIdx < layout.length - 1 ? layout[myRefIdx + 1] : null;
+  const leftNeighbor = leftNeighborRef?.ref
+    ? spec.cabinets.find(c => c.id === leftNeighborRef.ref)
+    : null;
+  const rightNeighbor = rightNeighborRef?.ref
+    ? spec.cabinets.find(c => c.id === rightNeighborRef.ref)
+    : null;
+
+  const onMergeLeft = leftNeighbor ? () => {
+    // Preserve spatial order: left neighbor becomes source, absorbs this cabinet
+    dispatch({ type: "MERGE_CABINETS", sourceId: leftNeighbor.id, targetId: cab.id });
+    if (onSelectId) onSelectId(leftNeighbor.id);
+  } : null;
+  const onMergeRight = rightNeighbor ? () => {
+    dispatch({ type: "MERGE_CABINETS", sourceId: cab.id, targetId: rightNeighbor.id });
+  } : null;
+
   const btnStyle = (active) => ({
     height: 28, padding: "0 8px", borderRadius: 4,
     background: active ? "#1a1a2a" : "transparent",
@@ -59,16 +81,12 @@ export default function CabinetEditBar({ cab, spec, dispatch, selColor, widthInp
   const commitDim = (field, val, inputEl) => {
     let v = parseFloat(val);
     if (isNaN(v) || v <= 0) return;
-    // Snap width to nearest standard size
-    if (field === "width") {
-      let best = STANDARD_WIDTHS[0], bestDist = Math.abs(v - best);
-      for (const sw of STANDARD_WIDTHS) {
-        const d = Math.abs(v - sw);
-        if (d < bestDist) { best = sw; bestDist = d; }
-      }
-      v = best;
-      if (inputEl) inputEl.value = v;
-    }
+    // Round to shop precision (0.25" = typical cut tolerance). Do NOT snap to
+    // standard widths — cabinet makers measure real dimensions, and the AI's
+    // correct non-standard widths must survive. Standard widths are offered
+    // below the input as quick-pick chips for when they DO apply.
+    v = Math.round(v * 4) / 4;
+    if (inputEl) inputEl.value = v;
     if (v !== cab[field]) {
       dispatch({ type: "SET_DIMENSION", id: cab.id, field, value: v });
     }
@@ -135,9 +153,60 @@ export default function CabinetEditBar({ cab, spec, dispatch, selColor, widthInp
         {onMoveRight && <button onClick={onMoveRight} title="Move right (Arrow Right)" style={{ height: 32, width: 32, padding: 0, borderRadius: 6, background: "#1a1a2a", border: "1px solid #2a2a3a", color: selColor, fontWeight: 700, fontSize: 14, cursor: "pointer", fontFamily: MONO, display: "flex", alignItems: "center", justifyContent: "center" }}>{"\u2192"}</button>}
         {onMoveUp && <button onClick={onMoveUp} title="Nudge up 3 inches (Arrow Up)" style={{ height: 32, width: 32, padding: 0, borderRadius: 6, background: "#1a1a2a", border: "1px solid #2a2a3a", color: selColor, fontWeight: 700, fontSize: 14, cursor: "pointer", fontFamily: MONO, display: "flex", alignItems: "center", justifyContent: "center" }}>{"\u2191"}</button>}
         {onMoveDown && <button onClick={onMoveDown} title="Nudge down 3 inches (Arrow Down)" style={{ height: 32, width: 32, padding: 0, borderRadius: 6, background: "#1a1a2a", border: "1px solid #2a2a3a", color: selColor, fontWeight: 700, fontSize: 14, cursor: "pointer", fontFamily: MONO, display: "flex", alignItems: "center", justifyContent: "center" }}>{"\u2193"}</button>}
+        {onMergeLeft && <button onClick={onMergeLeft}
+          title={`Merge with ${leftNeighbor.id} (left neighbor) — widths add, face sections combine`}
+          style={{ height: 32, padding: "0 8px", borderRadius: 6, background: "#1a1a2a", border: "1px solid #2a2a3a", color: selColor, fontWeight: 600, fontSize: 11, cursor: "pointer", fontFamily: SANS }}>
+          &#8592; Merge {leftNeighbor.id}
+        </button>}
+        {onMergeRight && <button onClick={onMergeRight}
+          title={`Merge with ${rightNeighbor.id} (right neighbor) — widths add, face sections combine`}
+          style={{ height: 32, padding: "0 8px", borderRadius: 6, background: "#1a1a2a", border: "1px solid #2a2a3a", color: selColor, fontWeight: 600, fontSize: 11, cursor: "pointer", fontFamily: SANS }}>
+          Merge {rightNeighbor.id} &#8594;
+        </button>}
         <button onClick={onAddGap} style={{ height: 32, padding: "0 8px", borderRadius: 6, background: "#1a1a2a", border: "1px solid #2a2a3a", color: "#888", fontWeight: 600, fontSize: 11, cursor: "pointer", fontFamily: SANS }}>Filler</button>
         <button onClick={onAddCab} style={{ height: 32, padding: "0 8px", borderRadius: 6, background: "#1a1a2a", border: "1px solid #2a2a3a", color: selColor, fontWeight: 600, fontSize: 11, cursor: "pointer", fontFamily: SANS }}>+ Cab</button>
+        <button
+          onClick={() => dispatch({ type: "SET_EXCLUDE_FROM_CUTLIST", id: cab.id, value: !cab.exclude_from_cutlist })}
+          title={cab.exclude_from_cutlist
+            ? "Currently EXCLUDED from cut list (duplicate of another photo). Click to include again."
+            : "Mark as duplicate — keep in layout view but skip in project cut list"}
+          style={{
+            height: 32, padding: "0 8px", borderRadius: 6,
+            background: cab.exclude_from_cutlist ? "#eab30822" : "#1a1a2a",
+            border: `1px solid ${cab.exclude_from_cutlist ? "#eab308" : "#2a2a3a"}`,
+            color: cab.exclude_from_cutlist ? "#eab308" : "#888",
+            fontWeight: 600, fontSize: 11, cursor: "pointer", fontFamily: SANS
+          }}
+        >{cab.exclude_from_cutlist ? "Dup \u2713" : "Dup?"}</button>
         <button onClick={onDelete} style={{ height: 32, padding: "0 8px", borderRadius: 6, background: "#1a1a2a", border: "1px solid #2a2a3a", color: "#e04040", fontWeight: 600, fontSize: 11, cursor: "pointer", fontFamily: SANS }}>Del</button>
+      </div>
+
+      {/* Width quick-pick chips — 1-click for standard sizes. Free input stays above. */}
+      <div style={{ display: "flex", alignItems: "center", gap: 4, padding: "4px 10px", borderBottom: "1px solid #111118" }}>
+        <span style={{ color: "#444", fontSize: 9, fontWeight: 700, fontFamily: MONO, letterSpacing: "0.06em", marginRight: 4 }}>STD W</span>
+        {STANDARD_WIDTHS.map(sw => {
+          const active = Math.abs(cab.width - sw) < 0.01;
+          return (
+            <button key={sw}
+              onClick={() => {
+                if (cab.width !== sw) dispatch({ type: "SET_DIMENSION", id: cab.id, field: "width", value: sw });
+                if (widthInputRef?.current) widthInputRef.current.value = sw;
+              }}
+              title={`Set width to ${sw}"`}
+              style={{
+                height: 20, minWidth: 24, padding: "0 5px", borderRadius: 3,
+                background: active ? selColor : "transparent",
+                border: active ? `1px solid ${selColor}` : "1px solid #222230",
+                color: active ? "#fff" : "#555",
+                fontWeight: active ? 700 : 500, fontSize: 10, cursor: "pointer",
+                fontFamily: MONO,
+              }}
+              onMouseEnter={e => { if (!active) { e.target.style.color = "#bbb"; e.target.style.borderColor = "#3a3a4a"; } }}
+              onMouseLeave={e => { if (!active) { e.target.style.color = "#555"; e.target.style.borderColor = "#222230"; } }}
+            >{sw}</button>
+          );
+        })}
+        <span style={{ color: "#333", fontSize: 9, fontFamily: MONO, marginLeft: 8 }}>or type any width above</span>
       </div>
 
       {/* Row 2: Face Sections */}

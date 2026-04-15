@@ -228,6 +228,15 @@ export default function specReducer(state, action) {
       return spec;
     }
 
+    case "SET_EXCLUDE_FROM_CUTLIST": {
+      // Mark a cabinet as a duplicate of one seen in another photo. The 3D view
+      // still shows it (so the wall layout reads correctly), but the project-
+      // level cut list skips it to avoid double-counting material.
+      const cab = spec.cabinets.find((c) => c.id === action.id);
+      if (cab) cab.exclude_from_cutlist = !!action.value;
+      return spec;
+    }
+
     case "CHANGE_TYPE": {
       const cab = spec.cabinets.find((c) => c.id === action.id);
       if (!cab) return spec;
@@ -276,6 +285,56 @@ export default function specReducer(state, action) {
       if (refIdx !== -1) {
         spec[layoutKey].splice(refIdx + 1, 0, { ref: action.newId });
       }
+      return spec;
+    }
+
+    case "MERGE_CABINETS": {
+      // Merge target into source: sum widths, concat face sections, remove target.
+      // Used when AI split one physical cabinet into two (e.g., B3+B4 that should be
+      // one 36" cabinet with 2 doors + 2 drawers). User then edits face sections.
+      const srcIdx = findCabinetIndex(spec, action.sourceId);
+      const tgtIdx = findCabinetIndex(spec, action.targetId);
+      if (srcIdx === -1 || tgtIdx === -1) return spec;
+
+      const source = spec.cabinets[srcIdx];
+      const target = spec.cabinets[tgtIdx];
+
+      // Must be same row — can't merge a base with a wall cabinet
+      const srcRow = rowForCabinet(state, action.sourceId);
+      const tgtRow = rowForCabinet(state, action.targetId);
+      if (!srcRow || srcRow !== tgtRow) return spec;
+
+      // Sum widths (quarter-inch precision to match editor)
+      source.width = Math.round((source.width + target.width) * 4) / 4;
+
+      // Concat face sections — preserve everything. User trims/combines after.
+      if (!source.face) source.face = { sections: [] };
+      if (!source.face.sections) source.face.sections = [];
+      const targetSections = (target.face && target.face.sections) || [];
+      source.face.sections = [...source.face.sections, ...targetSections];
+
+      // Remove target cabinet
+      const targetCabIdx = findCabinetIndex(spec, action.targetId);
+      if (targetCabIdx !== -1) spec.cabinets.splice(targetCabIdx, 1);
+
+      // Remove target from layout
+      const layoutKey = getLayoutKey(srcRow);
+      const tgtRefIdx = findRefIndex(spec[layoutKey], action.targetId);
+      if (tgtRefIdx !== -1) spec[layoutKey].splice(tgtRefIdx, 1);
+
+      // Remap alignments that referenced the target to now reference the source
+      spec.alignment = spec.alignment
+        .map((a) => {
+          if (a.wall === action.targetId) return { ...a, wall: action.sourceId };
+          if (a.base === action.targetId) return { ...a, base: action.sourceId };
+          return a;
+        })
+        // Deduplicate — if source was already aligned, drop the duplicate
+        .filter((a, i, arr) => {
+          const key = `${a.wall}-${a.base}`;
+          return arr.findIndex((x) => `${x.wall}-${x.base}` === key) === i;
+        });
+
       return spec;
     }
 

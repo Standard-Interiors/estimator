@@ -166,6 +166,23 @@ export default function BottomSheet({ spec, selectedId, dispatch, onSelect, onIn
         <ActionRow cabId={cab.id} spec={spec} dispatch={dispatch} onSelect={onSelect} />
       </div>
 
+      {/* Duplicate of another photo — exclude from cut list but keep in layout */}
+      <div style={{ marginBottom: 10 }}>
+        <button
+          onClick={() => dispatch({ type: "SET_EXCLUDE_FROM_CUTLIST", id: cab.id, value: !cab.exclude_from_cutlist })}
+          style={{
+            width: "100%", minHeight: 40, borderRadius: 8,
+            background: cab.exclude_from_cutlist ? "#eab30822" : "#14141e",
+            border: `1px solid ${cab.exclude_from_cutlist ? "#eab308" : "#2a2a3a"}`,
+            color: cab.exclude_from_cutlist ? "#eab308" : "#888",
+            fontWeight: 600, fontSize: 11, cursor: "pointer",
+            fontFamily: "'DM Sans',sans-serif", padding: "0 12px",
+          }}
+        >{cab.exclude_from_cutlist
+          ? "\u2713 Marked as duplicate — excluded from cut list"
+          : "Mark as duplicate of another photo (exclude from cut list)"}</button>
+      </div>
+
       {/* More section — height, depth, advanced */}
       <button onClick={() => setShowMore(!showMore)} style={{
         width: "100%", minHeight: 36, borderRadius: 8,
@@ -179,13 +196,15 @@ export default function BottomSheet({ spec, selectedId, dispatch, onSelect, onIn
 
       {showMore && (
         <div>
-          {/* Height pills */}
+          {/* Height — preset pills + custom input. Bathroom vanities (26-32"),
+              short wall cabinets (24, 26, 28, 31"), and any custom height need
+              to be enterable directly. */}
           <div style={{ marginBottom: 10 }}>
             <div style={{
               fontSize: 10, color: "#666", fontWeight: 600,
               fontFamily: "'DM Sans',sans-serif", marginBottom: 6, letterSpacing: "0.05em"
             }}>HEIGHT</div>
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
               {heightPresets.map(h => (
                 <button key={h} onClick={() => handleHeightChange(h)} style={{
                   minWidth: 48, minHeight: 44, borderRadius: 8,
@@ -196,16 +215,33 @@ export default function BottomSheet({ spec, selectedId, dispatch, onSelect, onIn
                   cursor: "pointer"
                 }}>{h}"</button>
               ))}
+              <span style={{ color: "#444", fontSize: 11, fontFamily: "'DM Sans',sans-serif", padding: "0 4px" }}>or</span>
+              <input
+                key={`${cab.id}-h-custom`}
+                type="number"
+                defaultValue={cab.height}
+                onFocus={e => e.target.select()}
+                onKeyDown={e => { if (e.key === "Enter") { const v = parseFloat(e.target.value); if (!isNaN(v) && v > 0) handleHeightChange(Math.round(v * 4) / 4); e.target.blur(); } }}
+                onBlur={e => { const v = parseFloat(e.target.value); if (!isNaN(v) && v > 0) { const r = Math.round(v * 4) / 4; if (r !== cab.height) handleHeightChange(r); e.target.value = r; } }}
+                placeholder="custom"
+                style={{
+                  width: 70, minHeight: 44, background: "#14141e",
+                  border: heightPresets.includes(cab.height) ? "1px solid #2a2a3a" : `2px solid ${rowColor}`,
+                  borderRadius: 8, color: "#fff", fontSize: 13, textAlign: "center",
+                  fontFamily: "'JetBrains Mono',monospace", fontWeight: 600,
+                }}
+              />
             </div>
           </div>
 
-          {/* Depth pills */}
+          {/* Depth — preset pills + custom input. Wall cabinets sometimes 14" or 24" deep;
+              bathroom vanities 18-21" deep. */}
           <div style={{ marginBottom: 10 }}>
             <div style={{
               fontSize: 10, color: "#666", fontWeight: 600,
               fontFamily: "'DM Sans',sans-serif", marginBottom: 6, letterSpacing: "0.05em"
             }}>DEPTH</div>
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
               {depthPresets.map(d => (
                 <button key={d} onClick={() => handleDepthChange(d)} style={{
                   minWidth: 48, minHeight: 44, borderRadius: 8,
@@ -216,6 +252,22 @@ export default function BottomSheet({ spec, selectedId, dispatch, onSelect, onIn
                   cursor: "pointer"
                 }}>{d}"</button>
               ))}
+              <span style={{ color: "#444", fontSize: 11, fontFamily: "'DM Sans',sans-serif", padding: "0 4px" }}>or</span>
+              <input
+                key={`${cab.id}-d-custom`}
+                type="number"
+                defaultValue={cab.depth}
+                onFocus={e => e.target.select()}
+                onKeyDown={e => { if (e.key === "Enter") { const v = parseFloat(e.target.value); if (!isNaN(v) && v > 0) handleDepthChange(Math.round(v * 4) / 4); e.target.blur(); } }}
+                onBlur={e => { const v = parseFloat(e.target.value); if (!isNaN(v) && v > 0) { const r = Math.round(v * 4) / 4; if (r !== cab.depth) handleDepthChange(r); e.target.value = r; } }}
+                placeholder="custom"
+                style={{
+                  width: 70, minHeight: 44, background: "#14141e",
+                  border: depthPresets.includes(cab.depth) ? "1px solid #2a2a3a" : `2px solid ${rowColor}`,
+                  borderRadius: 8, color: "#fff", fontSize: 13, textAlign: "center",
+                  fontFamily: "'JetBrains Mono',monospace", fontWeight: 600,
+                }}
+              />
             </div>
           </div>
         </div>

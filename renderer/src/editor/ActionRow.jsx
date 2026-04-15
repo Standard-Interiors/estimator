@@ -66,11 +66,40 @@ export default function ActionRow({ cabId, spec, dispatch, onSelect }) {
   const canMoveLeft = refIdx > 0;
   const canMoveRight = refIdx < layout.length - 1;
 
+  // Merge — only available when there's an adjacent neighbor in the same row
+  const leftNeighborRef = canMoveLeft ? layout[refIdx - 1] : null;
+  const rightNeighborRef = canMoveRight ? layout[refIdx + 1] : null;
+  const leftNeighbor = leftNeighborRef?.ref
+    ? spec.cabinets.find(c => c.id === leftNeighborRef.ref)
+    : null;
+  const rightNeighbor = rightNeighborRef?.ref
+    ? spec.cabinets.find(c => c.id === rightNeighborRef.ref)
+    : null;
+  const canMergeLeft = !!leftNeighbor;
+  const canMergeRight = !!rightNeighbor;
+
   const handleMoveLeft = () => {
     if (canMoveLeft) dispatch({ type: "MOVE_CABINET", id: cabId, direction: "left" });
   };
   const handleMoveRight = () => {
     if (canMoveRight) dispatch({ type: "MOVE_CABINET", id: cabId, direction: "right" });
+  };
+
+  const handleMergeLeft = () => {
+    // Merge left neighbor INTO this cabinet so this id is preserved, and the
+    // result appears where the left neighbor used to be.
+    if (!canMergeLeft) return;
+    // Shape: target (left) is absorbed into source (this); layout slot of left
+    // neighbor is removed. To keep visual order, we actually make the LEFT
+    // neighbor be the "source" so the merged cabinet stays in the left position.
+    dispatch({ type: "MERGE_CABINETS", sourceId: leftNeighbor.id, targetId: cabId });
+    // After merge, the merged cabinet keeps leftNeighbor.id — select it
+    if (onSelect) onSelect(leftNeighbor.id);
+  };
+  const handleMergeRight = () => {
+    if (!canMergeRight) return;
+    // Merge this cabinet's right neighbor INTO this one — this id is preserved
+    dispatch({ type: "MERGE_CABINETS", sourceId: cabId, targetId: rightNeighbor.id });
   };
 
   const pillBtn = (label, onClick, bg, color, extra) => (
@@ -130,6 +159,16 @@ export default function ActionRow({ cabId, spec, dispatch, onSelect }) {
           canMoveRight ? "#ccc" : "#444", canMoveRight ? {} : { opacity: 0.4 })}
         {pillBtn("Split", canSplit ? handleSplitStart : undefined, "#1a1a2a",
           canSplit ? "#ccc" : "#444", canSplit ? {} : { opacity: 0.4 })}
+      </div>
+      <div style={{ display: "flex", gap: 6 }}>
+        {pillBtn(canMergeLeft ? `\u2190 Merge ${leftNeighbor.id}` : "\u2190 Merge",
+          canMergeLeft ? handleMergeLeft : undefined, "#1a1a2a",
+          canMergeLeft ? rowColor : "#444",
+          canMergeLeft ? {} : { opacity: 0.4 })}
+        {pillBtn(canMergeRight ? `Merge ${rightNeighbor.id} \u2192` : "Merge \u2192",
+          canMergeRight ? handleMergeRight : undefined, "#1a1a2a",
+          canMergeRight ? rowColor : "#444",
+          canMergeRight ? {} : { opacity: 0.4 })}
       </div>
       <div style={{ display: "flex", gap: 6 }}>
         {pillBtn("+ Before", handleAddBefore, "#1a1a2a", rowColor)}
