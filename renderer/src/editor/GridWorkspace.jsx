@@ -63,6 +63,11 @@ function snapToStandard(inches) {
   return best;
 }
 
+/** Round to quarter-inch shop precision. */
+function roundQuarter(inches) {
+  return Math.round(inches * 4) / 4;
+}
+
 function faceSummary(cab) {
   if (!cab.face?.sections?.length) return "";
   return cab.face.sections.map(s => {
@@ -314,7 +319,8 @@ export default function GridWorkspace({ spec, dispatch, selectedId, onSelect, un
       const rawWidth = dragState.side === "right"
         ? dragState.origWidth + deltaInches
         : dragState.origWidth - deltaInches;
-      const snapped = snapToStandard(Math.max(6, rawWidth));
+      const clamped = Math.max(6, rawWidth);
+      const snapped = e.shiftKey ? snapToStandard(clamped) : roundQuarter(clamped);
       setResizeTooltip({ x: pt.x, y: pt.y - 8, width: snapped });
     } else if (dragState.type === "move") {
       const dx = Math.abs(pt.x - dragState.startX);
@@ -333,7 +339,8 @@ export default function GridWorkspace({ spec, dispatch, selectedId, onSelect, un
       const rawWidth = dragState.side === "right"
         ? dragState.origWidth + deltaInches
         : dragState.origWidth - deltaInches;
-      const snapped = snapToStandard(Math.max(6, rawWidth));
+      const clamped = Math.max(6, rawWidth);
+      const snapped = e.shiftKey ? snapToStandard(clamped) : roundQuarter(clamped);
       if (snapped !== dragState.origWidth) {
         dispatch({ type: "SET_DIMENSION", id: dragState.id, field: "width", value: snapped });
       }
@@ -401,9 +408,9 @@ export default function GridWorkspace({ spec, dispatch, selectedId, onSelect, un
   const handleSplit = useCallback((id) => {
     const cab = spec.cabinets.find(c => c.id === id);
     if (!cab) return;
-    const half = Math.round(cab.width / 2);
-    const leftW = snapToStandard(half);
-    const rightW = snapToStandard(cab.width - half);
+    const half = roundQuarter(cab.width / 2);
+    const leftW = half;
+    const rightW = roundQuarter(cab.width - half);
     const leftId = generateId(cab.row, spec);
     // Temporarily add left to get next id
     const tempSpec = { ...spec, cabinets: [...spec.cabinets, { id: leftId, row: cab.row }] };

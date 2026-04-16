@@ -307,6 +307,9 @@ export default function specReducer(state, action) {
       // Sum widths (quarter-inch precision to match editor)
       source.width = Math.round((source.width + target.width) * 4) / 4;
 
+      // Clear exclude flag — user is actively merging, so this is a real cabinet
+      delete source.exclude_from_cutlist;
+
       // Concat face sections — preserve everything. User trims/combines after.
       if (!source.face) source.face = { sections: [] };
       if (!source.face.sections) source.face.sections = [];

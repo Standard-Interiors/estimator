@@ -482,10 +482,11 @@ def step_validate(spec: dict) -> StepResult:
             errors.append(f"Duplicate cabinet ID: {c['id']}")
         seen.add(c["id"])
 
-    # Check widths are standard
+    # Check widths are within sane range (non-standard widths are allowed)
     for c in spec.get("cabinets", []):
-        if c.get("width") not in STANDARD_WIDTHS:
-            warnings.append(f"{c['id']} has non-standard width {c.get('width')}")
+        w = c.get("width", 0)
+        if w < 3 or w > 120:
+            warnings.append(f"{c['id']} has unusual width {w}\" (expected 3-120\")")
 
     # Check required fields
     for c in spec.get("cabinets", []):
@@ -575,7 +576,7 @@ def run_pipeline(photo_bytes: bytes, api_key: str,
         _progress("solve", f"Solve failed: {r4.error}")
         return None, results, None
 
-    _progress("solve", "Widths snapped to standard sizes")
+    _progress("solve", "Defaults filled, widths rounded to shop precision")
 
     # Step 5: Validate
     _progress("validate", "Validating spec...")

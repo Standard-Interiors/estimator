@@ -62,7 +62,7 @@ export default function ActionRow({ cabId, spec, dispatch, onSelect }) {
   };
 
   const rowColor = row === "base" ? "#D94420" : "#1a6fbf";
-  const canSplit = cab.width >= 24;
+  const canSplit = cab.width >= 12;
   const canMoveLeft = refIdx > 0;
   const canMoveRight = refIdx < layout.length - 1;
 
