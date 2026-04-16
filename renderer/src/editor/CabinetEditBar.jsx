@@ -124,22 +124,24 @@ export default function CabinetEditBar({ cab, spec, dispatch, selColor, widthInp
 
         <span style={{ width: 1, height: 20, background: "#1a1a2a", flexShrink: 0 }} />
 
-        {/* Dimensions */}
-        <input ref={widthInputRef} key={cab.id + "w"} type="number" defaultValue={cab.width}
+        {/* Dimensions — key includes current value so external changes (merge,
+            chip click, undo) re-initialize the input. Within-typing state isn't
+            affected because cab.width only updates on blur/Enter commit. */}
+        <input ref={widthInputRef} key={`${cab.id}w${cab.width}`} type="number" defaultValue={cab.width}
           onFocus={e => e.target.select()}
           onKeyDown={e => { if (e.key === "Enter") { commitDim("width", e.target.value, e.target); e.target.blur(); } }}
           onBlur={e => commitDim("width", e.target.value, e.target)}
           style={{ ...inputStyle(56, selColor), border: `2px solid ${selColor}` }}
         />
         <span style={{ color: "#555", fontSize: 12, fontFamily: MONO }}>w</span>
-        <input key={cab.id + "h"} type="number" defaultValue={cab.height}
+        <input key={`${cab.id}h${cab.height}`} type="number" defaultValue={cab.height}
           onFocus={e => e.target.select()}
           onKeyDown={e => { if (e.key === "Enter") { commitDim("height", e.target.value); e.target.blur(); } }}
           onBlur={e => commitDim("height", e.target.value)}
           style={{ ...inputStyle(48, selColor), border: `2px solid ${selColor}` }}
         />
         <span style={{ color: "#555", fontSize: 12, fontFamily: MONO }}>h</span>
-        <input key={cab.id + "d"} type="number" defaultValue={cab.depth}
+        <input key={`${cab.id}d${cab.depth}`} type="number" defaultValue={cab.depth}
           onFocus={e => e.target.select()}
           onKeyDown={e => { if (e.key === "Enter") { commitDim("depth", e.target.value); e.target.blur(); } }}
           onBlur={e => commitDim("depth", e.target.value)}

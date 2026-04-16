@@ -10,6 +10,12 @@ function dp(depth) { const v = depth || 0; return { x: v * SC * IDX, y: v * SC *
 const CONF_STROKE = { low: "#e07020", medium: "#c0a030", high: null };
 const CONF_DASH = { low: "4,3", medium: "6,2", high: "" };
 function confStyle(cab) {
+  // Cabinets flagged as duplicates of another photo get a yellow dashed outline
+  // so the user can see them in the layout but know they won't count in the
+  // cut list. Takes precedence over confidence styling.
+  if (cab?.exclude_from_cutlist) {
+    return { stroke: "#eab308", dash: "6,3" };
+  }
   const conf = cab?.confidence;
   if (!conf || conf === "high") return {};
   return { stroke: CONF_STROKE[conf], dash: CONF_DASH[conf] };
