@@ -66,13 +66,28 @@
 
 **We are cabinet makers.** Cabinets go in kitchens, bathrooms, laundry rooms, offices, garages, entertainment centers, mudrooms, closets, and anywhere else. ALL code, UI text, prompts, variable names, comments, and documentation MUST be room-agnostic. Never say "kitchen" — say "space", "room", or "layout".
 
+### Product Goal — AI Gets You 80%, Editor Gets You to 100%
+
+**The AI extraction will NEVER be perfect. That is by design.** The AI's job is to get the cabinet maker 80% of the way there — correct count, roughly correct sizes, right layout order. The EDITOR is the product. The editor gives users fast, easy tools to correct the last 20% (tap a width chip, type a height, merge two cabinets, drag to reorder).
+
+**Do NOT chase extraction perfection by rewriting prompts.** Prompt tweaking is a black hole — it fixes one project and breaks another. Instead, invest in making the editor corrections faster and easier. Every minute saved in the editor is worth more than a 2% accuracy improvement in extraction.
+
+### HARD CONSTRAINT — Do NOT Change Extraction Prompts
+
+**The extraction prompts in `pipeline.py` are FROZEN.** Do not rewrite, expand, or "improve" them without explicit user approval. Prompt changes:
+- Are unpredictable — fixing one case breaks others
+- Cannot be tested without running extraction on dozens of real photos
+- Create false confidence ("the prompt is better now" with no proof)
+
+If extraction accuracy needs improvement, the fix is almost always in the **pipeline logic** (better voting, better validation, better defaults) — not in the prompt text.
+
 ### Extraction Priority — CABINETS ONLY
 
 The extraction system exists to identify **cabinets**. Nothing else matters.
 
 **Priority order:**
 1. **Recognize every cabinet** — count every separate box, don't merge adjacent units
-2. **Get the size right** — width, height, depth using standard sizes only
+2. **Get the size right** — width, height, depth measured from the photo (NOT forced to standard sizes)
 3. **Get the position right** — left-to-right order, which row (upper/lower/tall)
 
 ### HARD CONSTRAINT — Cabinet Count Must Be 100%
@@ -113,8 +128,25 @@ If the answer to those three questions is yes, the extraction is good. Everythin
 - **NEVER use curl for testing.** Always test through the real UI in Chrome MCP. Curl is lazy and misses UI integration bugs.
 - A build passing (`vite build`) is NOT sufficient — you must verify runtime behavior
 - If Chrome MCP is unavailable, explicitly tell the user you could not verify
+- **Chrome MCP cannot navigate to fly.dev.** To test production data: temporarily change `api.js` BASE to `https://cabinet-estimator.fly.dev`, test on `localhost:5173`, then REVERT before committing. This gives real prod data with Chrome MCP access.
+- **Always test on REAL field data, not local test projects.** Local projects don't surface the same issues as field data (weird angles, non-standard sizes, closet doors confused for cabinets).
 
 **Why:** Bugs that ship because "it compiled" waste the user's time and erode trust. The photo_bytes bug was introduced because the extraction function signature was changed in server.py without verifying the actual extraction flow worked.
+
+## HARD CONSTRAINT — Know the Codebase Before Touching It
+
+### Dead Code Exists — Don't Waste Time on It
+
+- `renderer/src/editor/GridWorkspace.jsx` — **NOT IMPORTED ANYWHERE.** Dead code.
+- `renderer/src/editor/GridEditor.jsx` — **NOT IMPORTED ANYWHERE.** Dead code.
+- The ACTUAL production editor is `InteractiveRender.jsx` + `CabinetEditBar.jsx` (desktop) and `BottomSheet.jsx` + `ActionRow.jsx` (mobile).
+- Before fixing any editor file, verify it's actually imported in `App.jsx`.
+
+### Desktop vs Mobile Editor Paths
+
+- **Desktop** (≥768px): `InteractiveRender.jsx` renders the 3D SVG, `CabinetEditBar.jsx` is the bottom edit bar, right-click context menu is in `App.jsx`.
+- **Mobile** (<768px): Same `InteractiveRender.jsx` for 3D, but `BottomSheet.jsx` replaces `CabinetEditBar.jsx`, and `ActionRow.jsx` has Split/Move/Merge/Delete buttons.
+- **Any new editor feature must exist in BOTH paths** or the user will find it missing on one device.
 
 ## HARD CONSTRAINT — Project Manager Evaluation Standard
 

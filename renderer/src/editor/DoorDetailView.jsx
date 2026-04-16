@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { calcDoorSizes, formatFraction, FRAME_OFFSETS, SCRIBE_OFFSETS } from "../state/specHelpers";
+import { calcDoorSizes, formatFraction, FRAME_OFFSETS, SCRIBE_OFFSETS, resolveShopProfile } from "../state/specHelpers";
 
 const MONO = "'JetBrains Mono',monospace";
 
@@ -15,7 +15,7 @@ export default function DoorDetailView({ cab, spec, sectionIndex, dispatch, onBa
   const section = cab.face?.sections?.[sectionIndex];
   if (!section) return null;
 
-  const sizes = calcDoorSizes(cab, fs);
+  const sizes = calcDoorSizes(cab, fs, resolveShopProfile(spec));
   const ds = sizes.find(s => s.sectionIndex === sectionIndex);
   if (!ds) return null;
 

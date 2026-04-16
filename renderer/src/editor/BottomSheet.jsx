@@ -3,7 +3,7 @@ import WidthGrid from "./WidthGrid";
 import ActionRow from "./ActionRow";
 import {
   BASE_TYPES, WALL_TYPES, WALL_HEIGHTS, BASE_HEIGHT,
-  BASE_DEPTH, WALL_DEPTH, calcDoorSizes
+  BASE_DEPTH, WALL_DEPTH, calcDoorSizes, resolveShopProfile
 } from "../state/specHelpers";
 
 export default function BottomSheet({ spec, selectedId, dispatch, onSelect, onInsert, onSectionClick }) {
@@ -143,7 +143,7 @@ export default function BottomSheet({ spec, selectedId, dispatch, onSelect, onIn
             display: "flex", alignItems: "center", gap: 6,
           }}>FRONT SIZES <span style={{ fontWeight: 400, color: "#D94420", fontSize: 9, letterSpacing: 0 }}>tap to edit →</span></div>
           <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-            {calcDoorSizes(cab, spec.frame_style || "framed").map((ds, i) => {
+            {calcDoorSizes(cab, spec.frame_style || "framed", resolveShopProfile(spec)).map((ds, i) => {
               const colors = { door: "#22c55e", glass_door: "#06b6d4", drawer: "#f97216", false_front: "#8b5cf6" };
               const c = colors[ds.type] || "#888";
               return (

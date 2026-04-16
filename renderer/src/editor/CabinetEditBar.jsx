@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { SECTION_TYPES, BASE_TYPES, WALL_TYPES, TALL_TYPES, STANDARD_WIDTHS, generateId, defaultCabinet, calcDoorSizes, formatFraction, calcScribeNotes } from "../state/specHelpers";
+import { SECTION_TYPES, BASE_TYPES, WALL_TYPES, TALL_TYPES, STANDARD_WIDTHS, generateId, defaultCabinet, calcDoorSizes, formatFraction, calcScribeNotes, resolveShopProfile } from "../state/specHelpers";
 
 const MONO = "'JetBrains Mono',monospace";
 const SANS = "'DM Sans',sans-serif";
@@ -364,7 +364,7 @@ export default function CabinetEditBar({ cab, spec, dispatch, selColor, widthInp
         <span style={{ color: "#222", margin: "0 4px" }}>|</span>
         <span style={{ color: "#444", fontSize: 10, fontWeight: 700, fontFamily: MONO, letterSpacing: "0.06em" }}>SIZES</span>
         <span style={{ color: "#333", fontSize: 8 }}>click to edit →</span>
-        {calcDoorSizes(cab, spec.frame_style || "framed").map((ds, i) => {
+        {calcDoorSizes(cab, spec.frame_style || "framed", resolveShopProfile(spec)).map((ds, i) => {
           const colors = { door: "#22c55e", glass_door: "#06b6d4", drawer: "#f97216", false_front: "#8b5cf6" };
           const c = colors[ds.type] || "#888";
           return (

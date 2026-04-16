@@ -47,7 +47,7 @@ RULES:
 - Base cabinets get IDs: B1, B2, B3... left to right
 - Wall cabinets get IDs: W1, W2, W3... left to right
 - Tall cabinets get IDs: T1, T2...
-- Use standard cabinet widths ONLY: 9, 12, 15, 18, 21, 24, 27, 30, 33, 36, 42, 48 inches
+- Prefer standard cabinet widths: 9, 12, 15, 18, 21, 24, 27, 30, 33, 36, 42, 48 inches (but use the actual width if it clearly doesn't match a standard size)
 - Standard base height: 34.5", base depth: 24", wall depth: 12"
 - Identify appliance openings (range, fridge, dishwasher) — gaps with no cabinet
 - For each cabinet, describe the front face top-to-bottom as sections

@@ -252,7 +252,7 @@ export function formatFraction(inches) {
  * @param {string} frameStyle - "framed" or "frameless"
  * @returns {Array<{type, width, height, count, perDoorWidth, label, isOverride, needsVerify}>}
  */
-export function calcDoorSizes(cab, frameStyle = "framed") {
+export function calcDoorSizes(cab, frameStyle = "framed", shopProfile) {
   if (!cab?.face?.sections?.length) return [];
 
   const offsets = FRAME_OFFSETS[frameStyle] || FRAME_OFFSETS.framed;
@@ -284,9 +284,16 @@ export function calcDoorSizes(cab, frameStyle = "framed") {
     .filter(s => s.type === "drawer" || s.type === "false_front")
     .reduce((sum, s) => sum + (s.height || offsets.defaultDrawer), 0);
 
+  // Dynamic baseDeduct: standard bases (>28") get toe kick + clearance deduction;
+  // short bases like vanities (≤28") get no toe kick deduction — they either have
+  // no toe kick, legs, or a much shorter kick that the door covers.
+  const baseDeduct = (isBase && cab.height > 28)
+    ? (shopProfile?.toe_kick_height ?? 4.5) + (shopProfile?.base_bottom_clearance ?? 0.5)
+    : 0;
+
   // Door height calculation
   const baseDoorHeight = isBase
-    ? effHeight - offsets.baseDeduct - drawerHeightSum - offsets.height
+    ? effHeight - baseDeduct - drawerHeightSum - offsets.height
     : effHeight - offsets.height;
 
   const results = [];
@@ -546,7 +553,7 @@ export function calcFullCutList(cab, frameStyle, shop) {
   }
 
   // 2. Fronts (doors, drawers, false fronts) + drawer boxes
-  const frontSizes = calcDoorSizes(cab, frameStyle);
+  const frontSizes = calcDoorSizes(cab, frameStyle, shop);
   for (const ds of frontSizes) {
     const w = ds.count >= 2 && (ds.type === "door" || ds.type === "glass_door")
       ? ds.perDoorWidth : ds.width;

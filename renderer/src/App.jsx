@@ -1211,7 +1211,7 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
           const allSections = [];
           const sizeCounts = {};
           (spec.cabinets || []).forEach(cab => {
-            const sizes = calcDoorSizes(cab, fs);
+            const sizes = calcDoorSizes(cab, fs, resolveShopProfile(spec));
             sizes.forEach(ds => {
               const scribeNote = calcScribeNotes(cab);
               allSections.push({ cab, ...ds, scribeNote });
