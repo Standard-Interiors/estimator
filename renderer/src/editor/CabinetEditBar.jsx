@@ -80,7 +80,11 @@ export default function CabinetEditBar({ cab, spec, dispatch, selColor, widthInp
 
   const commitDim = (field, val, inputEl) => {
     let v = parseFloat(val);
-    if (isNaN(v) || v <= 0) return;
+    if (isNaN(v) || v <= 0) {
+      // Rejected — reset input to current valid value so it doesn't show "0" or garbage
+      if (inputEl) inputEl.value = cab[field];
+      return;
+    }
     // Round to shop precision (0.25" = typical cut tolerance). Do NOT snap to
     // standard widths — cabinet makers measure real dimensions, and the AI's
     // correct non-standard widths must survive. Standard widths are offered

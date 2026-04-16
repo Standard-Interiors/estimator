@@ -217,7 +217,7 @@ export default function BottomSheet({ spec, selectedId, dispatch, onSelect, onIn
               ))}
               <span style={{ color: "#444", fontSize: 11, fontFamily: "'DM Sans',sans-serif", padding: "0 4px" }}>or</span>
               <input
-                key={`${cab.id}-h-custom`}
+                key={`${cab.id}-h-${cab.height}`}
                 type="number"
                 defaultValue={cab.height}
                 onFocus={e => e.target.select()}
@@ -254,7 +254,7 @@ export default function BottomSheet({ spec, selectedId, dispatch, onSelect, onIn
               ))}
               <span style={{ color: "#444", fontSize: 11, fontFamily: "'DM Sans',sans-serif", padding: "0 4px" }}>or</span>
               <input
-                key={`${cab.id}-d-custom`}
+                key={`${cab.id}-d-${cab.depth}`}
                 type="number"
                 defaultValue={cab.depth}
                 onFocus={e => e.target.select()}

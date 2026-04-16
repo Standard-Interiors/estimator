@@ -434,8 +434,10 @@ export function calcBoxParts(cab, shop) {
       thickness: t, material: shop.box_material, grain: "H", edgeBand: "none" });
   }
 
-  // Nailer cleat (wall cabs)
-  if (cab.row === "wall" && shop.include_nailer) {
+  // Nailer cleat — ALL cabinet types need a rear nailer for wall mounting
+  // (base: supports countertop clips + wall screws; wall: sole mounting;
+  // tall: prevents tipping). Not just wall cabs.
+  if (shop.include_nailer) {
     parts.push({ part: "Nailer", partId: `${cab.id}-NL`, qty: 1,
       width: round4(cab.width - (2 * t)), height: 3,
       thickness: t, material: shop.box_material, grain: "H", edgeBand: "none" });
@@ -484,17 +486,22 @@ export function calcDrawerBoxParts(cab, ds, shop) {
 
   const parts = [];
   const bt = shop.drawer_box_thickness;
-  const frontW = ds.width;
   const frontH = ds.height;
 
   // FIX #4: Use configurable drawer_reveal instead of hardcoded 1.5
   const boxH = round4(frontH - (shop.drawer_reveal || 1.5));
 
-  // FIX #3: slide_clearance is now TOTAL (both sides), not per-side
+  // CRITICAL FIX: Drawer box width must be derived from the CABINET OPENING
+  // (cab.width minus two side panels), NOT from the door front width (ds.width).
+  // The front includes overlay that extends past the carcass — using it made
+  // every drawer box 0.5-1.375" too wide to physically fit inside the box.
+  //
+  // Correct: opening = cab.width - 2×box_thickness
+  //          boxW    = opening - slide_clearance - 2×drawer_box_thickness
+  const openingW = cab.width - (2 * shop.box_thickness);
   const slideTotal = shop.slide_clearance || 0.5;
-  // For undermount: no side clearance needed, box width = front width - 2×thickness
   const sideDeduct = shop.slide_type === "undermount" ? 0 : slideTotal;
-  const boxW = round4(frontW - sideDeduct - (2 * bt));
+  const boxW = round4(openingW - sideDeduct - (2 * bt));
 
   // FIX #5: Use door_thickness from shop profile, not hardcoded 0.75
   const frontThick = shop.door_thickness || 0.75;

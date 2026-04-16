@@ -1320,7 +1320,7 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
             <div style={{padding:isMobile?"10px":"14px 20px",maxHeight:"calc(100vh - 140px)",overflow:"auto"}}>
               <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8,flexWrap:"wrap"}}>
                 <h2 style={{fontSize:isMobile?14:16,fontWeight:700,color:"#eee",margin:0}}>CNC Cut List</h2>
-                <span style={{fontSize:10,color:"#555",fontFamily:"'JetBrains Mono',monospace"}}>{fs === "framed" ? "Framed" : "Frameless"} · {totalParts} parts · {(spec.cabinets||[]).length} cabinets</span>
+                <span style={{fontSize:10,color:"#555",fontFamily:"'JetBrains Mono',monospace"}}>{fs === "framed" ? "Framed" : "Frameless"} · {totalParts} parts · {(spec.cabinets||[]).filter(c=>!c.exclude_from_cutlist).length} cabinets</span>
                 <span style={{flex:1}}/>
                 <button onClick={()=>setShowShopProfile(true)} style={{padding:"5px 10px",borderRadius:6,fontSize:10,fontWeight:600,cursor:"pointer",background:"#1a1a2a",border:"1px solid #2a2a3a",color:"#888",fontFamily:"inherit"}}>⚙ Shop Profile</button>
                 <button onClick={()=>{
