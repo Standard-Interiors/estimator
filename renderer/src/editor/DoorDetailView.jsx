@@ -15,7 +15,8 @@ export default function DoorDetailView({ cab, spec, sectionIndex, dispatch, onBa
   const section = cab.face?.sections?.[sectionIndex];
   if (!section) return null;
 
-  const sizes = calcDoorSizes(cab, fs, resolveShopProfile(spec));
+  const shop = resolveShopProfile(spec);
+  const sizes = calcDoorSizes(cab, fs, shop);
   const ds = sizes.find(s => s.sectionIndex === sectionIndex);
   if (!ds) return null;
 
@@ -23,6 +24,16 @@ export default function DoorDetailView({ cab, spec, sectionIndex, dispatch, onBa
   const isDouble = ds.count >= 2 && (ds.type === "door" || ds.type === "glass_door");
   const doorW = isDouble ? ds.perDoorWidth : ds.width;
   const doorH = ds.height;
+  // Mirror calcDoorSizes: only standard bases (>28") get the toe kick + clearance deduction.
+  const baseDeduct = (cab.row === "base" && cab.height > 28)
+    ? (shop?.toe_kick_height ?? 4.5) + (shop?.base_bottom_clearance ?? 0.5)
+    : 0;
+  // Drawers/false_fronts above/below a door on a base cab consume height — mirror calcDoorSizes.
+  const drawerHeightSum = cab.row === "base" && (ds.type === "door" || ds.type === "glass_door")
+    ? (cab.face?.sections || [])
+        .filter(s => s.type === "drawer" || s.type === "false_front")
+        .reduce((sum, s) => sum + (s.height || offsets.defaultDrawer), 0)
+    : 0;
 
   const rowColor = cab.row === "base" ? "#D94420" : "#1a6fbf";
 
@@ -52,7 +63,7 @@ export default function DoorDetailView({ cab, spec, sectionIndex, dispatch, onBa
   const formulaW = `${cab.width}" - ${offsets.width}" ${scribe.left ? `- ${SCRIBE_OFFSETS.side}" L` : ""}${scribe.right ? ` - ${SCRIBE_OFFSETS.side}" R` : ""}${isDouble ? ` - ${offsets.centerStile}" stile ÷ 2` : ""} = ${formatFraction(doorW)}"`;
   const formulaH = ds.type === "drawer"
     ? `Drawer height: ${formatFraction(doorH)}"`
-    : `${cab.height}" - ${cab.row === "base" ? `${offsets.baseDeduct}" base` : "0"} ${cab.row === "base" && section.height ? "" : `- ${offsets.height}" frame`}${scribe.top ? ` - ${SCRIBE_OFFSETS.top}" top` : ""} = ${formatFraction(doorH)}"`;
+    : `${cab.height}"${baseDeduct > 0 ? ` - ${baseDeduct}" base` : ""}${drawerHeightSum > 0 ? ` - ${drawerHeightSum}" drawers/FF` : ""} - ${offsets.height}" frame${scribe.top ? ` - ${SCRIBE_OFFSETS.top}" top` : ""} = ${formatFraction(doorH)}"`;
 
   const typeLabel = ds.type === "door" ? "Door" : ds.type === "glass_door" ? "Glass Door" : ds.type === "drawer" ? "Drawer" : "False Front";
 
@@ -262,7 +273,8 @@ export default function DoorDetailView({ cab, spec, sectionIndex, dispatch, onBa
                 <span style={{color:"#22c55e", fontWeight:700}}>{formatFraction(doorH)}" (set)</span>
               ) : (<>
                 <span style={{color:"#aaa"}}>{cab.height}"</span>
-                {cab.row === "base" && <span style={{color:"#666"}}> − {offsets.baseDeduct}" base</span>}
+                {baseDeduct > 0 && <span style={{color:"#666"}}> − {baseDeduct}" base</span>}
+                {drawerHeightSum > 0 && <span style={{color:"#f97216"}}> − {drawerHeightSum}" drawers/FF</span>}
                 {offsets.height > 0 && <span style={{color:"#666"}}> − {offsets.height}" frame</span>}
                 {scribe.top && <span style={{color:"#eab308"}}> − {SCRIBE_OFFSETS.top}" top</span>}
                 <span style={{color:"#22c55e", fontWeight:700}}> = {formatFraction(doorH)}"</span>
