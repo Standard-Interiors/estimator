@@ -127,6 +127,50 @@ export default function BottomSheet({ spec, selectedId, dispatch, onSelect, onIn
         <WidthGrid currentWidth={cab.width} rowColor={rowColor} onWidthChange={handleWidthChange} />
       </div>
 
+      {/* Scribe toggles — desktop/mobile parity with CabinetEditBar.
+          Per Neil's spec: 0.5" per scribed side (reduces door width), 0.75" on top
+          (reduces door height). Scribed cabinets require 0.5" overlay hinges. */}
+      <div style={{ marginBottom: 12 }}>
+        <div style={{
+          fontSize: 10, color: "#666", fontWeight: 600,
+          fontFamily: "'DM Sans',sans-serif", marginBottom: 6, letterSpacing: "0.05em",
+          display: "flex", alignItems: "center", gap: 6,
+        }}>
+          SCRIBE
+          <span style={{ fontWeight: 400, color: "#555", fontSize: 9, letterSpacing: 0 }}>
+            trims edge to fit wall
+          </span>
+        </div>
+        <div style={{ display: "flex", gap: 6 }}>
+          {[["left", "Left"], ["right", "Right"], ["top", "Top"]].map(([key, label]) => {
+            const active = cab.scribe?.[key];
+            return (
+              <button key={key}
+                onClick={() => dispatch({ type: "SET_SCRIBE", id: cab.id, updates: { [key]: !active } })}
+                style={{
+                  flex: 1, minHeight: 40, borderRadius: 8,
+                  background: active ? "rgba(234,179,8,0.2)" : "#14141e",
+                  border: active ? "1px solid rgba(234,179,8,0.3)" : "1px solid #2a2a3a",
+                  color: active ? "#eab308" : "#666",
+                  fontWeight: 600, fontSize: 11,
+                  fontFamily: "'DM Sans',sans-serif",
+                  cursor: "pointer",
+                }}>{label}</button>
+            );
+          })}
+        </div>
+        {(cab.scribe?.left || cab.scribe?.right || cab.scribe?.top) && (
+          <div style={{
+            marginTop: 6, padding: "5px 8px", borderRadius: 6,
+            background: "rgba(234,179,8,0.08)", border: "1px solid rgba(234,179,8,0.25)",
+            color: "#eab308", fontSize: 10, lineHeight: 1.4,
+            fontFamily: "'DM Sans',sans-serif",
+          }}>
+            ⚠ Use 1/2" overlay hinges on this cabinet
+          </div>
+        )}
+      </div>
+
       {/* Face sections + front sizes — ALWAYS visible (critical for tweaking) */}
       {cab.face?.sections?.length > 0 && (
         <div style={{ marginBottom: 10 }}>

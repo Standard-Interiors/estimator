@@ -114,19 +114,30 @@ export function resolveShopProfile(spec) {
 }
 
 // Door sizing offsets by frame style
+// Per Neil Prinster's spec (Standard Interiors of Colorado):
+//   framed    wall/tall: door = cab - 0.5 (width and height)
+//   framed    base:      door_h = cab_h - 5 - drawer_height
+//   frameless wall/tall: door = cab - 0.125 (w), cab - 0.25 (h)
+//   frameless base:      door_h = cab_h - 4.875 - drawer_height
+// The baseDeduct values (5 / 4.875) ALREADY include the top reveal —
+// callers must NOT add `height` on top for standard bases. See calcDoorSizes().
+// baseRevealExtra = baseDeduct − standard toe_kick (4.5). If shop_profile.toe_kick_height
+// is non-standard, baseDeduct is recomputed as toe_kick + baseRevealExtra.
 export const FRAME_OFFSETS = {
   framed: {
-    width: 0.5,           // subtract from cabinet width for single door
-    centerStile: 0.25,    // additional subtract for double doors, then divide by 2
-    height: 0.5,          // subtract from cabinet height
-    baseDeduct: 5,        // subtract for base cab (toe kick + clearance)
-    defaultDrawer: 6,     // default drawer height
+    width: 0.5,            // subtract from cabinet width for single door
+    centerStile: 0.25,     // additional subtract for double doors, then divide by 2
+    height: 0.5,           // subtract from cab height for non-base doors
+    baseDeduct: 5,         // Neil's number: total deduction for std base (toe kick + reveal)
+    baseRevealExtra: 0.5,  // baseDeduct − 4.5" std toe kick; added to shop toe_kick_height
+    defaultDrawer: 6,      // default drawer height
   },
   frameless: {
     width: 0.125,
-    centerStile: 0.125,   // 0.25 total gap, then divide by 2
+    centerStile: 0.125,    // 0.25 total gap, then divide by 2
     height: 0.25,
     baseDeduct: 4.875,
+    baseRevealExtra: 0.375,
     defaultDrawer: 6,
   },
 };
@@ -137,8 +148,10 @@ export const SCRIBE_OFFSETS = {
   top: 0.75,   // scribed top, reduces door height
 };
 
-// Drawer bank default heights (bottom to top)
-export const DRAWER_BANK_HEIGHTS = [10.5, 6, 6, 6];
+// Drawer bank default heights, in section order (top → bottom).
+// Per Neil's spec: "10.5" for lowest drawer, 6" for three drawers above it."
+// These are often custom — UI surfaces a verify badge (see needsVerify below).
+export const DRAWER_BANK_HEIGHTS = [6, 6, 6, 10.5];
 
 const PREFIX = { base: "B", wall: "W", tall: "T" };
 
@@ -284,16 +297,27 @@ export function calcDoorSizes(cab, frameStyle = "framed", shopProfile) {
     .filter(s => s.type === "drawer" || s.type === "false_front")
     .reduce((sum, s) => sum + (s.height || offsets.defaultDrawer), 0);
 
-  // Dynamic baseDeduct: standard bases (>28") get toe kick + clearance deduction;
-  // short bases like vanities (≤28") get no toe kick deduction — they either have
-  // no toe kick, legs, or a much shorter kick that the door covers.
+  // Dynamic baseDeduct: standard bases (>28") get Neil's full frame-style deduction
+  // (5" framed / 4.875" frameless). This value ALREADY includes the top reveal, so we
+  // do NOT add offsets.height on top for standard bases. Short bases like vanities
+  // (≤28") have no toe kick and fall back to the general cab rule (effHeight - height).
+  // If shop_profile.toe_kick_height is non-standard, we rebuild baseDeduct as
+  // toe_kick + baseRevealExtra so the door math tracks the custom toe kick.
+  const stdToeKick = 4.5;
+  const shopToeKick = shopProfile?.toe_kick_height ?? stdToeKick;
   const baseDeduct = (isBase && cab.height > 28)
-    ? (shopProfile?.toe_kick_height ?? 4.5) + (shopProfile?.base_bottom_clearance ?? 0.5)
+    ? shopToeKick + offsets.baseRevealExtra
     : 0;
 
-  // Door height calculation
+  // Door height:
+  // - Non-base: effHeight - offsets.height (general rule)
+  // - Base >28" (std base): effHeight - baseDeduct - drawerHeightSum
+  //     (baseDeduct already bakes in the top reveal; do NOT add offsets.height again)
+  // - Base ≤28" (vanity): effHeight - drawerHeightSum - offsets.height (general rule)
   const baseDoorHeight = isBase
-    ? effHeight - baseDeduct - drawerHeightSum - offsets.height
+    ? (baseDeduct > 0
+        ? effHeight - baseDeduct - drawerHeightSum
+        : effHeight - drawerHeightSum - offsets.height)
     : effHeight - offsets.height;
 
   const results = [];

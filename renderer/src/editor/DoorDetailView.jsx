@@ -21,12 +21,14 @@ export default function DoorDetailView({ cab, spec, sectionIndex, dispatch, onBa
   if (!ds) return null;
 
   const scribe = cab.scribe || {};
+  const hasScribe = !!(scribe.left || scribe.right || scribe.top);
   const isDouble = ds.count >= 2 && (ds.type === "door" || ds.type === "glass_door");
   const doorW = isDouble ? ds.perDoorWidth : ds.width;
   const doorH = ds.height;
-  // Mirror calcDoorSizes: only standard bases (>28") get the toe kick + clearance deduction.
+  // Mirror calcDoorSizes: std bases (>28") get full frame-style deduction; this
+  // already INCLUDES the top reveal, so we do NOT also show offsets.height below.
   const baseDeduct = (cab.row === "base" && cab.height > 28)
-    ? (shop?.toe_kick_height ?? 4.5) + (shop?.base_bottom_clearance ?? 0.5)
+    ? (shop?.toe_kick_height ?? 4.5) + offsets.baseRevealExtra
     : 0;
   // Drawers/false_fronts above/below a door on a base cab consume height — mirror calcDoorSizes.
   const drawerHeightSum = cab.row === "base" && (ds.type === "door" || ds.type === "glass_door")
@@ -59,11 +61,15 @@ export default function DoorDetailView({ cab, spec, sectionIndex, dispatch, onBa
   const doorX = ox + (cabW - (isDouble ? doorPxW * 2 + offsets.centerStile * SC : doorPxW)) / 2;
   const doorY = oy + (cabH - doorPxH) / 2;
 
-  // Formula display
+  // Formula display — mirrors calcDoorSizes exactly.
+  // For std bases (baseDeduct > 0), Neil's formula is `cab - baseDeduct - drawers`
+  // and DOES NOT also subtract offsets.height (the baseDeduct already includes the top reveal).
   const formulaW = `${cab.width}" - ${offsets.width}" ${scribe.left ? `- ${SCRIBE_OFFSETS.side}" L` : ""}${scribe.right ? ` - ${SCRIBE_OFFSETS.side}" R` : ""}${isDouble ? ` - ${offsets.centerStile}" stile ÷ 2` : ""} = ${formatFraction(doorW)}"`;
   const formulaH = ds.type === "drawer"
     ? `Drawer height: ${formatFraction(doorH)}"`
-    : `${cab.height}"${baseDeduct > 0 ? ` - ${baseDeduct}" base` : ""}${drawerHeightSum > 0 ? ` - ${drawerHeightSum}" drawers/FF` : ""} - ${offsets.height}" frame${scribe.top ? ` - ${SCRIBE_OFFSETS.top}" top` : ""} = ${formatFraction(doorH)}"`;
+    : baseDeduct > 0
+      ? `${cab.height}" - ${baseDeduct}" base${drawerHeightSum > 0 ? ` - ${drawerHeightSum}" drawers/FF` : ""}${scribe.top ? ` - ${SCRIBE_OFFSETS.top}" top` : ""} = ${formatFraction(doorH)}"`
+      : `${cab.height}"${drawerHeightSum > 0 ? ` - ${drawerHeightSum}" drawers/FF` : ""} - ${offsets.height}" frame${scribe.top ? ` - ${SCRIBE_OFFSETS.top}" top` : ""} = ${formatFraction(doorH)}"`;
 
   const typeLabel = ds.type === "door" ? "Door" : ds.type === "glass_door" ? "Glass Door" : ds.type === "drawer" ? "Drawer" : "False Front";
 
@@ -257,6 +263,17 @@ export default function DoorDetailView({ cab, spec, sectionIndex, dispatch, onBa
                 );
               })}
             </div>
+            {/* Per Neil's spec: scribed cabinets require 1/2" overlay hinges so the door
+                still covers the opening after the scribe is trimmed. */}
+            {hasScribe && (
+              <div style={{
+                marginTop: 8, padding: "6px 10px", borderRadius: 6,
+                background: "rgba(234,179,8,0.08)", border: "1px solid rgba(234,179,8,0.25)",
+                color: "#eab308", fontSize: 10, fontFamily: MONO, lineHeight: 1.4,
+              }}>
+                ⚠ Scribed cabinet — use 1/2" overlay hinges (door is trimmed by the scribe amount).
+              </div>
+            )}
           </div>
 
           {/* Formula — broken into readable steps */}
@@ -275,7 +292,7 @@ export default function DoorDetailView({ cab, spec, sectionIndex, dispatch, onBa
                 <span style={{color:"#aaa"}}>{cab.height}"</span>
                 {baseDeduct > 0 && <span style={{color:"#666"}}> − {baseDeduct}" base</span>}
                 {drawerHeightSum > 0 && <span style={{color:"#f97216"}}> − {drawerHeightSum}" drawers/FF</span>}
-                {offsets.height > 0 && <span style={{color:"#666"}}> − {offsets.height}" frame</span>}
+                {baseDeduct === 0 && offsets.height > 0 && <span style={{color:"#666"}}> − {offsets.height}" frame</span>}
                 {scribe.top && <span style={{color:"#eab308"}}> − {SCRIBE_OFFSETS.top}" top</span>}
                 <span style={{color:"#22c55e", fontWeight:700}}> = {formatFraction(doorH)}"</span>
               </>)}</div>

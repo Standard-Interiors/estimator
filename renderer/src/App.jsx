@@ -1232,10 +1232,13 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
                 <span style={{fontSize:11,color:"#555",fontFamily:"'JetBrains Mono',monospace"}}>{fs === "framed" ? "Framed" : "Frameless"}</span>
                 <span style={{flex:1}}/>
                 <button onClick={()=>{
-                  const csv = ["Cabinet,Type,Component,Qty,Width,Height,Scribe"];
+                  // Per Neil's spec: scribed cabinets require 1/2" overlay hinges so the
+                  // door still covers the opening after the scribe is trimmed.
+                  const csv = ["Cabinet,Type,Component,Qty,Width,Height,Scribe,Hinge Overlay"];
                   allSections.forEach(s => {
                     const w = s.count >= 2 && (s.type === "door" || s.type === "glass_door") ? s.perDoorWidth : s.width;
-                    csv.push(`${s.cab.id},${s.cab.type},${s.type},${s.count},${w},${s.height},${s.scribeNote||""}`);
+                    const overlay = s.scribeNote && (s.type === "door" || s.type === "glass_door") ? "1/2\"" : "";
+                    csv.push(`${s.cab.id},${s.cab.type},${s.type},${s.count},${w},${s.height},${s.scribeNote||""},${overlay}`);
                   });
                   const blob = new Blob([csv.join("\n")], { type: "text/csv" });
                   const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
@@ -1255,7 +1258,7 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
               <table style={{width:"100%",borderCollapse:"collapse",fontSize:12,fontFamily:"'JetBrains Mono',monospace"}}>
                 <thead>
                   <tr style={{borderBottom:"2px solid #2a2a3a"}}>
-                    {["Cab","Type","Component","Qty","Width","Height","Scribe",""].map(h=>(
+                    {["Cab","Type","Component","Qty","Width","Height","Scribe","Hinge",""].map(h=>(
                       <th key={h} style={{padding:"8px 6px",textAlign:"left",color:"#666",fontWeight:600,fontSize:10,letterSpacing:"0.05em"}}>{h}</th>
                     ))}
                   </tr>
@@ -1263,6 +1266,9 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
                 <tbody>
                   {allSections.map((s, i) => {
                     const w = s.count >= 2 && (s.type === "door" || s.type === "glass_door") ? s.perDoorWidth : s.width;
+                    // Scribed DOORS (and glass doors) get forced to 1/2" overlay hinges per Neil's spec;
+                    // drawers/false-fronts don't use hinges so leave blank.
+                    const hingeOverlay = s.scribeNote && (s.type === "door" || s.type === "glass_door") ? "1/2\"" : "";
                     return (
                       <tr key={i} style={{borderBottom:"1px solid #1a1a2a",cursor:"pointer",background:i%2===0?"transparent":"rgba(255,255,255,0.015)"}}
                         onClick={()=>{setSelectedId(s.cab.id);setTab("render");}}
@@ -1277,6 +1283,7 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
                         <td style={{padding:"6px",color:"#eee",fontWeight:600}}>{formatFraction(w)}"</td>
                         <td style={{padding:"6px",color:"#eee",fontWeight:600}}>{formatFraction(s.height)}"</td>
                         <td style={{padding:"6px",color:s.scribeNote?"#eab308":"#555"}}>{s.scribeNote||"None"}</td>
+                        <td style={{padding:"6px",color:hingeOverlay?"#eab308":"#555",fontWeight:hingeOverlay?700:400}}>{hingeOverlay||"—"}</td>
                         <td style={{padding:"6px"}}>
                           {s.isOverride && <span style={{color:"#8b5cf6",fontSize:9,padding:"2px 6px",background:"rgba(139,92,246,0.1)",borderRadius:3}}>override</span>}
                           {s.needsVerify && <span style={{color:"#eab308",fontSize:9,padding:"2px 6px",background:"rgba(234,179,8,0.1)",borderRadius:3}}>verify</span>}

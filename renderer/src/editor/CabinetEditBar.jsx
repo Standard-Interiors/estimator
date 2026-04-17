@@ -361,6 +361,18 @@ export default function CabinetEditBar({ cab, spec, dispatch, selColor, widthInp
             </button>
           );
         })}
+        {(cab.scribe?.left || cab.scribe?.right || cab.scribe?.top) && (
+          <span
+            title='Scribed cabinets require 1/2" overlay hinges so the door still covers the opening after the scribe is trimmed.'
+            style={{
+              fontSize: 9, fontWeight: 700, fontFamily: MONO, padding: "2px 6px",
+              borderRadius: 4, background: "rgba(234,179,8,0.1)",
+              border: "1px solid rgba(234,179,8,0.3)", color: "#eab308",
+              cursor: "help", whiteSpace: "nowrap",
+            }}>
+            ⚠ 1/2" overlay
+          </span>
+        )}
         <span style={{ color: "#222", margin: "0 4px" }}>|</span>
         <span style={{ color: "#444", fontSize: 10, fontWeight: 700, fontFamily: MONO, letterSpacing: "0.06em" }}>SIZES</span>
         <span style={{ color: "#333", fontSize: 8 }}>click to edit →</span>

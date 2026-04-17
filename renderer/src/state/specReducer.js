@@ -2,6 +2,7 @@
  * Pure reducer for cabinet spec state.
  * Deep-clones state on every action to guarantee immutability.
  */
+import { DRAWER_BANK_HEIGHTS } from "./specHelpers";
 
 function clone(obj) {
   return typeof structuredClone === "function"
@@ -244,12 +245,12 @@ export default function specReducer(state, action) {
       // Auto-update face to match common types
       const t = action.newType;
       if (t === "base_drawer_bank" || t === "drawer_bank") {
-        cab.face = { sections: [
-          { type: "drawer", count: 1, height: 6 },
-          { type: "drawer", count: 1, height: 6 },
-          { type: "drawer", count: 1, height: 6 },
-          { type: "drawer", count: 1 },
-        ]};
+        // Neil's spec: 10.5" bottom, 6" × 3 above (section order = top→bottom).
+        // These are often custom — `needsVerify` badge prompts the cabinet maker
+        // to double-check sizes in the UI.
+        cab.face = {
+          sections: DRAWER_BANK_HEIGHTS.map((height) => ({ type: "drawer", count: 1, height })),
+        };
       } else if (t === "base_sink" || t === "sink") {
         cab.face = { sections: [
           { type: "false_front", height: 6 },
