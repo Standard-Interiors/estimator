@@ -31,11 +31,14 @@ function actionLabel(action) {
     case "CHANGE_TYPE":
       return `Change ${action.id} to ${action.newType}`;
     case "ADD_SECTION":
-      return `Add section to ${action.id}`;
+      // Dispatches use `cabId` (not `id`). Previously labeled "Add section to undefined".
+      return `Add section to ${action.cabId}`;
     case "REMOVE_SECTION":
-      return `Remove section from ${action.id}`;
+      return `Remove section from ${action.cabId}`;
     case "UPDATE_SECTION":
-      return `Update section on ${action.id}`;
+      return `Update section on ${action.cabId}`;
+    case "MERGE_CABINETS":
+      return `Merge ${action.targetId} into ${action.sourceId}`;
     case "ADD_GAP":
       return `Add gap`;
     case "DELETE_GAP":

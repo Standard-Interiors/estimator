@@ -2,7 +2,7 @@
  * Pure reducer for cabinet spec state.
  * Deep-clones state on every action to guarantee immutability.
  */
-import { DRAWER_BANK_HEIGHTS } from "./specHelpers";
+import { DRAWER_BANK_HEIGHTS, FRAME_OFFSETS } from "./specHelpers";
 
 function clone(obj) {
   return typeof structuredClone === "function"
@@ -316,6 +316,39 @@ export default function specReducer(state, action) {
       if (!source.face.sections) source.face.sections = [];
       const targetSections = (target.face && target.face.sections) || [];
       source.face.sections = [...source.face.sections, ...targetSections];
+
+      // OVERFLOW GUARD: a concatenated face may push the door's auto-computed height
+      // below zero (e.g. B1[drawer+door] + B2[3 drawers] → 4 drawers totalling > cab).
+      // We used to let that propagate silently into the cut list and CSV (-6.5" door!).
+      // Now: if a door exists and the arithmetic would produce <= 0" for the door,
+      // reset the face to a sensible default matching the merged cabinet.
+      {
+        const isBase = srcRow === "base";
+        const hasDoor = source.face.sections.some((s) => s.type === "door" || s.type === "glass_door");
+        if (hasDoor) {
+          const drawerSum = source.face.sections
+            .filter((s) => s.type === "drawer" || s.type === "false_front")
+            .reduce((sum, s) => sum + (s.height || 6), 0);
+          const fs = spec.frame_style || "framed";
+          const offsets = FRAME_OFFSETS[fs] || FRAME_OFFSETS.framed;
+          const toeKick = spec.shop_profile_override?.toe_kick_height ?? 4.5;
+          const baseDeduct = (isBase && source.height > 28) ? toeKick + offsets.baseRevealExtra : 0;
+          // availableDoorH mirrors calcDoorSizes: base>28 uses baseDeduct only; everything
+          // else (vanities, walls, tall) uses offsets.height for the top reveal.
+          const availableDoorH = baseDeduct > 0
+            ? source.height - baseDeduct - drawerSum
+            : source.height - drawerSum - offsets.height;
+          if (availableDoorH <= 0) {
+            const isWide = source.width >= 24;
+            source.face = {
+              sections: [
+                ...(isBase && source.height > 28 ? [{ type: "drawer", count: 1, height: 6 }] : []),
+                { type: "door", count: isWide ? 2 : 1, hinge_side: isWide ? "both" : "left" },
+              ],
+            };
+          }
+        }
+      }
 
       // Remove target cabinet
       const targetCabIdx = findCabinetIndex(spec, action.targetId);

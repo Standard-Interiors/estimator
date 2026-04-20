@@ -310,7 +310,8 @@ export function calcDoorSizes(cab, frameStyle = "framed", shopProfile) {
     : 0;
 
   // Door height:
-  // - Non-base: effHeight - offsets.height (general rule)
+  // - Non-base (wall/tall): effHeight - drawerHeightSum - offsets.height
+  //     (drawers on wall cabs are unusual but legal — must still subtract their height)
   // - Base >28" (std base): effHeight - baseDeduct - drawerHeightSum
   //     (baseDeduct already bakes in the top reveal; do NOT add offsets.height again)
   // - Base ≤28" (vanity): effHeight - drawerHeightSum - offsets.height (general rule)
@@ -318,7 +319,15 @@ export function calcDoorSizes(cab, frameStyle = "framed", shopProfile) {
     ? (baseDeduct > 0
         ? effHeight - baseDeduct - drawerHeightSum
         : effHeight - drawerHeightSum - offsets.height)
-    : effHeight - offsets.height;
+    : effHeight - drawerHeightSum - offsets.height;
+
+  // Cabinet-level overflow: do the face sections fit in the cabinet?
+  // For drawer banks (no door) this is the ONLY way we'd catch a bad face.
+  // Example: AI extracts drawer heights [6, 12, 12] on a 34.5" base → sum=30,
+  // + 5" base deduct = 35" needed for 34.5" cab → overflow.
+  const hasDoor = sections.some(s => s.type === "door" || s.type === "glass_door");
+  const consumedByDrawersPlusDeduct = drawerHeightSum + (isBase && baseDeduct > 0 ? baseDeduct : offsets.height);
+  const faceOverflow = !hasDoor && consumedByDrawersPlusDeduct > effHeight;
 
   const results = [];
 
@@ -370,6 +379,13 @@ export function calcDoorSizes(cab, frameStyle = "framed", shopProfile) {
       ? `${typeLabel} (x${count}) ${wStr} x ${hStr}`
       : `${typeLabel} ${wStr} x ${hStr}`;
 
+    // Overflow flag: either
+    //   (a) computed dimensions went negative (door auto-height < 0) — catches the
+    //       post-merge "-6.5\" door" case even though merge now auto-resets, OR
+    //   (b) cabinet-level face overflow (drawer bank where heights sum > cab height).
+    // The UI surfaces this in red so the cabinet maker never sends bad geometry to CNC.
+    const overflows = w <= 0 || h <= 0 || faceOverflow;
+
     results.push({
       sectionIndex: i,
       type: sec.type,
@@ -380,6 +396,7 @@ export function calcDoorSizes(cab, frameStyle = "framed", shopProfile) {
       label,
       isOverride: hasOverride,
       needsVerify: isDrawerBank && sec.type === "drawer",
+      overflows,
     });
   }
 

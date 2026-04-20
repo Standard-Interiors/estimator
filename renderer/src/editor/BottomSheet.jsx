@@ -189,15 +189,19 @@ export default function BottomSheet({ spec, selectedId, dispatch, onSelect, onIn
           <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
             {calcDoorSizes(cab, spec.frame_style || "framed", resolveShopProfile(spec)).map((ds, i) => {
               const colors = { door: "#22c55e", glass_door: "#06b6d4", drawer: "#f97216", false_front: "#8b5cf6" };
-              const c = colors[ds.type] || "#888";
+              // Overflow: computed width/height <= 0 — slam chip red.
+              const c = ds.overflows ? "#ef4444" : (colors[ds.type] || "#888");
               return (
-                <span key={i} onClick={() => onSectionClick?.(ds.sectionIndex)} style={{
+                <span key={i} onClick={() => onSectionClick?.(ds.sectionIndex)}
+                  title={ds.overflows ? "Face overflows cabinet — rebuild" : undefined}
+                  style={{
                   fontSize: 11, fontFamily: "'JetBrains Mono',monospace", padding: "6px 10px", borderRadius: 6,
                   background: `${c}1a`, color: c, fontWeight: 600, cursor: "pointer",
-                  border: `1px solid ${c}33`,
+                  border: `1px solid ${c}${ds.overflows ? "" : "33"}`,
                 }}>
                   {ds.label}
-                  {ds.needsVerify && <span style={{ color: "#eab308", marginLeft: 4 }}>!</span>}
+                  {ds.overflows && <span style={{ marginLeft: 4 }}>⚠</span>}
+                  {ds.needsVerify && !ds.overflows && <span style={{ color: "#eab308", marginLeft: 4 }}>!</span>}
                 </span>
               );
             })}

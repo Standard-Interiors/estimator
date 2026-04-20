@@ -1234,11 +1234,19 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
                 <button onClick={()=>{
                   // Per Neil's spec: scribed cabinets require 1/2" overlay hinges so the
                   // door still covers the opening after the scribe is trimmed.
-                  const csv = ["Cabinet,Type,Component,Qty,Width,Height,Scribe,Hinge Overlay"];
+                  // Also: refuse to silently export overflow rows to CSV — cabinet maker
+                  // should NEVER receive a negative-dim door in a cut list. Warn + flag.
+                  const overflowRows = allSections.filter(s => s.overflows);
+                  if (overflowRows.length > 0) {
+                    const cabs = [...new Set(overflowRows.map(s => s.cab.id))].join(", ");
+                    if (!window.confirm(`${overflowRows.length} cabinet section(s) overflow their cabinet (${cabs}). The CSV will tag them OVERFLOW. Fix the face before sending to the shop. Export anyway?`)) return;
+                  }
+                  const csv = ["Cabinet,Type,Component,Qty,Width,Height,Scribe,Hinge Overlay,Status"];
                   allSections.forEach(s => {
                     const w = s.count >= 2 && (s.type === "door" || s.type === "glass_door") ? s.perDoorWidth : s.width;
                     const overlay = s.scribeNote && (s.type === "door" || s.type === "glass_door") ? "1/2\"" : "";
-                    csv.push(`${s.cab.id},${s.cab.type},${s.type},${s.count},${w},${s.height},${s.scribeNote||""},${overlay}`);
+                    const status = s.overflows ? "OVERFLOW" : "";
+                    csv.push(`${s.cab.id},${s.cab.type},${s.type},${s.count},${w},${s.height},${s.scribeNote||""},${overlay},${status}`);
                   });
                   const blob = new Blob([csv.join("\n")], { type: "text/csv" });
                   const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
@@ -1248,10 +1256,11 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
               </div>
 
               {/* Legend */}
-              <div style={{display:"flex",gap:12,marginBottom:10,fontSize:9,color:"#444",fontFamily:"'JetBrains Mono',monospace"}}>
+              <div style={{display:"flex",gap:12,marginBottom:10,fontSize:9,color:"#444",fontFamily:"'JetBrains Mono',monospace",flexWrap:"wrap"}}>
                 <span>Click a row to view in 3D</span>
                 <span><span style={{color:"#eab308"}}>!</span> = verify against drawing</span>
                 <span><span style={{color:"#8b5cf6",padding:"1px 4px",borderRadius:2,border:"1px dashed #8b5cf6",fontSize:8}}>dashed</span> = manual override</span>
+                <span><span style={{color:"#ef4444",padding:"1px 4px",borderRadius:2,background:"rgba(239,68,68,0.12)",border:"1px solid rgba(239,68,68,0.4)",fontSize:8,fontWeight:700}}>⚠ overflow</span> = face exceeds cabinet, rebuild before CNC</span>
               </div>
 
               {/* Detail table */}
@@ -1269,24 +1278,28 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
                     // Scribed DOORS (and glass doors) get forced to 1/2" overlay hinges per Neil's spec;
                     // drawers/false-fronts don't use hinges so leave blank.
                     const hingeOverlay = s.scribeNote && (s.type === "door" || s.type === "glass_door") ? "1/2\"" : "";
+                    // Overflow rows get tinted red + explicit badge so a bad merge can't slip
+                    // into a CSV that goes to a CNC operator.
+                    const overflowBg = s.overflows ? "rgba(239,68,68,0.08)" : (i%2===0?"transparent":"rgba(255,255,255,0.015)");
                     return (
-                      <tr key={i} style={{borderBottom:"1px solid #1a1a2a",cursor:"pointer",background:i%2===0?"transparent":"rgba(255,255,255,0.015)"}}
+                      <tr key={i} style={{borderBottom:"1px solid #1a1a2a",cursor:"pointer",background:overflowBg}}
                         onClick={()=>{setSelectedId(s.cab.id);setTab("render");}}
-                        onMouseEnter={e=>e.currentTarget.style.background="rgba(217,68,32,0.05)"}
-                        onMouseLeave={e=>e.currentTarget.style.background=i%2===0?"transparent":"rgba(255,255,255,0.015)"}>
+                        onMouseEnter={e=>e.currentTarget.style.background=s.overflows?"rgba(239,68,68,0.18)":"rgba(217,68,32,0.05)"}
+                        onMouseLeave={e=>e.currentTarget.style.background=overflowBg}>
                         <td style={{padding:"6px",color:s.cab.row==="base"?"#D94420":"#1a6fbf",fontWeight:700}}>{s.cab.id}</td>
                         <td style={{padding:"6px",color:"#666"}}>{({base:"Base",base_sink:"Sink",base_drawer_bank:"Drw Bank",base_pullout:"Pullout",base_spice:"Spice",wall:"Wall",wall_bridge:"Bridge",wall_stacker:"Stacker",tall_pantry:"Pantry",tall_oven:"Oven"})[s.cab.type]||s.cab.type}</td>
                         <td style={{padding:"6px",color:rowColor(s.type),fontWeight:600}}>
                           {s.type === "door" ? "Door" : s.type === "glass_door" ? "Glass" : s.type === "drawer" ? "Drawer" : "False Front"}
                         </td>
                         <td style={{padding:"6px",color:"#aaa"}}>{s.count}</td>
-                        <td style={{padding:"6px",color:"#eee",fontWeight:600}}>{formatFraction(w)}"</td>
-                        <td style={{padding:"6px",color:"#eee",fontWeight:600}}>{formatFraction(s.height)}"</td>
+                        <td style={{padding:"6px",color:s.overflows?"#ef4444":"#eee",fontWeight:600}}>{formatFraction(w)}"</td>
+                        <td style={{padding:"6px",color:s.overflows?"#ef4444":"#eee",fontWeight:600}}>{formatFraction(s.height)}"</td>
                         <td style={{padding:"6px",color:s.scribeNote?"#eab308":"#555"}}>{s.scribeNote||"None"}</td>
                         <td style={{padding:"6px",color:hingeOverlay?"#eab308":"#555",fontWeight:hingeOverlay?700:400}}>{hingeOverlay||"—"}</td>
                         <td style={{padding:"6px"}}>
-                          {s.isOverride && <span style={{color:"#8b5cf6",fontSize:9,padding:"2px 6px",background:"rgba(139,92,246,0.1)",borderRadius:3}}>override</span>}
-                          {s.needsVerify && <span style={{color:"#eab308",fontSize:9,padding:"2px 6px",background:"rgba(234,179,8,0.1)",borderRadius:3}}>verify</span>}
+                          {s.overflows && <span title="Face overflows cabinet — rebuild face" style={{color:"#ef4444",fontSize:9,padding:"2px 6px",background:"rgba(239,68,68,0.15)",border:"1px solid rgba(239,68,68,0.4)",borderRadius:3,fontWeight:700}}>⚠ overflow</span>}
+                          {s.isOverride && <span style={{color:"#8b5cf6",fontSize:9,padding:"2px 6px",background:"rgba(139,92,246,0.1)",borderRadius:3,marginLeft:s.overflows?4:0}}>override</span>}
+                          {s.needsVerify && !s.overflows && <span style={{color:"#eab308",fontSize:9,padding:"2px 6px",background:"rgba(234,179,8,0.1)",borderRadius:3}}>verify</span>}
                         </td>
                       </tr>
                     );

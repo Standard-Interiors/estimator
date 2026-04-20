@@ -108,9 +108,13 @@ export default function CabinetEditBar({ cab, spec, dispatch, selColor, widthInp
           type="text"
           defaultValue={cab.label || ""}
           placeholder="add label..."
+          // Tooltip surfaces the full label even when width truncates — estimators
+          // rely on the AI's context labels (e.g. "Double door left of microwave")
+          // to match cabinets back to the field photo. 100px was too small.
+          title={cab.label || ""}
           onBlur={e => { const v = e.target.value.trim(); if (v !== (cab.label || "")) dispatch({ type: "SET_LABEL", id: cab.id, label: v }); }}
           onKeyDown={e => { if (e.key === "Enter") e.target.blur(); if (e.key === "Escape") { e.target.value = cab.label || ""; e.target.blur(); } }}
-          style={{ width: 100, height: 24, background: "transparent", border: "1px solid transparent", borderRadius: 4, color: "#888", fontSize: 11, fontFamily: MONO, padding: "0 4px", cursor: "text" }}
+          style={{ flex: "1 1 auto", minWidth: 120, maxWidth: 320, height: 24, background: "transparent", border: "1px solid transparent", borderRadius: 4, color: "#888", fontSize: 11, fontFamily: MONO, padding: "0 4px", cursor: "text" }}
           onFocus={e => { e.target.style.borderColor = "#2a2a3a"; e.target.style.background = "#14141e"; }}
           onMouseEnter={e => { if (document.activeElement !== e.target) e.target.style.borderColor = "#1a1a2a"; }}
           onMouseLeave={e => { if (document.activeElement !== e.target) e.target.style.borderColor = "transparent"; }}
@@ -378,17 +382,22 @@ export default function CabinetEditBar({ cab, spec, dispatch, selColor, widthInp
         <span style={{ color: "#333", fontSize: 8 }}>click to edit →</span>
         {calcDoorSizes(cab, spec.frame_style || "framed", resolveShopProfile(spec)).map((ds, i) => {
           const colors = { door: "#22c55e", glass_door: "#06b6d4", drawer: "#f97216", false_front: "#8b5cf6" };
-          const c = colors[ds.type] || "#888";
+          // Overflow (negative/zero computed dim) slams the chip into red so the
+          // cabinet maker never ships a "−6-1/2 in" door to CNC.
+          const c = ds.overflows ? "#ef4444" : (colors[ds.type] || "#888");
           return (
-            <span key={i} onClick={() => onSectionClick?.(ds.sectionIndex)} style={{
+            <span key={i} onClick={() => onSectionClick?.(ds.sectionIndex)}
+              title={ds.overflows ? "Face sections overflow this cabinet — rebuild face (total drawer/FF heights exceed cabinet height)" : undefined}
+              style={{
               fontSize: 10, fontFamily: MONO, padding: "3px 8px", borderRadius: 4,
               background: `${c}1a`, color: c, fontWeight: 600, cursor: "pointer",
-              border: `1px solid ${c}33`,
+              border: `1px solid ${c}${ds.overflows ? "" : "33"}`,
             }}
             onMouseEnter={e => e.target.style.borderColor = c}
-            onMouseLeave={e => e.target.style.borderColor = c + "33"}>
+            onMouseLeave={e => e.target.style.borderColor = c + (ds.overflows ? "" : "33")}>
               {ds.label}
-              {ds.needsVerify && <span style={{ color: "#eab308", marginLeft: 4 }}>!</span>}
+              {ds.overflows && <span style={{ marginLeft: 4 }}>⚠</span>}
+              {ds.needsVerify && !ds.overflows && <span style={{ color: "#eab308", marginLeft: 4 }}>!</span>}
             </span>
           );
         })}
