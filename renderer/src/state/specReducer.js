@@ -30,6 +30,10 @@ function rowForCabinet(spec, id) {
   return null;
 }
 
+function isExplicitSpacer(item) {
+  return !!item && !item.ref && (item.type === "filler" || item.type === "spacer");
+}
+
 export default function specReducer(state, action) {
   const spec = clone(state);
 
@@ -130,60 +134,67 @@ export default function specReducer(state, action) {
     }
 
     case "NUDGE_CABINET": {
-      // Move a cabinet left/right by inserting/resizing a filler gap before it.
-      // Compensates the spacer AFTER so downstream cabinets stay in place.
+      // Move a cabinet left/right by inserting/resizing explicit spacer stock.
+      // Openings/appliances are real geometry and must not be silently resized.
       // action: { id, amount } — positive = right, negative = left
       const row = rowForCabinet(spec, action.id);
-      if (!row) return spec;
+      if (!row) return state;
       const layoutKey = getLayoutKey(row);
       const layout = spec[layoutKey];
       let idx = findRefIndex(layout, action.id);
-      if (idx === -1) return spec;
+      if (idx === -1) return state;
 
       const amount = action.amount || 1;
+      if (!amount) return state;
 
       // Find filler immediately before this cabinet
       const prevIdx = idx - 1;
       const prevItem = prevIdx >= 0 ? layout[prevIdx] : null;
-      const prevIsFiller = prevItem && !prevItem.ref; // any non-cabinet layout item (filler, spacer, appliance, hood) is a gap
+      const prevIsSpacer = isExplicitSpacer(prevItem);
+
+      const makeSpacer = (width) => ({
+        type: "filler",
+        id: `spacer_${Date.now()}`,
+        label: "",
+        width,
+      });
 
       if (amount > 0) {
-        // Moving right — expand or create filler before
-        if (prevIsFiller) {
+        // Moving right — only allowed if a real spacer exists after the cabinet
+        // to absorb the shift without changing a true opening.
+        const afterIdx = idx + 1;
+        const afterItem = afterIdx < layout.length ? layout[afterIdx] : null;
+        const afterIsSpacer = isExplicitSpacer(afterItem);
+        if (!afterIsSpacer) return state;
+
+        if (prevIsSpacer) {
           prevItem.width = (prevItem.width || 0) + amount;
         } else {
-          layout.splice(idx, 0, { type: "filler", id: `spacer_${Date.now()}`, label: "", width: amount });
+          layout.splice(idx, 0, makeSpacer(amount));
           idx++; // cabinet shifted right in array
         }
-        // Compensate: shrink/remove spacer AFTER this cabinet so downstream stays put
-        const afterIdx = idx + 1;
-        if (afterIdx < layout.length) {
-          const afterItem = layout[afterIdx];
-          const afterIsFiller = afterItem && !afterItem.ref; // any non-cabinet item is a gap
-          if (afterIsFiller) {
-            afterItem.width = (afterItem.width || 0) - amount;
-            if (afterItem.width <= 0) layout.splice(afterIdx, 1);
-          }
-        }
+        const shiftedAfterIdx = idx + 1;
+        const shiftedAfter = layout[shiftedAfterIdx];
+        shiftedAfter.width = (shiftedAfter.width || 0) - amount;
+        if (shiftedAfter.width <= 0) layout.splice(shiftedAfterIdx, 1);
       } else {
         // Moving left — shrink or remove filler before
-        if (!prevIsFiller) return spec; // blocked — nothing to shrink
+        if (!prevIsSpacer) return state; // blocked — nothing movable before this cabinet
         const shrink = Math.min(prevItem.width || 0, Math.abs(amount));
+        if (!shrink) return state;
         prevItem.width = (prevItem.width || 0) - shrink;
         if (prevItem.width <= 0) {
           layout.splice(prevIdx, 1);
           idx--; // cabinet shifted left in array
         }
-        // Compensate: grow spacer AFTER this cabinet so downstream stays put
+        // Compensate with explicit spacer stock after the cabinet.
         const afterIdx = idx + 1;
-        if (afterIdx < layout.length) {
-          const afterItem = layout[afterIdx];
-          const afterIsFiller = afterItem && !afterItem.ref; // any non-cabinet item is a gap
-          if (afterIsFiller) {
-            afterItem.width = (afterItem.width || 0) + shrink;
-          } else {
-            layout.splice(afterIdx, 0, { type: "filler", id: `spacer_${Date.now()}`, label: "", width: shrink });
-          }
+        const afterItem = afterIdx < layout.length ? layout[afterIdx] : null;
+        const afterIsSpacer = isExplicitSpacer(afterItem);
+        if (afterIsSpacer) {
+          afterItem.width = (afterItem.width || 0) + shrink;
+        } else {
+          layout.splice(afterIdx, 0, makeSpacer(shrink));
         }
       }
       return spec;
@@ -539,53 +550,14 @@ export default function specReducer(state, action) {
     // ── Meta ────────────────────────────────────────────────────────
 
     case "LOAD_SPEC": {
-      const loaded = clone(action.spec);
-      // Convert alignment gaps into explicit spacers so Edit and Render match
-      if (loaded.alignment?.length && loaded.wall_layout?.length && loaded.cabinets?.length) {
-        const cabMap = {};
-        loaded.cabinets.forEach(c => { cabMap[c.id] = c; });
-        // Build base position map
-        const baseMap = {};
-        let bx = 0;
-        (loaded.base_layout || []).forEach(item => {
-          const id = item.ref || item.id;
-          const w = item.ref ? (cabMap[id]?.width || 0) : (item.width || 0);
-          baseMap[id] = bx;
-          bx += w;
-        });
-        // Build alignment map
-        const aMap = {};
-        loaded.alignment.forEach(a => { aMap[a.wall] = a.base; });
-        // Walk the wall layout and insert spacers where alignment creates gaps
-        let wx = 0;
-        // Find first alignment to set starting position
-        for (const item of loaded.wall_layout) {
-          if (item.ref && aMap[item.ref] && baseMap[aMap[item.ref]] !== undefined) {
-            wx = baseMap[aMap[item.ref]];
-            break;
-          }
-        }
-        const newWall = [];
-        let cursor = wx;
-        for (const item of loaded.wall_layout) {
-          const id = item.ref || item.id;
-          const w = item.ref ? (cabMap[id]?.width || 0) : (item.width || 0);
-          if (item.ref && aMap[id] && baseMap[aMap[id]] !== undefined) {
-            const alignPos = baseMap[aMap[id]];
-            if (alignPos > cursor) {
-              // Insert spacer for the alignment gap
-              const gap = alignPos - cursor;
-              newWall.push({ type: "filler", id: `align_${Date.now()}_${id}`, label: "", width: gap });
-              cursor = alignPos;
-            }
-          }
-          newWall.push(item);
-          cursor += w;
-        }
-        loaded.wall_layout = newWall;
-        // Remove alignment rules since they're now explicit spacers
-        loaded.alignment = [];
-      }
+      const loaded = clone(action.spec || {});
+      loaded.base_layout = Array.isArray(loaded.base_layout) ? loaded.base_layout : [];
+      loaded.wall_layout = Array.isArray(loaded.wall_layout) ? loaded.wall_layout : [];
+      loaded.cabinets = Array.isArray(loaded.cabinets) ? loaded.cabinets : [];
+      // Keep alignment first-class so render/load/save all preserve the same intent.
+      loaded.alignment = Array.isArray(loaded.alignment)
+        ? loaded.alignment.filter((a) => a?.wall && a?.base)
+        : [];
       return loaded;
     }
 

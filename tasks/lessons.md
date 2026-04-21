@@ -53,6 +53,12 @@ The Claude in Chrome extension blocks all non-localhost domains from Claude Code
 ### 9. Always verify on REAL field data, not test projects
 Local test projects don't surface the same issues as field data. Tester photos have weird angles, non-standard sizes, overlapping walls, closet doors confused for cabinets. Always QA against actual field projects.
 
+### 9b. If the user explicitly asks for production runtime verification, use the real site
+Do not default back to localhost once the user has redirected verification to production. If they say to use `https://cabinet-estimator.fly.dev/`, keep the browser pass on the live site unless they explicitly change that instruction again.
+
+### 9c. Prefer Chrome DevTools MCP over fallback browser drivers for verification
+If the user says to use Chrome MCP, do not drift into Computer Use unless they explicitly approve a fallback. Fix the DevTools MCP transport first, because that is the verification path they actually want.
+
 ### 10. Dead code is a maintenance trap
 GridWorkspace.jsx and GridEditor.jsx are not imported anywhere but received code fixes. Wasted effort. Should be deleted or clearly marked as deprecated.
 

@@ -321,14 +321,78 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
   // ── Auto-save (when inside a project/room context) ──
   // ── Auto-save — uses refs to avoid re-render cascades ──
   const specVersionRef = useRef(0);
-  const [saveState, setSaveState] = useState("idle"); // idle | saving | saved | error
+  const [saveState, setSaveState] = useState("idle"); // idle | saving | saved | error | conflict
   const saveTimer = useRef(null);
+  const saveStateTimer = useRef(null);
   const pendingSave = useRef(false);
   const lastSaveTime = useRef(Date.now());
   const specRef = useRef(spec);
   const modeRef = useRef(mode);
+  const skipNextAutosave = useRef(false);
   specRef.current = spec;
   modeRef.current = mode;
+
+  const normalizeLoadedSpec = useCallback((loadedSpec) => {
+    const nextSpec = JSON.parse(JSON.stringify(loadedSpec || EMPTY_SPEC));
+    nextSpec.base_layout = Array.isArray(nextSpec.base_layout) ? nextSpec.base_layout : [];
+    nextSpec.wall_layout = Array.isArray(nextSpec.wall_layout) ? nextSpec.wall_layout : [];
+    nextSpec.alignment = Array.isArray(nextSpec.alignment) ? nextSpec.alignment : [];
+    nextSpec.cabinets = Array.isArray(nextSpec.cabinets) ? nextSpec.cabinets : [];
+    nextSpec.cabinets.forEach((c) => {
+      if (!c.depth) c.depth = c.row === "wall" ? 12 : 24;
+      if (!c.height) c.height = c.row === "wall" ? 30 : 34.5;
+      if (!c.width) c.width = 24;
+    });
+    return nextSpec;
+  }, []);
+
+  const showTransientSaveState = useCallback((nextState, resetMs = 3000) => {
+    clearTimeout(saveStateTimer.current);
+    setSaveState(nextState);
+    if (resetMs > 0) {
+      saveStateTimer.current = setTimeout(() => setSaveState("idle"), resetMs);
+    }
+  }, []);
+
+  const hydrateRoomSnapshot = useCallback((room, { activateTab = false, resetSelection = false, preserveImages = false } = {}) => {
+    clearTimeout(saveTimer.current);
+    pendingSave.current = false;
+    skipNextAutosave.current = true;
+    specVersionRef.current = room?.spec_version || 0;
+
+    const nextSpec = normalizeLoadedSpec(room?.spec);
+    dispatch({ type: "LOAD_SPEC", spec: nextSpec });
+
+    const nextMode = room?.spec ? "loaded" : "home";
+    modeRef.current = nextMode;
+    setMode(nextMode);
+    if (room?.spec && activateTab) setTab("render");
+
+    if (!preserveImages || room?.photo_url) {
+      setPhotoPreview(room?.photo_url ? api.imageUrl(room.photo_url) : null);
+    }
+    if (!preserveImages || room?.wireframe_url) {
+      setWireframePreview(room?.wireframe_url ? api.imageUrl(room.wireframe_url) : null);
+    }
+
+    if (resetSelection) {
+      setSelectedId(null);
+      setSelectedGapItem(null);
+      setEditingSectionIdx(null);
+    }
+  }, [dispatch, normalizeLoadedSpec]);
+
+  const reloadLatestRoom = useCallback(async ({ activateTab = false, saveStateValue = null, extractionMessage = null } = {}) => {
+    if (!roomId) return null;
+    const latestRoom = await api.getRoom(roomId);
+    hydrateRoomSnapshot(latestRoom, { activateTab, resetSelection: true });
+    if (saveStateValue) showTransientSaveState(saveStateValue, 4000);
+    if (extractionMessage) {
+      setUploadStatus("");
+      setExtractionError(extractionMessage);
+    }
+    return latestRoom;
+  }, [hydrateRoomSnapshot, roomId, showTransientSaveState]);
 
   // Load spec from DB when a roomId is provided
   useEffect(() => {
@@ -336,21 +400,10 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
     (async () => {
       try {
         const r = await api.getRoom(roomId);
-        if (r.spec) {
-          r.spec.cabinets?.forEach(c => {
-            if (!c.depth) c.depth = c.row === "wall" ? 12 : 24;
-            if (!c.height) c.height = c.row === "wall" ? 30 : 34.5;
-            if (!c.width) c.width = 24;
-          });
-          dispatch({ type: "LOAD_SPEC", spec: r.spec });
-          setMode("loaded"); setTab("render");
-        }
-        specVersionRef.current = r.spec_version || 0;
-        if (r.photo_url) setPhotoPreview(api.imageUrl(r.photo_url));
-        if (r.wireframe_url) setWireframePreview(api.imageUrl(r.wireframe_url));
+        hydrateRoomSnapshot(r, { activateTab: !!r.spec, resetSelection: true });
       } catch (e) { console.error("Failed to load room:", e); }
     })();
-  }, [roomId]);
+  }, [hydrateRoomSnapshot, roomId]);
 
   // Coalesced save — prevents save storms during rapid edits.
   // If no save in-flight: debounce 1s then fire.
@@ -367,16 +420,27 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
     }
     pendingSave.current = false;
     saveInFlight.current = true;
+    clearTimeout(saveStateTimer.current);
     setSaveState("saving");
     try {
       const result = await api.saveRoomSpec(roomId, specRef.current, specVersionRef.current);
       specVersionRef.current = result.version;
-      setSaveState("saved");
+      showTransientSaveState("saved");
       lastSaveTime.current = Date.now();
       try { localStorage.setItem(`room_spec_${roomId}`, JSON.stringify({ spec: specRef.current, version: result.version, ts: Date.now() })); } catch {}
-      setTimeout(() => setSaveState("idle"), 3000);
     } catch (e) {
-      setSaveState("error");
+      if (e.status === 409) {
+        stashedSave.current = false;
+        pendingSave.current = false;
+        try {
+          await reloadLatestRoom({ saveStateValue: "conflict" });
+        } catch (reloadErr) {
+          console.error("Conflict recovery failed:", reloadErr);
+          showTransientSaveState("error", 4000);
+        }
+      } else {
+        showTransientSaveState("error", 4000);
+      }
       console.error("Auto-save failed:", e);
     } finally {
       saveInFlight.current = false;
@@ -386,11 +450,15 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
         doSave();
       }
     }
-  }, [roomId]); // only depends on roomId — stable across spec changes
+  }, [reloadLatestRoom, roomId, showTransientSaveState]); // only depends on roomId + recovery helpers
 
   // Watch spec changes — just set a debounce timer, no re-render
   useEffect(() => {
     if (!roomId || mode !== "loaded") return;
+    if (skipNextAutosave.current) {
+      skipNextAutosave.current = false;
+      return;
+    }
     clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => doSave(), 1000);
     pendingSave.current = true;
@@ -401,6 +469,7 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
   useEffect(() => {
     return () => {
       clearTimeout(saveTimer.current);
+      clearTimeout(saveStateTimer.current);
       if (pendingSave.current && roomId) {
         api.beaconSaveSpec(roomId, specRef.current, specVersionRef.current);
       }
@@ -639,15 +708,30 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
         }
         extracted = await resp.json();
       }
+      if (extracted?._save_conflict) {
+        await reloadLatestRoom({
+          activateTab: true,
+          saveStateValue: "conflict",
+          extractionMessage: extracted._save_conflict_message,
+        });
+        return;
+      }
       setUploadStatus(`Extracted ${extracted.cabinets?.length || 0} cabinets`);
-      if (extracted._spec_version != null) {
-        specVersionRef.current = extracted._spec_version;
+      const nextSpecVersion = extracted?._spec_version;
+      if (nextSpecVersion != null) {
+        specVersionRef.current = nextSpecVersion;
         delete extracted._spec_version;
       }
       delete extracted._pipeline;
-      extracted.cabinets?.forEach(c => { if(!c.depth) c.depth = c.row==="wall"?12:24; if(!c.height) c.height = c.row==="wall"?30:34.5; if(!c.width) c.width=24; });
-      dispatch({ type: "LOAD_SPEC", spec: extracted });
-      setMode("loaded"); setTab("render");
+      if (roomId) {
+        const latestRoom = await api.getRoom(roomId);
+        hydrateRoomSnapshot(latestRoom, { activateTab: true, resetSelection: true });
+      } else {
+        hydrateRoomSnapshot(
+          { spec: extracted, spec_version: nextSpecVersion || 0 },
+          { activateTab: true, resetSelection: true, preserveImages: true }
+        );
+      }
     } catch(err) { setExtractionError(err.message); setUploadStatus(""); }
     finally { setUploading(false); }
   };
@@ -725,6 +809,7 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
           <h1 style={{fontSize:16,fontWeight:700,margin:0,letterSpacing:"-0.02em",color:"#eee"}}>{wallName || "Wall"}</h1>
           {saveState === "saving" && <span style={{fontSize:10,color:"#888",fontFamily:"'JetBrains Mono',monospace"}}>Saving...</span>}
           {saveState === "saved" && <span style={{fontSize:10,color:"#22c55e",opacity:0.6,fontFamily:"'JetBrains Mono',monospace"}}>✓ Saved</span>}
+          {saveState === "conflict" && <span style={{fontSize:10,color:"#f59e0b",fontFamily:"'JetBrains Mono',monospace"}}>Reloaded newer changes</span>}
           {saveState === "error" && <span style={{fontSize:10,color:"#e04040",fontFamily:"'JetBrains Mono',monospace"}}>Save failed</span>}
         </div>
         {hasSpec && (
@@ -901,9 +986,13 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
               const isTimeout = /timeout|timed out|deadline/i.test(raw);
               const isAuth = /401|403|unauthorized|api.?key/i.test(raw);
               const isRateLimit = /429|rate.?limit|quota/i.test(raw);
+              const isSaveConflict = /newer room changes were saved before the result could be applied|reloaded the latest room instead/i.test(raw);
 
               let friendly, hint;
-              if (isAuth) {
+              if (isSaveConflict) {
+                friendly = "Extraction finished but room changed";
+                hint = "Newer edits were already saved while extraction was running. The latest saved room was reloaded to protect those changes. Run extraction again if you still want a fresh result.";
+              } else if (isAuth) {
                 friendly = "API key problem";
                 hint = "The server's AI API key isn't working. Contact support.";
               } else if (isRateLimit) {
@@ -1110,7 +1199,7 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
               {sel && !selectedGapItem && editingSectionIdx === null && (
                 isMobile ? (
                   <div style={{maxHeight:isLandscape?"40vh":"50vh",overflowY:"auto",WebkitOverflowScrolling:"touch"}}>
-                    <BottomSheet spec={spec} selectedId={selectedId} dispatch={dispatch} onSelect={handleSelect} onSectionClick={(idx) => setEditingSectionIdx(idx)} />
+                    <BottomSheet key={selectedId || "none"} spec={spec} selectedId={selectedId} dispatch={dispatch} onSelect={handleSelect} onSectionClick={(idx) => setEditingSectionIdx(idx)} />
                   </div>
                 ) : (
                   <CabinetEditBar

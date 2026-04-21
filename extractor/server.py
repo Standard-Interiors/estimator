@@ -393,6 +393,18 @@ async def get_task_status(task_id: str):
     return task.to_dict()
 
 
+def _save_conflict_result(latest_room: dict | None) -> dict:
+    latest_version = latest_room.get("spec_version", 0) if latest_room else 0
+    return {
+        "_save_conflict": True,
+        "_save_conflict_message": (
+            "Extraction finished, but newer room changes were saved before the result "
+            "could be applied. Reloaded the latest room instead."
+        ),
+        "_spec_version": latest_version,
+    }
+
+
 def _run_pipeline_task(task, rid, room, photo_bytes, api_key, model):
     """Background task: structured pipeline extraction with progress updates."""
     def on_progress(step, msg):
@@ -448,7 +460,25 @@ def _run_pipeline_task(task, rid, room, photo_bytes, api_key, model):
 
     # Save spec to room
     spec_str = json.dumps(spec)
-    save_result = db.save_room_spec(rid, spec_str, room.get("spec_version", 0))
+    latest_room = db.get_room(rid)
+    if not latest_room:
+        task.fail("Room not found")
+        return
+
+    started_version = room.get("spec_version", 0)
+    latest_version = latest_room.get("spec_version", 0)
+    if latest_version != started_version:
+        task.complete(_save_conflict_result(latest_room))
+        return
+
+    try:
+        save_result = db.save_room_spec(rid, spec_str, latest_version)
+    except ValueError as e:
+        if "conflict" in str(e).lower():
+            task.complete(_save_conflict_result(db.get_room(rid) or latest_room))
+            return
+        task.fail(str(e))
+        return
     spec["_spec_version"] = save_result.get("version", 1) if save_result else 1
 
     # Build safe pipeline metadata
@@ -508,7 +538,25 @@ def _run_legacy_task(task, rid, room, photo_bytes, api_key, model):
     )
 
     spec_str = json.dumps(spec)
-    save_result = db.save_room_spec(rid, spec_str, room.get("spec_version", 0))
+    latest_room = db.get_room(rid)
+    if not latest_room:
+        task.fail("Room not found")
+        return
+
+    started_version = room.get("spec_version", 0)
+    latest_version = latest_room.get("spec_version", 0)
+    if latest_version != started_version:
+        task.complete(_save_conflict_result(latest_room))
+        return
+
+    try:
+        save_result = db.save_room_spec(rid, spec_str, latest_version)
+    except ValueError as e:
+        if "conflict" in str(e).lower():
+            task.complete(_save_conflict_result(db.get_room(rid) or latest_room))
+            return
+        task.fail(str(e))
+        return
     spec["_spec_version"] = save_result.get("version", 1) if save_result else 1
     task.complete(spec)
 

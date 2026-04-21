@@ -3,6 +3,10 @@ import specReducer from "./specReducer";
 
 const MAX_HISTORY = 50;
 
+function specsEqual(a, b) {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
 /**
  * Generate a human-readable label for an action.
  */
@@ -93,6 +97,11 @@ function historyReducer(state, action) {
       // LOAD_SPEC resets history — extraction is the undo floor
       if (action.type === "LOAD_SPEC") {
         return { past: [], present: newPresent, future: [] };
+      }
+
+      // Keep blocked / no-op actions out of history and auto-save churn.
+      if (newPresent === state.present || specsEqual(newPresent, state.present)) {
+        return state;
       }
 
       const label = actionLabel(action);

@@ -3,13 +3,41 @@ import WidthGrid from "./WidthGrid";
 import ActionRow from "./ActionRow";
 import {
   BASE_TYPES, WALL_TYPES, WALL_HEIGHTS, BASE_HEIGHT,
-  BASE_DEPTH, WALL_DEPTH, calcDoorSizes, resolveShopProfile
+  BASE_DEPTH, WALL_DEPTH, SECTION_TYPES, calcDoorSizes, resolveShopProfile
 } from "../state/specHelpers";
 
-export default function BottomSheet({ spec, selectedId, dispatch, onSelect, onInsert, onSectionClick }) {
+const SEC_LABELS = {
+  drawer: "Drawer",
+  door: "Door",
+  false_front: "False",
+  glass_door: "Glass",
+  open: "Open",
+};
+
+const SEC_COLORS = {
+  drawer: { bg: "#f972161a", fg: "#f97216" },
+  false_front: { bg: "#8b5cf61a", fg: "#8b5cf6" },
+  door: { bg: "#22c55e1a", fg: "#22c55e" },
+  glass_door: { bg: "#3b82f61a", fg: "#3b82f6" },
+  open: { bg: "#eab3081a", fg: "#eab308" },
+};
+
+function sectionSummary(sec) {
+  let s = SEC_LABELS[sec.type] || sec.type;
+  if (sec.count && sec.count > 1) s += ` x${sec.count}`;
+  if (sec.height) s += ` ${sec.height}"`;
+  if (sec.hinge_side) s += ` ${sec.hinge_side}`;
+  return s;
+}
+
+export default function BottomSheet({ spec, selectedId, dispatch, onSelect, onSectionClick }) {
   const [showMore, setShowMore] = useState(false);
+  const [editingFaceSectionIdx, setEditingFaceSectionIdx] = useState(null);
+  const [showSectionPicker, setShowSectionPicker] = useState(false);
 
   const cab = selectedId ? spec.cabinets.find(c => c.id === selectedId) : null;
+  const sections = cab?.face?.sections || [];
+  const editingSection = editingFaceSectionIdx !== null ? sections[editingFaceSectionIdx] : null;
 
   if (!cab) {
     return (
@@ -59,27 +87,6 @@ export default function BottomSheet({ spec, selectedId, dispatch, onSelect, onIn
         fontFamily: "'DM Sans',sans-serif",
         cursor: "pointer", whiteSpace: "nowrap", textTransform: "capitalize"
       }}>{label}</button>
-    );
-  };
-
-  const sectionBadge = (sec, i) => {
-    const colors = {
-      drawer: { bg: "#f972161a", fg: "#f97216" },
-      false_front: { bg: "#8b5cf61a", fg: "#8b5cf6" },
-      door: { bg: "#22c55e1a", fg: "#22c55e" },
-      glass_door: { bg: "#3b82f61a", fg: "#3b82f6" },
-      open: { bg: "#eab3081a", fg: "#eab308" },
-    };
-    const c = colors[sec.type] || colors.door;
-    return (
-      <span key={i} style={{
-        display: "inline-block", fontSize: 10, padding: "3px 8px",
-        borderRadius: 4, fontFamily: "'JetBrains Mono',monospace",
-        background: c.bg, color: c.fg, marginRight: 4
-      }}>
-        {sec.type}{sec.count > 1 ? ` x${sec.count}` : ""}{sec.height ? ` ${sec.height}"` : ""}
-        {sec.hinge_side ? ` ${sec.hinge_side}` : ""}
-      </span>
     );
   };
 
@@ -172,42 +179,305 @@ export default function BottomSheet({ spec, selectedId, dispatch, onSelect, onIn
       </div>
 
       {/* Face sections + front sizes — ALWAYS visible (critical for tweaking) */}
-      {cab.face?.sections?.length > 0 && (
-        <div style={{ marginBottom: 10 }}>
-          <div style={{
-            fontSize: 10, color: "#666", fontWeight: 600,
-            fontFamily: "'DM Sans',sans-serif", marginBottom: 6, letterSpacing: "0.05em"
-          }}>FACE SECTIONS</div>
-          <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 8 }}>
-            {cab.face.sections.map(sectionBadge)}
-          </div>
-          <div style={{
-            fontSize: 10, color: "#666", fontWeight: 600,
-            fontFamily: "'DM Sans',sans-serif", marginBottom: 6, letterSpacing: "0.05em",
-            display: "flex", alignItems: "center", gap: 6,
-          }}>FRONT SIZES <span style={{ fontWeight: 400, color: "#D94420", fontSize: 9, letterSpacing: 0 }}>tap to edit →</span></div>
-          <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-            {calcDoorSizes(cab, spec.frame_style || "framed", resolveShopProfile(spec)).map((ds, i) => {
-              const colors = { door: "#22c55e", glass_door: "#06b6d4", drawer: "#f97216", false_front: "#8b5cf6" };
-              // Overflow: computed width/height <= 0 — slam chip red.
-              const c = ds.overflows ? "#ef4444" : (colors[ds.type] || "#888");
-              return (
-                <span key={i} onClick={() => onSectionClick?.(ds.sectionIndex)}
-                  title={ds.overflows ? "Face overflows cabinet — rebuild" : undefined}
-                  style={{
-                  fontSize: 11, fontFamily: "'JetBrains Mono',monospace", padding: "6px 10px", borderRadius: 6,
-                  background: `${c}1a`, color: c, fontWeight: 600, cursor: "pointer",
-                  border: `1px solid ${c}${ds.overflows ? "" : "33"}`,
-                }}>
-                  {ds.label}
-                  {ds.overflows && <span style={{ marginLeft: 4 }}>⚠</span>}
-                  {ds.needsVerify && !ds.overflows && <span style={{ color: "#eab308", marginLeft: 4 }}>!</span>}
-                </span>
-              );
-            })}
-          </div>
+      <div style={{ marginBottom: 10 }}>
+        <div style={{
+          fontSize: 10, color: "#666", fontWeight: 600,
+          fontFamily: "'DM Sans',sans-serif", marginBottom: 6, letterSpacing: "0.05em",
+          display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8,
+        }}>
+          <span>FACE SECTIONS</span>
+          <span style={{ fontWeight: 400, color: "#555", fontSize: 9, letterSpacing: 0 }}>
+            tap a section to edit
+          </span>
         </div>
-      )}
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
+          {sections.map((sec, i) => {
+            const colors = SEC_COLORS[sec.type] || SEC_COLORS.door;
+            const active = editingFaceSectionIdx === i;
+            return (
+              <button
+                key={i}
+                onClick={() => setEditingFaceSectionIdx(active ? null : i)}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  padding: "5px 8px",
+                  borderRadius: 6,
+                  border: active ? `1px solid ${colors.fg}` : "1px solid transparent",
+                  background: active ? `${colors.fg}22` : colors.bg,
+                  color: colors.fg,
+                  fontSize: 10,
+                  fontFamily: "'JetBrains Mono',monospace",
+                  cursor: "pointer",
+                }}
+              >
+                <span>{sectionSummary(sec)}</span>
+                <span
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    dispatch({ type: "REMOVE_SECTION", cabId: cab.id, sectionIndex: i });
+                    setEditingFaceSectionIdx(null);
+                  }}
+                  style={{
+                    color: "#666",
+                    fontSize: 12,
+                    lineHeight: 1,
+                    padding: "0 2px",
+                  }}
+                  title="Remove section"
+                >
+                  ×
+                </span>
+              </button>
+            );
+          })}
+          <button
+            onClick={() => setShowSectionPicker((open) => !open)}
+            style={{
+              padding: "5px 8px",
+              borderRadius: 6,
+              border: "1px dashed #333",
+              background: showSectionPicker ? "#1a1a2a" : "transparent",
+              color: "#777",
+              fontSize: 10,
+              fontWeight: 600,
+              fontFamily: "'JetBrains Mono',monospace",
+              cursor: "pointer",
+            }}
+          >
+            + Section
+          </button>
+        </div>
+
+        {showSectionPicker && (
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
+            {SECTION_TYPES.map((type) => (
+              <button
+                key={type}
+                onClick={() => {
+                  const section =
+                    type === "drawer"
+                      ? { type: "drawer", count: 1, height: 6 }
+                      : type === "false_front"
+                        ? { type: "false_front", height: 6 }
+                        : { type, count: 1 };
+                  dispatch({ type: "ADD_SECTION", cabId: cab.id, section });
+                  setShowSectionPicker(false);
+                  setEditingFaceSectionIdx(sections.length);
+                }}
+                style={{
+                  padding: "6px 10px",
+                  borderRadius: 6,
+                  background: "#14141e",
+                  border: "1px solid #2a2a3a",
+                  color: "#ccc",
+                  fontSize: 10,
+                  fontWeight: 600,
+                  fontFamily: "'JetBrains Mono',monospace",
+                  cursor: "pointer",
+                }}
+              >
+                {SEC_LABELS[type] || type}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {editingSection && (
+          <div style={{
+            background: "#14141e",
+            border: "1px solid #2a2a3a",
+            borderRadius: 8,
+            padding: "10px",
+            marginBottom: 10,
+            display: "flex",
+            flexDirection: "column",
+            gap: 10,
+          }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+              <span style={{ color: "#ddd", fontSize: 11, fontWeight: 600, fontFamily: "'DM Sans',sans-serif" }}>
+                Edit section {editingFaceSectionIdx + 1}
+              </span>
+              <button
+                onClick={() => {
+                  dispatch({ type: "REMOVE_SECTION", cabId: cab.id, sectionIndex: editingFaceSectionIdx });
+                  setEditingFaceSectionIdx(null);
+                }}
+                style={{
+                  border: "1px solid rgba(224,64,64,0.35)",
+                  background: "rgba(224,64,64,0.12)",
+                  color: "#e04040",
+                  borderRadius: 6,
+                  padding: "4px 8px",
+                  fontSize: 10,
+                  fontWeight: 600,
+                  fontFamily: "'DM Sans',sans-serif",
+                  cursor: "pointer",
+                }}
+              >
+                Remove
+              </button>
+            </div>
+
+            <div>
+              <div style={{ fontSize: 10, color: "#666", fontWeight: 600, fontFamily: "'DM Sans',sans-serif", marginBottom: 6, letterSpacing: "0.05em" }}>
+                TYPE
+              </div>
+              <select
+                value={editingSection.type}
+                onChange={(e) => dispatch({ type: "UPDATE_SECTION", cabId: cab.id, sectionIndex: editingFaceSectionIdx, updates: { type: e.target.value } })}
+                style={{
+                  width: "100%",
+                  minHeight: 38,
+                  background: "#0c0c14",
+                  border: "1px solid #2a2a3a",
+                  borderRadius: 8,
+                  color: "#ddd",
+                  fontSize: 12,
+                  fontFamily: "'JetBrains Mono',monospace",
+                }}
+              >
+                {SECTION_TYPES.map((type) => (
+                  <option key={type} value={type}>{SEC_LABELS[type]}</option>
+                ))}
+              </select>
+            </div>
+
+            {(editingSection.type === "door" || editingSection.type === "glass_door" || editingSection.type === "drawer") && (
+              <div>
+                <div style={{ fontSize: 10, color: "#666", fontWeight: 600, fontFamily: "'DM Sans',sans-serif", marginBottom: 6, letterSpacing: "0.05em" }}>
+                  COUNT
+                </div>
+                <div style={{ display: "flex", gap: 6 }}>
+                  {[1, 2, 3, 4].map((count) => {
+                    const active = (editingSection.count || 1) === count;
+                    return (
+                      <button
+                        key={count}
+                        onClick={() => dispatch({ type: "UPDATE_SECTION", cabId: cab.id, sectionIndex: editingFaceSectionIdx, updates: { count } })}
+                        style={{
+                          flex: 1,
+                          minHeight: 36,
+                          borderRadius: 8,
+                          border: "none",
+                          background: active ? "rgba(34,197,94,0.2)" : "#0c0c14",
+                          color: active ? "#22c55e" : "#666",
+                          fontSize: 12,
+                          fontWeight: 700,
+                          fontFamily: "'JetBrains Mono',monospace",
+                          cursor: "pointer",
+                        }}
+                      >
+                        {count}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {(editingSection.type === "drawer" || editingSection.type === "false_front") && (
+              <div>
+                <div style={{ fontSize: 10, color: "#666", fontWeight: 600, fontFamily: "'DM Sans',sans-serif", marginBottom: 6, letterSpacing: "0.05em" }}>
+                  HEIGHT
+                </div>
+                <input
+                  type="number"
+                  key={`${cab.id}-section-${editingFaceSectionIdx}-height`}
+                  defaultValue={editingSection.height || ""}
+                  placeholder="auto"
+                  onBlur={(e) => {
+                    const value = parseFloat(e.target.value);
+                    dispatch({
+                      type: "UPDATE_SECTION",
+                      cabId: cab.id,
+                      sectionIndex: editingFaceSectionIdx,
+                      updates: { height: Number.isNaN(value) ? undefined : value },
+                    });
+                  }}
+                  onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); }}
+                  style={{
+                    width: "100%",
+                    minHeight: 38,
+                    background: "#0c0c14",
+                    border: "1px solid #2a2a3a",
+                    borderRadius: 8,
+                    color: "#fff",
+                    fontSize: 13,
+                    textAlign: "center",
+                    fontFamily: "'JetBrains Mono',monospace",
+                  }}
+                />
+              </div>
+            )}
+
+            {(editingSection.type === "door" || editingSection.type === "glass_door") && (editingSection.count || 1) === 1 && (
+              <div>
+                <div style={{ fontSize: 10, color: "#666", fontWeight: 600, fontFamily: "'DM Sans',sans-serif", marginBottom: 6, letterSpacing: "0.05em" }}>
+                  HINGE SIDE
+                </div>
+                <div style={{ display: "flex", gap: 6 }}>
+                  {["left", "right"].map((side) => {
+                    const active = (editingSection.hinge_side || "left") === side;
+                    return (
+                      <button
+                        key={side}
+                        onClick={() => dispatch({ type: "UPDATE_SECTION", cabId: cab.id, sectionIndex: editingFaceSectionIdx, updates: { hinge_side: side } })}
+                        style={{
+                          flex: 1,
+                          minHeight: 36,
+                          borderRadius: 8,
+                          border: "1px solid #2a2a3a",
+                          background: active ? `${rowColor}22` : "#0c0c14",
+                          color: active ? rowColor : "#777",
+                          fontSize: 12,
+                          fontWeight: 700,
+                          fontFamily: "'DM Sans',sans-serif",
+                          textTransform: "capitalize",
+                          cursor: "pointer",
+                        }}
+                      >
+                        {side}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {sections.length > 0 && (
+          <>
+            <div style={{
+              fontSize: 10, color: "#666", fontWeight: 600,
+              fontFamily: "'DM Sans',sans-serif", marginBottom: 6, letterSpacing: "0.05em",
+              display: "flex", alignItems: "center", gap: 6,
+            }}>FRONT SIZES <span style={{ fontWeight: 400, color: "#D94420", fontSize: 9, letterSpacing: 0 }}>tap to edit →</span></div>
+            <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+              {calcDoorSizes(cab, spec.frame_style || "framed", resolveShopProfile(spec)).map((ds, i) => {
+                const colors = { door: "#22c55e", glass_door: "#06b6d4", drawer: "#f97216", false_front: "#8b5cf6" };
+                // Overflow: computed width/height <= 0 — slam chip red.
+                const c = ds.overflows ? "#ef4444" : (colors[ds.type] || "#888");
+                return (
+                  <span key={i} onClick={() => onSectionClick?.(ds.sectionIndex)}
+                    title={ds.overflows ? "Face overflows cabinet — rebuild" : undefined}
+                    style={{
+                    fontSize: 11, fontFamily: "'JetBrains Mono',monospace", padding: "6px 10px", borderRadius: 6,
+                    background: `${c}1a`, color: c, fontWeight: 600, cursor: "pointer",
+                    border: `1px solid ${c}${ds.overflows ? "" : "33"}`,
+                  }}>
+                    {ds.label}
+                    {ds.overflows && <span style={{ marginLeft: 4 }}>⚠</span>}
+                    {ds.needsVerify && !ds.overflows && <span style={{ color: "#eab308", marginLeft: 4 }}>!</span>}
+                  </span>
+                );
+              })}
+            </div>
+          </>
+        )}
+      </div>
 
       {/* Action row */}
       <div style={{ marginBottom: 10 }}>

@@ -6,6 +6,7 @@ export default function ActionRow({ cabId, spec, dispatch, onSelect }) {
   const [splitting, setSplitting] = useState(false);
   const [splitLeft, setSplitLeft] = useState("");
   const [splitRight, setSplitRight] = useState("");
+  const [splitError, setSplitError] = useState("");
 
   const cab = spec.cabinets.find(c => c.id === cabId);
   if (!cab) return null;
@@ -35,13 +36,27 @@ export default function ActionRow({ cabId, spec, dispatch, onSelect }) {
     const half = Math.floor(cab.width / 2);
     setSplitLeft(String(half));
     setSplitRight(String(cab.width - half));
+    setSplitError("");
     setSplitting(true);
   };
 
+  const leftWidth = parseFloat(splitLeft);
+  const rightWidth = parseFloat(splitRight);
+  const splitTotal = (Number.isFinite(leftWidth) ? leftWidth : 0) + (Number.isFinite(rightWidth) ? rightWidth : 0);
+  const splitValid =
+    Number.isFinite(leftWidth) &&
+    Number.isFinite(rightWidth) &&
+    leftWidth > 0 &&
+    rightWidth > 0 &&
+    Math.abs(splitTotal - cab.width) < 0.01;
+
   const handleSplitConfirm = () => {
-    const lw = parseFloat(splitLeft);
-    const rw = parseFloat(splitRight);
-    if (isNaN(lw) || isNaN(rw) || lw <= 0 || rw <= 0) return;
+    if (!splitValid) {
+      setSplitError(`Split widths must total ${cab.width}"`);
+      return;
+    }
+    const lw = leftWidth;
+    const rw = rightWidth;
     const leftId = generateId(row, spec);
     // Generate right ID from a spec that already includes the left ID
     const tempSpec = { ...spec, cabinets: [...spec.cabinets, { id: leftId, row }] };
@@ -51,6 +66,7 @@ export default function ActionRow({ cabId, spec, dispatch, onSelect }) {
       leftId, rightId, leftWidth: lw, rightWidth: rw
     });
     setSplitting(false);
+    setSplitError("");
     if (onSelect) onSelect(leftId);
   };
 
@@ -120,6 +136,7 @@ export default function ActionRow({ cabId, spec, dispatch, onSelect }) {
         </div>
         <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
           <input type="number" value={splitLeft} onChange={e => {
+            setSplitError("");
             setSplitLeft(e.target.value);
             const v = parseFloat(e.target.value);
             if (!isNaN(v)) setSplitRight(String(Math.max(0, cab.width - v)));
@@ -130,6 +147,7 @@ export default function ActionRow({ cabId, spec, dispatch, onSelect }) {
           }} />
           <span style={{ color: "#555", fontSize: 16 }}>+</span>
           <input type="number" value={splitRight} onChange={e => {
+            setSplitError("");
             setSplitRight(e.target.value);
             const v = parseFloat(e.target.value);
             if (!isNaN(v)) setSplitLeft(String(Math.max(0, cab.width - v)));
@@ -139,11 +157,16 @@ export default function ActionRow({ cabId, spec, dispatch, onSelect }) {
             fontFamily: "'JetBrains Mono',monospace"
           }} />
           <span style={{ color: "#666", fontSize: 11, fontFamily: "'JetBrains Mono',monospace" }}>
-            = {(parseFloat(splitLeft) || 0) + (parseFloat(splitRight) || 0)}"
+            = {splitTotal}"
           </span>
         </div>
+        {(splitError || !splitValid) && (
+          <div style={{ fontSize: 11, color: splitError ? "#e04040" : "#888", fontFamily: "'DM Sans',sans-serif" }}>
+            {splitError || `Split widths must total ${cab.width}"`}
+          </div>
+        )}
         <div style={{ display: "flex", gap: 6 }}>
-          {pillBtn("Split", handleSplitConfirm, rowColor, "#fff")}
+          {pillBtn("Split", splitValid ? handleSplitConfirm : undefined, splitValid ? rowColor : "#1a1a2a", splitValid ? "#fff" : "#555", splitValid ? {} : { opacity: 0.5 })}
           {pillBtn("Cancel", () => setSplitting(false), "#1a1a2a", "#888")}
         </div>
       </div>
