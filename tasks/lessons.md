@@ -85,3 +85,6 @@ When a cabinet has stacked drawers (like a 4-drawer base), the AI often gets the
 Across Lambertson 1516 and Velo A104, the AI consistently under- or over-estimates widths by 3-6 inches (e.g., 18w when real is 21w, 36w when real is 33w). Standard-width snapping (lesson #4) makes this worse — a 21" cabinet gets snapped to 18" instead of staying at 21".
 
 **Pattern**: The AI rounds to the nearest standard size even when the photo proportions clearly show something different. Removing the "ONLY" constraint from the prompt would let non-standard widths through.
+
+### 15. Editor safety should warn before it restricts
+If a move can resize a real opening or appliance gap, do not hard-block the cabinet maker unless they asked for that constraint. Keep the edit flexible, let the move happen, and show a short warning so the user stays in control.

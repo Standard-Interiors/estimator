@@ -34,6 +34,10 @@ function isExplicitSpacer(item) {
   return !!item && !item.ref && (item.type === "filler" || item.type === "spacer");
 }
 
+function isGapItem(item) {
+  return !!item && !item.ref;
+}
+
 export default function specReducer(state, action) {
   const spec = clone(state);
 
@@ -134,8 +138,8 @@ export default function specReducer(state, action) {
     }
 
     case "NUDGE_CABINET": {
-      // Move a cabinet left/right by inserting/resizing explicit spacer stock.
-      // Openings/appliances are real geometry and must not be silently resized.
+      // Move a cabinet left/right by inserting/resizing surrounding gap stock.
+      // Real openings can be resized too, but the UI warns when that happens.
       // action: { id, amount } — positive = right, negative = left
       const row = rowForCabinet(spec, action.id);
       if (!row) return state;
@@ -150,7 +154,7 @@ export default function specReducer(state, action) {
       // Find filler immediately before this cabinet
       const prevIdx = idx - 1;
       const prevItem = prevIdx >= 0 ? layout[prevIdx] : null;
-      const prevIsSpacer = isExplicitSpacer(prevItem);
+      const prevIsGap = isGapItem(prevItem);
 
       const makeSpacer = (width) => ({
         type: "filler",
@@ -160,26 +164,26 @@ export default function specReducer(state, action) {
       });
 
       if (amount > 0) {
-        // Moving right — only allowed if a real spacer exists after the cabinet
-        // to absorb the shift without changing a true opening.
+        // Moving right — grow/create gap before, then shrink any gap after.
         const afterIdx = idx + 1;
         const afterItem = afterIdx < layout.length ? layout[afterIdx] : null;
-        const afterIsSpacer = isExplicitSpacer(afterItem);
-        if (!afterIsSpacer) return state;
+        const afterIsGap = isGapItem(afterItem);
 
-        if (prevIsSpacer) {
+        if (prevIsGap) {
           prevItem.width = (prevItem.width || 0) + amount;
         } else {
           layout.splice(idx, 0, makeSpacer(amount));
           idx++; // cabinet shifted right in array
         }
-        const shiftedAfterIdx = idx + 1;
-        const shiftedAfter = layout[shiftedAfterIdx];
-        shiftedAfter.width = (shiftedAfter.width || 0) - amount;
-        if (shiftedAfter.width <= 0) layout.splice(shiftedAfterIdx, 1);
+        if (afterIsGap) {
+          const shiftedAfterIdx = idx + 1;
+          const shiftedAfter = layout[shiftedAfterIdx];
+          shiftedAfter.width = (shiftedAfter.width || 0) - amount;
+          if (shiftedAfter.width <= 0) layout.splice(shiftedAfterIdx, 1);
+        }
       } else {
-        // Moving left — shrink or remove filler before
-        if (!prevIsSpacer) return state; // blocked — nothing movable before this cabinet
+        // Moving left — shrink/remove gap before, then grow/create gap after.
+        if (!prevIsGap) return state; // blocked — nothing movable before this cabinet
         const shrink = Math.min(prevItem.width || 0, Math.abs(amount));
         if (!shrink) return state;
         prevItem.width = (prevItem.width || 0) - shrink;
@@ -190,8 +194,8 @@ export default function specReducer(state, action) {
         // Compensate with explicit spacer stock after the cabinet.
         const afterIdx = idx + 1;
         const afterItem = afterIdx < layout.length ? layout[afterIdx] : null;
-        const afterIsSpacer = isExplicitSpacer(afterItem);
-        if (afterIsSpacer) {
+        const afterIsGap = isGapItem(afterItem);
+        if (afterIsGap) {
           afterItem.width = (afterItem.width || 0) + shrink;
         } else {
           layout.splice(afterIdx, 0, makeSpacer(shrink));

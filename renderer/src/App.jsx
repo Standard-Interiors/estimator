@@ -258,6 +258,27 @@ function Render({ spec }) {
 // ═══════════════════════════════════════════════════════════
 const EMPTY_SPEC = { base_layout: [], wall_layout: [], alignment: [], cabinets: [] };
 
+function isExplicitSpacerEntry(item) {
+  return !!item && !item.ref && (item.type === "filler" || item.type === "spacer");
+}
+
+function getNudgeWarning(spec, id, amount) {
+  const baseLayout = spec?.base_layout || [];
+  const wallLayout = spec?.wall_layout || [];
+  const row = baseLayout.some((item) => item.ref === id) ? "base" : wallLayout.some((item) => item.ref === id) ? "wall" : null;
+  if (!row) return null;
+
+  const layout = row === "base" ? baseLayout : wallLayout;
+  const idx = layout.findIndex((item) => item.ref === id);
+  if (idx === -1) return null;
+
+  const gapItem = amount > 0 ? layout[idx + 1] : layout[idx - 1];
+  if (!gapItem || gapItem.ref || isExplicitSpacerEntry(gapItem)) return null;
+
+  const label = (gapItem.label || gapItem.type || "opening").toLowerCase();
+  return `Warning: move resized the ${label} gap`;
+}
+
 function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack }) {
   const { spec, dispatch, undo, redo, canUndo, canRedo, undoLabel, redoLabel } = useSpecState(EMPTY_SPEC);
   const { isMobile, isLandscape } = useIsMobile();
@@ -322,8 +343,10 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
   // ── Auto-save — uses refs to avoid re-render cascades ──
   const specVersionRef = useRef(0);
   const [saveState, setSaveState] = useState("idle"); // idle | saving | saved | error | conflict
+  const [editorNotice, setEditorNotice] = useState(null);
   const saveTimer = useRef(null);
   const saveStateTimer = useRef(null);
+  const editorNoticeTimer = useRef(null);
   const pendingSave = useRef(false);
   const lastSaveTime = useRef(Date.now());
   const specRef = useRef(spec);
@@ -354,6 +377,20 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
     }
   }, []);
 
+  const showEditorNotice = useCallback((message, resetMs = 3000) => {
+    clearTimeout(editorNoticeTimer.current);
+    setEditorNotice(message);
+    if (resetMs > 0) {
+      editorNoticeTimer.current = setTimeout(() => setEditorNotice(null), resetMs);
+    }
+  }, []);
+
+  const handleNudge = useCallback((id, amount) => {
+    const warning = getNudgeWarning(specRef.current, id, amount);
+    if (warning) showEditorNotice(warning, 4000);
+    dispatch({ type: "NUDGE_CABINET", id, amount });
+  }, [dispatch, showEditorNotice]);
+
   const hydrateRoomSnapshot = useCallback((room, { activateTab = false, resetSelection = false, preserveImages = false } = {}) => {
     clearTimeout(saveTimer.current);
     pendingSave.current = false;
@@ -380,6 +417,7 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
       setSelectedGapItem(null);
       setEditingSectionIdx(null);
     }
+    setEditorNotice(null);
   }, [dispatch, normalizeLoadedSpec]);
 
   const reloadLatestRoom = useCallback(async ({ activateTab = false, saveStateValue = null, extractionMessage = null } = {}) => {
@@ -470,6 +508,7 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
     return () => {
       clearTimeout(saveTimer.current);
       clearTimeout(saveStateTimer.current);
+      clearTimeout(editorNoticeTimer.current);
       if (pendingSave.current && roomId) {
         api.beaconSaveSpec(roomId, specRef.current, specVersionRef.current);
       }
@@ -498,13 +537,13 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
       if (e.key === "ArrowLeft") {
         e.preventDefault();
         if (e.metaKey || e.ctrlKey) dispatch({ type: "MOVE_CABINET", id: selectedId, direction: "left" });
-        else dispatch({ type: "NUDGE_CABINET", id: selectedId, amount: e.shiftKey ? -0.5 : -1 });
+        else handleNudge(selectedId, e.shiftKey ? -0.5 : -1);
         return;
       }
       if (e.key === "ArrowRight") {
         e.preventDefault();
         if (e.metaKey || e.ctrlKey) dispatch({ type: "MOVE_CABINET", id: selectedId, direction: "right" });
-        else dispatch({ type: "NUDGE_CABINET", id: selectedId, amount: e.shiftKey ? 0.5 : 1 });
+        else handleNudge(selectedId, e.shiftKey ? 0.5 : 1);
         return;
       }
       if (e.key === "ArrowUp") {
@@ -554,7 +593,7 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [tab, selectedId, spec, dispatch, undo, redo]);
+  }, [tab, selectedId, spec, dispatch, handleNudge, undo, redo]);
 
   const loadWireframe = () => { dispatch({ type: "LOAD_SPEC", spec: JSON.parse(JSON.stringify(WIREFRAME_SPEC)) }); setMode("loaded"); setTab("render"); };
 
@@ -811,6 +850,7 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
           {saveState === "saved" && <span style={{fontSize:10,color:"#22c55e",opacity:0.6,fontFamily:"'JetBrains Mono',monospace"}}>✓ Saved</span>}
           {saveState === "conflict" && <span style={{fontSize:10,color:"#f59e0b",fontFamily:"'JetBrains Mono',monospace"}}>Reloaded newer changes</span>}
           {saveState === "error" && <span style={{fontSize:10,color:"#e04040",fontFamily:"'JetBrains Mono',monospace"}}>Save failed</span>}
+          {editorNotice && <span style={{fontSize:10,color:"#f59e0b",fontFamily:"'JetBrains Mono',monospace"}}>{editorNotice}</span>}
         </div>
         {hasSpec && (
           <div style={{display:"flex",gap:3,alignItems:"center"}}>
@@ -1137,7 +1177,7 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
                     const idx=bIdx!==-1?bIdx:wIdx;
                     setSelectedGapItem({...item, entry:item, rowName, idx, w:item.width||0});
                   }}
-                  onNudge={(id,amount)=>dispatch({type:"NUDGE_CABINET",id,amount})}
+                  onNudge={handleNudge}
                   onNudgeVertical={(id,amount)=>dispatch({type:"NUDGE_VERTICAL",id,amount})}
                 />
                 {/* Context menu */}
@@ -1211,8 +1251,8 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
                       if(idx!==-1&&idx<allRefs.length-1){setSelectedId(allRefs[idx+1].ref);setTimeout(()=>{if(widthInputRef.current){widthInputRef.current.focus();widthInputRef.current.select();}},50);}
                     }}
                     onSelectId={setSelectedId}
-                    onMoveLeft={() => dispatch({ type: "NUDGE_CABINET", id: sel.id, amount: -3 })}
-                    onMoveRight={() => dispatch({ type: "NUDGE_CABINET", id: sel.id, amount: 3 })}
+                    onMoveLeft={() => handleNudge(sel.id, -3)}
+                    onMoveRight={() => handleNudge(sel.id, 3)}
                     onMoveUp={sel.row === "wall" ? () => dispatch({ type: "NUDGE_VERTICAL", id: sel.id, amount: -3 }) : undefined}
                     onMoveDown={sel.row === "wall" ? () => dispatch({ type: "NUDGE_VERTICAL", id: sel.id, amount: 3 }) : undefined}
                     onDelete={() => setPendingDelete(sel.id)}
