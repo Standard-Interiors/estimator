@@ -402,6 +402,10 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
     dispatch({ type: "NUDGE_CABINET", id, amount });
   }, [dispatch, showEditorNotice]);
 
+  const handlePlaceCabinet = useCallback(({ id, targetRow, targetIndex, targetYOffset }) => {
+    dispatch({ type: "PLACE_CABINET", id, targetRow, targetIndex, targetYOffset });
+  }, [dispatch]);
+
   const hydrateRoomSnapshot = useCallback((room, { activateTab = false, resetSelection = false, preserveImages = false } = {}) => {
     clearTimeout(saveTimer.current);
     pendingSave.current = false;
@@ -1196,6 +1200,7 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
                   }}
                   onNudge={handleNudge}
                   onNudgeVertical={(id,amount)=>dispatch({type:"NUDGE_VERTICAL",id,amount})}
+                  onPlaceCabinet={handlePlaceCabinet}
                 />
                 {/* Context menu */}
                 {renderCtxMenu && (()=>{
@@ -1206,6 +1211,10 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
                     {label:"Duplicate (⌘D)",action:()=>{const newId=generateId(ctxCab.row,spec);dispatch({type:"DUPLICATE_CABINET",id:renderCtxMenu.id,newId});setSelectedId(newId);setRenderCtxMenu(null);}},
                     {label:"Set Width…",action:()=>{setSelectedId(renderCtxMenu.id);setRenderCtxMenu(null);setTimeout(()=>{if(widthInputRef.current){widthInputRef.current.focus();widthInputRef.current.select();}},50);}},
                     ...(ctxCab.width>=12?[{label:"Split in Half",action:()=>{const half=Math.round(ctxCab.width/2*4)/4;const leftW=half;const rightW=Math.round((ctxCab.width-half)*4)/4;const leftId=generateId(ctxCab.row,spec);const tempSpec={...spec,cabinets:[...spec.cabinets,{id:leftId,row:ctxCab.row}]};const rightId=generateId(ctxCab.row,tempSpec);dispatch({type:"SPLIT_CABINET",id:renderCtxMenu.id,leftId,rightId,leftWidth:leftW,rightWidth:rightW});setSelectedId(leftId);setRenderCtxMenu(null);}}]:[]),
+                    ...(["base","wall","tall"].filter((row)=>row!==ctxCab.row).map((row)=>({
+                      label:`Move to ${row}`,
+                      action:()=>{dispatch({type:"MOVE_ROW",id:renderCtxMenu.id,targetRow:row});setSelectedId(renderCtxMenu.id);setRenderCtxMenu(null);}
+                    }))),
                     {label:"+ Space Left",action:()=>{const layout=spec[layoutKeyForCabinetRow(ctxCab.row)]||[];const pos=layout.findIndex(i=>i.ref===renderCtxMenu.id);dispatch({type:"ADD_GAP",row:ctxCab.row,position:Math.max(pos,0),gap:{type:"filler",label:"Filler",width:3}});setRenderCtxMenu(null);}},
                     {label:"+ Space Right",action:()=>{const layout=spec[layoutKeyForCabinetRow(ctxCab.row)]||[];const pos=layout.findIndex(i=>i.ref===renderCtxMenu.id);dispatch({type:"ADD_GAP",row:ctxCab.row,position:pos+1,gap:{type:"filler",label:"Filler",width:3}});setRenderCtxMenu(null);}},
                     {label:"Delete",action:()=>{setPendingDelete(renderCtxMenu.id);setRenderCtxMenu(null);},color:"#e04040"},

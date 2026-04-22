@@ -90,6 +90,33 @@ export default function BottomSheet({ spec, selectedId, dispatch, onSelect, onSe
     );
   };
 
+  const rowPill = (nextRow) => {
+    const active = row === nextRow;
+    return (
+      <button
+        key={nextRow}
+        onClick={() => {
+          if (!active) dispatch({ type: "MOVE_ROW", id: cab.id, targetRow: nextRow });
+        }}
+        style={{
+          minHeight: 34,
+          borderRadius: 18,
+          padding: "0 12px",
+          background: active ? rowColor : "#14141e",
+          border: active ? `2px solid ${rowColor}` : "1px solid #2a2a3a",
+          color: active ? "#fff" : "#999",
+          fontWeight: active ? 700 : 500,
+          fontSize: 10,
+          fontFamily: "'DM Sans',sans-serif",
+          cursor: "pointer",
+          textTransform: "capitalize",
+        }}
+      >
+        {nextRow}
+      </button>
+    );
+  };
+
   return (
     <div style={{
       background: "#0c0c14", borderTop: "1px solid #1a1a2a",
@@ -123,6 +150,16 @@ export default function BottomSheet({ spec, selectedId, dispatch, onSelect, onSe
         overflowX: "auto", WebkitOverflowScrolling: "touch"
       }}>
         {types.map(typePill)}
+      </div>
+
+      <div style={{ marginBottom: 12 }}>
+        <div style={{
+          fontSize: 10, color: "#666", fontWeight: 600,
+          fontFamily: "'DM Sans',sans-serif", marginBottom: 6, letterSpacing: "0.05em"
+        }}>ROW</div>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          {["base", "wall", "tall"].map(rowPill)}
+        </div>
       </div>
 
       {/* Width grid */}

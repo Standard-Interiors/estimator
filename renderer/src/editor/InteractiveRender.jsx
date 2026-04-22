@@ -69,7 +69,7 @@ function Face({ cab, cx, cy, w, h }) {
   return <>{els}</>;
 }
 
-export default function InteractiveRender({ spec, selectedId, isMobile, onSelect, onDoubleClick, onContextMenu: onCtxMenu, onGapSelect, onNudge, onNudgeVertical }) {
+export default function InteractiveRender({ spec, selectedId, isMobile, onSelect, onDoubleClick, onContextMenu: onCtxMenu, onGapSelect, onNudge, onNudgeVertical, onPlaceCabinet }) {
   if (!spec?.cabinets?.length) return <div style={{ color: "#555", padding: 20, textAlign: "center" }}>No cabinets loaded</div>;
 
   const cabMap = {}; spec.cabinets.forEach(c => { cabMap[c.id] = c; });
@@ -150,6 +150,55 @@ export default function InteractiveRender({ spec, selectedId, isMobile, onSelect
   const svgRef = useRef(null);
   const dragThreshold = 4; // px before drag starts
 
+  const getCurrentInsertIndex = (items, id) => {
+    let insertIndex = 0;
+    for (const item of items) {
+      if (item.id === id) return insertIndex;
+      insertIndex += 1;
+    }
+    return insertIndex;
+  };
+
+  const getInsertIndexAtX = (items, svgX) => {
+    const idx = items.findIndex((item) => svgX < item.x + (item.w * SC) / 2);
+    return idx === -1 ? items.length : idx;
+  };
+
+  const getInsertX = (items, insertIndex) => {
+    if (!items.length) return PAD;
+    if (insertIndex <= 0) return items[0].x;
+    if (insertIndex >= items.length) {
+      const last = items[items.length - 1];
+      return last.x + last.w * SC;
+    }
+    return items[insertIndex].x;
+  };
+
+  const getDropPlacement = (activeDrag) => {
+    if (!activeDrag || typeof activeDrag.svgX !== "number" || typeof activeDrag.svgY !== "number") {
+      return null;
+    }
+
+    const targetRow = activeDrag.row;
+    const targetItems = (targetRow === "wall" ? wallItems : lowerItems).filter((item) => item.id !== activeDrag.id);
+    const currentItems = activeDrag.row === "wall" ? wallItems : lowerItems;
+    const targetIndex = getInsertIndexAtX(targetItems, activeDrag.svgX);
+    const currentIndex = getCurrentInsertIndex(currentItems, activeDrag.id);
+    const currentYOffset = cabMap[activeDrag.id]?.yOffset || 0;
+    const targetYOffset = targetRow === "wall"
+      ? Math.max(0, activeDrag.row === "wall" ? currentYOffset + (activeDrag.dyInches || 0) : 0)
+      : undefined;
+
+    return {
+      id: activeDrag.id,
+      targetRow,
+      targetIndex,
+      currentIndex,
+      targetYOffset,
+      previewX: getInsertX(targetItems, targetIndex),
+    };
+  };
+
   const onPointerDown = useCallback((id, row) => (e) => {
     if (e.button !== 0) return; // left click only
     e.stopPropagation();
@@ -167,6 +216,8 @@ export default function InteractiveRender({ spec, selectedId, isMobile, onSelect
     if (!svg) return;
     const rect = svg.getBoundingClientRect();
     const svgScale = rect.width / svg.viewBox.baseVal.width;
+    const svgX = (e.clientX - rect.left) / svgScale + svg.viewBox.baseVal.x;
+    const svgY = (e.clientY - rect.top) / svgScale + svg.viewBox.baseVal.y;
     // Horizontal snap
     const dxSvg = rawDx / svgScale;
     const snapInchX = Math.round(dxSvg / SC);
@@ -178,21 +229,28 @@ export default function InteractiveRender({ spec, selectedId, isMobile, onSelect
       snapInchY = Math.round(dySvg / SC);
       snappedDy = snapInchY * SC * svgScale;
     }
-    setDrag(d => ({ ...d, dx: snappedDx, dy: snappedDy, dxInches: snapInchX, dyInches: snapInchY, started: true }));
+    setDrag(d => ({ ...d, dx: snappedDx, dy: snappedDy, dxInches: snapInchX, dyInches: snapInchY, svgX, svgY, started: true }));
   }, [drag]);
 
   const onPointerUp = useCallback((e) => {
     if (!drag) return;
     if (drag.started) {
-      if (drag.dxInches && drag.dxInches !== 0 && onNudge) {
-        onNudge(drag.id, drag.dxInches);
-      }
-      if (drag.dyInches && drag.dyInches !== 0 && onNudgeVertical && drag.row === "wall") {
-        onNudgeVertical(drag.id, drag.dyInches);
+      const placement = getDropPlacement(drag);
+      const sameSlot = placement && placement.targetRow === drag.row && placement.targetIndex === placement.currentIndex;
+
+      if (placement && !sameSlot && onPlaceCabinet) {
+        onPlaceCabinet(placement);
+      } else {
+        if (drag.dxInches && drag.dxInches !== 0 && onNudge) {
+          onNudge(drag.id, drag.dxInches);
+        }
+        if (drag.dyInches && drag.dyInches !== 0 && onNudgeVertical && drag.row === "wall") {
+          onNudgeVertical(drag.id, drag.dyInches);
+        }
       }
     }
     setDrag(null);
-  }, [drag, onNudge, onNudgeVertical]);
+  }, [drag, onNudge, onNudgeVertical, onPlaceCabinet]);
 
   const highlightRect = (x, cy, w, h, row) => {
     const color = row === "base" ? "#D94420" : "#1a6fbf";
@@ -202,6 +260,13 @@ export default function InteractiveRender({ spec, selectedId, isMobile, onSelect
         rx={2} style={{ pointerEvents: "none" }} />
     );
   };
+
+  const dropPlacement = drag?.started ? getDropPlacement(drag) : null;
+  const dropColor = dropPlacement?.targetRow === "wall" ? "#1a6fbf" : "#D94420";
+  const dropTop = dropPlacement?.targetRow === "wall"
+    ? WTOP - 8
+    : (tallTop !== null ? Math.min(CTTOP, tallTop) : CTTOP) - 8;
+  const dropBottom = dropPlacement?.targetRow === "wall" ? WBOT + 8 : FLOOR + 8;
 
   return (
     <div style={{
@@ -217,6 +282,20 @@ export default function InteractiveRender({ spec, selectedId, isMobile, onSelect
         {counterSegments.map((segment, idx) => (
           <Box3D key={`ct-under-${idx}`} cx={segment.x} cy={CTTOP} w={segment.w} h={1.5} depth={25.5} front="none" top="none" side="none" stroke="#888" sw={0.8} />
         ))}
+
+        {dropPlacement && (
+          <g style={{ pointerEvents: "none" }}>
+            <line
+              x1={dropPlacement.previewX}
+              y1={dropTop}
+              x2={dropPlacement.previewX}
+              y2={dropBottom}
+              stroke={dropColor}
+              strokeWidth={2}
+              strokeDasharray="5,4"
+            />
+          </g>
+        )}
 
         {/* Lower cabinets first (bases only here; talls render later so bridge uppers don't cut through them) */}
         {baseCabItems.map(bi => {

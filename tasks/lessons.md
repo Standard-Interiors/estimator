@@ -88,3 +88,12 @@ Across Lambertson 1516 and Velo A104, the AI consistently under- or over-estimat
 
 ### 15. Editor safety should warn before it restricts
 If a move can resize a real opening or appliance gap, do not hard-block the cabinet maker unless they asked for that constraint. Keep the edit flexible, let the move happen, and show a short warning so the user stays in control.
+
+### 16. Do not claim a visual fix without a fresh Chrome MCP check
+If the user questions whether a UI/layout issue is actually fixed, stop asserting and re-open the exact live screen in Chrome MCP. Compare the render against the photo/wireframe and report what is visibly true before making any more claims.
+
+### 17. Verify editability, not just appearance
+If the user is talking about fixing AI output in the editor, a correct-looking render is not enough. In Chrome MCP, test the actual edit affordance they care about: move, reorder, change row, split, merge, or retype. Report interaction limits separately from visual correctness.
+
+### 18. When the editor needs more freedom, prefer slot placement over fake geometry edits
+If 3D drag is supposed to let the cabinet maker fix AI layout mistakes, do not keep routing it through nudge math that only stretches nearby gaps. Keep layout order as the source of truth, make drag commit a real slot change, and expose row changes explicitly instead of hiding them behind unpredictable drag behavior.

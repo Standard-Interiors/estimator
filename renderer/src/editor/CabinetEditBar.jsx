@@ -5,6 +5,7 @@ const MONO = "'JetBrains Mono',monospace";
 const SANS = "'DM Sans',sans-serif";
 
 const TYPE_MAP = { base: BASE_TYPES, wall: WALL_TYPES, tall: TALL_TYPES };
+const ROWS = ["base", "wall", "tall"];
 
 const SEC_LABELS = {
   drawer: "Drawer",
@@ -128,6 +129,24 @@ export default function CabinetEditBar({ cab, spec, dispatch, selColor, widthInp
               {t.replace(/^(base|wall|tall)_?/, "").replace(/_/g, " ") || t.split("_")[0]}
             </button>
           ))}
+        </div>
+
+        <div style={{ display: "flex", gap: 3 }}>
+          {ROWS.map((row) => {
+            const active = cab.row === row;
+            return (
+              <button
+                key={row}
+                style={btnStyle(active)}
+                onClick={() => {
+                  if (!active) dispatch({ type: "MOVE_ROW", id: cab.id, targetRow: row });
+                }}
+                title={`Move ${cab.id} to ${row} row`}
+              >
+                {row}
+              </button>
+            );
+          })}
         </div>
 
         <span style={{ width: 1, height: 20, background: "#1a1a2a", flexShrink: 0 }} />

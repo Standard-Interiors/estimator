@@ -138,3 +138,73 @@
 - The photo and wireframe both show a real tall pantry to the right of the refrigerator. The bad screenshot is not just "AI guessed wrong."
 - The frontend only has `base_layout` and `wall_layout`. `T1` exists as `row: "tall"`, but it is carried inside `base_layout`, so base-row rendering logic incorrectly gives it countertop/base-neighbor behavior.
 - Desktop and mobile editor paths both have row-to-layout logic that only understands `base` and `wall`, so tall cabinets lose merge/add-gap/add-cab safety and mobile type controls regress to wall behavior.
+- Local Chrome MCP verification: adding a tall cabinet from the production editor path now gives tall-specific controls and no longer drags the counter through the tall box.
+- Live Chrome MCP verification on `Wall 3`: `T1` now renders as a distinct tall pantry, the counter stops before it, the upper bridges no longer visually slice through it, and selecting `T1` surfaces tall type pills (`pantry` / `oven`) plus lower-row edit actions.
+
+# Tall Move Investigation
+
+- [x] Reproduce `T1` movement behavior in live 3D Chrome MCP
+- [x] Trace the exact movement rules for tall cabinets in the production editor code
+- [x] Explain whether the limitation is intentional, inherited from lower-run layout rules, or a bug
+
+## Tall Move Investigation Notes
+
+- User expectation: in 3D mode, a tall cabinet should be movable anywhere needed for correction, even if the AI originally placed it badly.
+- Root cause: production 3D drag was still just a visual wrapper around `NUDGE_CABINET`, so `T1` could only resize nearby lower-run gaps instead of changing its actual slot in `base_layout`.
+- Fix direction chosen after staff-level review: keep `base_layout` / `wall_layout` as the persisted source of truth, make drag commit a real slot placement action, and expose row changes explicitly in the editor instead of hiding them inside drag.
+
+# 3D Placement Fix
+
+- [x] Replace lower/tall drag-to-nudge with true slot placement in the active 3D editor
+- [x] Keep warning-based nudge behavior for arrow-button precision moves
+- [x] Add explicit base / wall / tall row controls to desktop and mobile editor surfaces
+- [x] Verify local Chrome MCP behavior on real Wall 3 field data
+- [ ] Deploy to Fly and rerun the production Chrome MCP matrix
+
+## 3D Placement Review
+
+- Local Chrome MCP on Wall 3 confirmed `T1` now commits a real placement action in 3D: dragging left changed the saved lower-run order to `B2, T1, B3, fridge`.
+- Undo / Redo worked on the placement action without losing selection or breaking render layering.
+- Explicit row controls now exist on desktop and mobile; locally, `T1 -> wall` converted the cabinet into the wall run with wall controls and wall dimensions, then undo restored the original tall state.
+- Precision nudge still works separately: `B3` move-right still warns and resizes the refrigerator opening instead of silently reordering.
+- The temporary local real-data verification path restored Wall 3 to its original saved state after testing.
+# Production Editor Drag/Reorder Review (2026-04-21)
+
+- [x] Confirm the active production editor files and interaction path for desktop/mobile
+- [x] Trace `InteractiveRender.jsx` drag handling and compare it to arrow-button/keyboard nudges in `App.jsx`
+- [x] Trace state updates in `specReducer.js` and directly related layout helpers
+- [x] Identify why the current drag model behaves like a disguised nudge, especially for tall-cabinet cases like `T1` on `Wall 3`
+- [x] Propose a clean reducer/UI design for true placement/reordering while preserving useful nudge behavior
+- [x] Capture edge cases, constraints, and exact file references in the review output
+
+## Review Notes
+
+- Active production path confirmed:
+- Desktop uses `InteractiveRender.jsx` + `CabinetEditBar.jsx` via `App.jsx`.
+- Mobile uses `InteractiveRender.jsx` + `BottomSheet.jsx` + `ActionRow.jsx` via `App.jsx`.
+- Current 3D drag is a disguised nudge:
+- `InteractiveRender.jsx` converts pointer delta into snapped inch deltas, then calls `onNudge` / `onNudgeVertical` on pointer-up instead of committing placement.
+- Desktop arrows and plain keyboard arrows already use the same nudge path; Cmd/Ctrl + arrows and mobile `ActionRow` use discrete swap-style moves.
+- Root cause for tall-cabinet placement pain:
+- Lower placement is derived entirely from `base_layout`, which mixes bases, talls, and openings.
+- A tall like `T1` can visually move during drag preview, but drop only resizes/adds gap stock; it never changes its slot in `base_layout`, so it cannot truly move past adjacent openings/cabinets.
+- Recommended design direction:
+- Keep nudge as a precision spacing tool for arrows/keyboard.
+- Make 3D drag commit a placement action that reorders a cabinet ref inside the correct layout row instead of resizing gaps.
+- For wall cabinets, horizontal drag should update order plus alignment anchor; vertical drag should continue to affect `yOffset`.
+
+# Production Editor Free Placement Regression Review (2026-04-21)
+
+- [x] Confirm the active production editor files and state entry points
+- [x] Inspect desktop/mobile editor controls that would interact with free placement or row changes
+- [x] Inspect reducer/history/autosave behavior for placement-related edits
+- [x] Rank the top 5 concrete regression risks with exact file references
+- [x] Add final review notes and verdict
+
+## Review Notes
+
+- Highest-risk behavior if row changes are added: `MOVE_ROW` rewrites row, dimensions, and the cabinet ID prefix, but the active editor selection still keys off the old `selectedId`. Without consuming `_movedTo`, the row-changed cabinet immediately loses selection and the bottom editor path goes blank.
+- Highest-risk behavior if free placement is added on the current drag path: desktop drag still resolves to `NUDGE_CABINET`, which mutates adjacent non-ref layout items rather than storing an independent x-position. That means openings/appliance gaps are likely to be rewritten instead of the cabinet simply moving.
+- Alignment is still derived from `wall_layout` order plus `alignment` references, not from persisted wall positions. Moving bases/walls between rows or allowing arbitrary placement will make upper cabinets jump unless alignment semantics are redesigned together.
+- Desktop and mobile movement semantics are not equivalent today. Desktop uses nudge + filler semantics; mobile action buttons use neighbor swaps and have no row/vertical placement controls, so parity is a real regression risk.
+- Undo/autosave are currently safe because drag emits one action on pointer-up. Live placement updates would need batching/commit semantics or they will flood history, trigger autosave churn, and make conflict recovery much harsher.

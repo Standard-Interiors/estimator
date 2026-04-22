@@ -32,12 +32,64 @@ function rowForCabinet(spec, id) {
   return cab.row || null;
 }
 
-function isExplicitSpacer(item) {
-  return !!item && !item.ref && (item.type === "filler" || item.type === "spacer");
-}
-
 function isGapItem(item) {
   return !!item && !item.ref;
+}
+
+function defaultTypeForRow(row) {
+  if (row === "wall") return "wall";
+  if (row === "tall") return "tall_pantry";
+  return "base";
+}
+
+function typeMatchesRow(type, row) {
+  if (!type) return false;
+  if (row === "wall") return type === "wall" || type.startsWith("wall_");
+  if (row === "tall") return type.startsWith("tall_");
+  return (
+    type === "base" ||
+    type.startsWith("base_") ||
+    type === "sink" ||
+    type === "drawer_bank"
+  );
+}
+
+function applyRowDefaults(cab, targetRow) {
+  cab.row = targetRow;
+
+  if (!typeMatchesRow(cab.type, targetRow)) {
+    cab.type = defaultTypeForRow(targetRow);
+  }
+
+  if (targetRow === "wall") {
+    if (cab.height === 34.5 || cab.height === 84) cab.height = 30;
+    if (cab.depth === 24) cab.depth = 12;
+    cab.yOffset = Math.max(0, cab.yOffset || 0);
+    return;
+  }
+
+  if (targetRow === "tall") {
+    if (cab.height === 34.5 || cab.height === 30) cab.height = 84;
+    if (cab.depth === 12) cab.depth = 24;
+    delete cab.yOffset;
+    return;
+  }
+
+  if (cab.height === 30 || cab.height === 84) cab.height = 34.5;
+  if (cab.depth === 12) cab.depth = 24;
+  delete cab.yOffset;
+}
+
+function removeRefFromLayout(layout, id) {
+  const idx = findRefIndex(layout, id);
+  if (idx === -1) return false;
+  layout.splice(idx, 1);
+  return true;
+}
+
+function clampInsertIndex(layout, targetIndex) {
+  if (!Array.isArray(layout) || layout.length === 0) return 0;
+  return Math.max(0, Math.min(targetIndex, layout.length));
 }
 
 export default function specReducer(state, action) {
@@ -86,65 +138,84 @@ export default function specReducer(state, action) {
     }
 
     case "MOVE_ROW": {
-      // Move a cabinet between lower/wall rows.
+      // Move a cabinet between rows. Keep ids stable so selection, undo, and
+      // cut-list references do not churn when the cabinet maker is correcting AI.
       // action: { id, targetRow } — "base", "wall", or "tall"
       const currentRow = rowForCabinet(spec, action.id);
       if (!currentRow || currentRow === action.targetRow) return spec;
 
-      const fromKey = getLayoutKey(currentRow);
-      const toKey = getLayoutKey(action.targetRow);
-      const fromLayout = spec[fromKey];
-      const idx = findRefIndex(fromLayout, action.id);
-      if (idx === -1) return spec;
-
-      // Remove from source layout
-      fromLayout.splice(idx, 1);
-
-      // Add to end of target layout
-      spec[toKey].push({ ref: action.id });
-
-      // Update cabinet's row property
       const cabIdx = findCabinetIndex(spec, action.id);
-      if (cabIdx !== -1) {
-        spec.cabinets[cabIdx].row = action.targetRow;
-        // Adjust default dimensions for new row
-        if (action.targetRow === "wall") {
-          if (spec.cabinets[cabIdx].height === 34.5 || spec.cabinets[cabIdx].height === 84) {
-            spec.cabinets[cabIdx].height = 30;
-          }
-          if (spec.cabinets[cabIdx].depth === 24) spec.cabinets[cabIdx].depth = 12;
-        } else if (action.targetRow === "tall") {
-          if (spec.cabinets[cabIdx].height === 34.5 || spec.cabinets[cabIdx].height === 30) {
-            spec.cabinets[cabIdx].height = 84;
-          }
-          if (spec.cabinets[cabIdx].depth === 12) spec.cabinets[cabIdx].depth = 24;
-        } else {
-          if (spec.cabinets[cabIdx].height === 30 || spec.cabinets[cabIdx].height === 84) {
-            spec.cabinets[cabIdx].height = 34.5;
-          }
-          if (spec.cabinets[cabIdx].depth === 12) spec.cabinets[cabIdx].depth = 24;
-        }
-        // Update ID prefix — ensure uniqueness
-        const oldId = spec.cabinets[cabIdx].id;
-        const prefix = action.targetRow === "wall" ? "W" : action.targetRow === "tall" ? "T" : "B";
-        const num = oldId.replace(/^[BWT]/, "");
-        let newId = prefix + num;
-        // If ID already taken, find next available number
-        const existingIds = new Set(spec.cabinets.map(c => c.id));
-        if (existingIds.has(newId)) {
-          let n = 1;
-          while (existingIds.has(prefix + n)) n++;
-          newId = prefix + n;
-        }
-        spec.cabinets[cabIdx].id = newId;
-        // Update layout ref
-        const toLayout = spec[toKey];
-        const newIdx = toLayout.findIndex(i => i.ref === oldId);
-        if (newIdx !== -1) toLayout[newIdx].ref = newId;
-        // Update alignment refs
-        spec.alignment = (spec.alignment || []).filter(a => a.wall !== oldId && a.base !== oldId);
-        return { ...spec, _movedTo: newId };
+      if (cabIdx === -1) return spec;
+
+      const currentKey = getLayoutKey(currentRow);
+      const targetKey = getLayoutKey(action.targetRow);
+      if (!currentKey || !targetKey) return spec;
+
+      const sameLowerRun =
+        currentKey === "base_layout" &&
+        targetKey === "base_layout" &&
+        (currentRow === "base" || currentRow === "tall") &&
+        (action.targetRow === "base" || action.targetRow === "tall");
+
+      if (!sameLowerRun) {
+        if (!removeRefFromLayout(spec[currentKey], action.id)) return spec;
+        spec[targetKey].push({ ref: action.id });
       }
+
+      applyRowDefaults(spec.cabinets[cabIdx], action.targetRow);
+
+      if (currentRow === "wall") {
+        spec.alignment = (spec.alignment || []).filter((a) => a.wall !== action.id);
+      }
+      if (action.targetRow === "wall" && currentRow !== "wall") {
+        spec.alignment = (spec.alignment || []).filter((a) => a.base !== action.id);
+      }
+
+      return spec;
+    }
+
+    case "PLACE_CABINET": {
+      // True 3D placement: move a cabinet to a row + insertion slot, instead of
+      // only resizing surrounding gaps. targetIndex is relative to the target
+      // layout with this cabinet already removed.
+      const currentRow = rowForCabinet(spec, action.id);
+      if (!currentRow) return state;
+
+      const targetRow = action.targetRow || currentRow;
+      const currentKey = getLayoutKey(currentRow);
+      const targetKey = getLayoutKey(targetRow);
+      if (!currentKey || !targetKey) return state;
+
+      const cabIdx = findCabinetIndex(spec, action.id);
+      if (cabIdx === -1) return state;
+      const cab = spec.cabinets[cabIdx];
+
+      const currentLayout = spec[currentKey];
+      if (!removeRefFromLayout(currentLayout, action.id)) return state;
+
+      const targetLayout = spec[targetKey];
+      const insertAt = clampInsertIndex(targetLayout, action.targetIndex ?? targetLayout.length);
+      targetLayout.splice(insertAt, 0, { ref: action.id });
+
+      if (targetRow !== currentRow) {
+        applyRowDefaults(cab, targetRow);
+      } else if (targetRow === "wall" && typeof action.targetYOffset === "number") {
+        cab.yOffset = Math.max(0, action.targetYOffset);
+      }
+
+      if (targetRow !== "wall") {
+        delete cab.yOffset;
+      } else if (targetRow === "wall" && currentRow !== "wall") {
+        cab.yOffset = Math.max(0, action.targetYOffset || 0);
+      }
+
+      if (currentRow === "wall") {
+        spec.alignment = (spec.alignment || []).filter((a) => a.wall !== action.id);
+      }
+      if (targetRow === "wall" && currentRow !== "wall") {
+        spec.alignment = (spec.alignment || []).filter((a) => a.base !== action.id);
+      }
+
       return spec;
     }
 
