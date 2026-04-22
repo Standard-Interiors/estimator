@@ -638,14 +638,20 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
       const selectedWallAlignment = selectedCab?.row === "wall" ? getAlignmentBaseId(spec, selectedId) : null;
       if (e.key === "ArrowLeft") {
         e.preventDefault();
-        if (e.metaKey || e.ctrlKey) dispatch({ type: "MOVE_CABINET", id: selectedId, direction: "left" });
+        if (e.metaKey || e.ctrlKey) {
+          if (selectedWallAlignment) showEditorNotice("Clear Align to edit wall slot", 3000);
+          else dispatch({ type: "MOVE_CABINET", id: selectedId, direction: "left" });
+        }
         else if (selectedWallAlignment) showEditorNotice("Clear Align to edit wall spacing", 3000);
         else handleNudge(selectedId, e.shiftKey ? -0.5 : -1);
         return;
       }
       if (e.key === "ArrowRight") {
         e.preventDefault();
-        if (e.metaKey || e.ctrlKey) dispatch({ type: "MOVE_CABINET", id: selectedId, direction: "right" });
+        if (e.metaKey || e.ctrlKey) {
+          if (selectedWallAlignment) showEditorNotice("Clear Align to edit wall slot", 3000);
+          else dispatch({ type: "MOVE_CABINET", id: selectedId, direction: "right" });
+        }
         else if (selectedWallAlignment) showEditorNotice("Clear Align to edit wall spacing", 3000);
         else handleNudge(selectedId, e.shiftKey ? 0.5 : 1);
         return;

@@ -315,3 +315,21 @@ Review:
 - Chrome MCP runtime proof:
 - Local localhost-with-prod-data pass: `W3 -> Align Over -> B3` saved `alignment:[{wall:\"W3\",base:\"B3\"}]`, selecting `B3` for `W2` showed `B3 is already anchoring W3`, `Tab` canceled stale pick mode by moving back to `W3`, and a simulated horizontal drag on aligned `W3` produced no extra PATCH.
 - Live Fly pass: the deployed build showed the same desktop and mobile `Align Over` controls, saved and cleared `W3 <-> B3` alignment through `PATCH /api/rooms/24ca994d2d3db8de/spec`, and the production room was restored to `alignment: []` afterward.
+
+# Editor Correction Iteration 3 (2026-04-22)
+
+- [x] Re-run fresh-eye staff/domain review after the alignment guardrail batch
+- [x] Fix row changes so they preserve measured height/depth and choose the best-fit target slot instead of appending
+- [x] Keep stored alignment in sync with geometry edits that make the old anchor impossible
+- [x] Close the keyboard slot-move bypass for aligned uppers
+- [x] Re-verify the new behavior in Chrome MCP locally against real Wall 3 data
+- [ ] Deploy, re-test on the live site in Chrome MCP, and restore production data to the clean baseline
+
+Review:
+- `MOVE_ROW` and cross-row placement now preserve the measured box instead of force-converting heights/depths, and the insertion rule picks the slot whose resulting cabinet center is closest to the old center.
+- `sanitizeAlignments()` now mirrors the renderer’s actual feasibility rule, so width/order/gap edits stop claiming `Over Bx` when the render can no longer keep that upper over the base.
+- Local Chrome MCP proof on localhost proxy with real Wall 3 data:
+- Moving `W3` from `wall -> tall` kept `18w 30h 12d`, and moving it back restored the original wall order `W1, W2, W3, W4, W5` instead of drifting right.
+- With `W3` aligned over `B3`, `Meta+ArrowRight` showed `Clear Align to edit wall slot` and created no new `PATCH`.
+- On mobile, aligned `W3` still showed `+ Before` / `+ After` visually, but clicking `+ Before` created no new network request and did not insert a cabinet, which matches the intended lockout.
+- After local verification, the proxied production room was restored to `wall_layout = [W1, W2, W3, W4, W5]` and `alignment: []`.

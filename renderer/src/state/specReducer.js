@@ -42,26 +42,65 @@ function defaultTypeForRow(row) {
   return "base";
 }
 
+function defaultHeightForRow(row) {
+  if (row === "wall") return 30;
+  if (row === "tall") return 84;
+  return 34.5;
+}
+
+function defaultDepthForRow(row) {
+  return row === "wall" ? 12 : 24;
+}
+
 function isFrontBaseCabinet(cab) {
   return !!cab && cab.row === "base" && (cab.lane || "front") !== "back";
 }
 
 function sanitizeAlignments(spec) {
   const cabMap = new Map((spec.cabinets || []).map((cab) => [cab.id, cab]));
+  const lowerXById = new Map();
+  let lowerX = 0;
+  (spec.base_layout || []).forEach((item) => {
+    const id = item?.ref || item?.id;
+    const cab = id ? cabMap.get(id) : null;
+    const width = cab ? cab.width : item?.width || 30;
+    if (item?.ref) lowerXById.set(item.ref, lowerX);
+    lowerX += width;
+  });
+
+  const rawByWall = new Map();
   const seenWalls = new Set();
   const seenBases = new Set();
-
-  spec.alignment = (spec.alignment || []).filter((entry) => {
-    if (!entry?.wall || !entry?.base) return false;
+  for (const entry of spec.alignment || []) {
+    if (!entry?.wall || !entry?.base) continue;
     const wallCab = cabMap.get(entry.wall);
     const baseCab = cabMap.get(entry.base);
-    if (!wallCab || wallCab.row !== "wall") return false;
-    if (!isFrontBaseCabinet(baseCab)) return false;
-    if (seenWalls.has(entry.wall) || seenBases.has(entry.base)) return false;
+    if (!wallCab || wallCab.row !== "wall") continue;
+    if (!isFrontBaseCabinet(baseCab)) continue;
+    if (seenWalls.has(entry.wall) || seenBases.has(entry.base)) continue;
+    rawByWall.set(entry.wall, entry.base);
     seenWalls.add(entry.wall);
     seenBases.add(entry.base);
-    return true;
+  }
+
+  const accepted = [];
+  let wallX = 0;
+  let prevWasGap = false;
+  (spec.wall_layout || []).forEach((item) => {
+    const id = item?.ref || item?.id;
+    const cab = id ? cabMap.get(id) : null;
+    const width = cab ? cab.width : item?.width || 30;
+    const baseId = item?.ref ? rawByWall.get(item.ref) : null;
+    const baseX = baseId != null ? lowerXById.get(baseId) : null;
+    if (!prevWasGap && baseId && baseX != null && baseX >= wallX) {
+      accepted.push({ wall: item.ref, base: baseId });
+      wallX = baseX;
+    }
+    wallX += width;
+    prevWasGap = !item?.ref;
   });
+
+  spec.alignment = accepted;
 }
 
 function typeMatchesRow(type, row) {
@@ -81,7 +120,31 @@ function normalizeLane(row, lane) {
   return lane === "back" ? "back" : "front";
 }
 
-function applyRowDefaults(cab, targetRow) {
+function initializeCabinetForRow(cab, targetRow) {
+  cab.row = targetRow;
+
+  if (!typeMatchesRow(cab.type, targetRow)) {
+    cab.type = defaultTypeForRow(targetRow);
+  }
+
+  if (!Number.isFinite(cab.height) || cab.height <= 0) {
+    cab.height = defaultHeightForRow(targetRow);
+  }
+  if (!Number.isFinite(cab.depth) || cab.depth <= 0) {
+    cab.depth = defaultDepthForRow(targetRow);
+  }
+
+  if (targetRow === "wall") {
+    cab.yOffset = Math.max(0, cab.yOffset || 0);
+    delete cab.lane;
+    return;
+  }
+
+  delete cab.yOffset;
+  cab.lane = normalizeLane(targetRow, cab.lane);
+}
+
+function moveCabinetToRow(cab, targetRow) {
   cab.row = targetRow;
 
   if (!typeMatchesRow(cab.type, targetRow)) {
@@ -89,23 +152,11 @@ function applyRowDefaults(cab, targetRow) {
   }
 
   if (targetRow === "wall") {
-    if (cab.height === 34.5 || cab.height === 84) cab.height = 30;
-    if (cab.depth === 24) cab.depth = 12;
     cab.yOffset = Math.max(0, cab.yOffset || 0);
     delete cab.lane;
     return;
   }
 
-  if (targetRow === "tall") {
-    if (cab.height === 34.5 || cab.height === 30) cab.height = 84;
-    if (cab.depth === 12) cab.depth = 24;
-    delete cab.yOffset;
-    cab.lane = normalizeLane(targetRow, cab.lane);
-    return;
-  }
-
-  if (cab.height === 30 || cab.height === 84) cab.height = 34.5;
-  if (cab.depth === 12) cab.depth = 24;
   delete cab.yOffset;
   cab.lane = normalizeLane(targetRow, cab.lane);
 }
@@ -122,6 +173,44 @@ function clampInsertIndex(layout, targetIndex) {
   return Math.max(0, Math.min(targetIndex, layout.length));
 }
 
+function layoutItemWidth(spec, item) {
+  if (!item) return 0;
+  if (!item.ref) return Math.max(0, item.width || 0);
+  const cab = spec.cabinets.find((entry) => entry.id === item.ref);
+  return Math.max(0, cab?.width || 0);
+}
+
+function centerXForRef(spec, layout, id) {
+  let cursor = 0;
+  for (const item of layout || []) {
+    const width = layoutItemWidth(spec, item);
+    if (item?.ref === id) return cursor + width / 2;
+    cursor += width;
+  }
+  return null;
+}
+
+function bestInsertIndexForCenterX(spec, layout, cabId, centerX) {
+  const movingWidth = layoutItemWidth(spec, { ref: cabId });
+  let cursor = 0;
+  let bestIdx = 0;
+  let bestDistance = Number.POSITIVE_INFINITY;
+
+  for (let idx = 0; idx <= (layout || []).length; idx += 1) {
+    const candidateCenter = cursor + movingWidth / 2;
+    const distance = Math.abs(candidateCenter - centerX);
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      bestIdx = idx;
+    }
+    if (idx < (layout || []).length) {
+      cursor += layoutItemWidth(spec, layout[idx]);
+    }
+  }
+
+  return bestIdx;
+}
+
 export default function specReducer(state, action) {
   const spec = clone(state);
 
@@ -132,10 +221,11 @@ export default function specReducer(state, action) {
       const layoutKey = getLayoutKey(action.row);
       if (!layoutKey) return spec;
       const cab = clone(action.cabinet || {});
-      applyRowDefaults(cab, action.row);
+      initializeCabinetForRow(cab, action.row);
       spec.cabinets.push(cab);
       const pos = Math.min(action.position, spec[layoutKey].length);
       spec[layoutKey].splice(pos, 0, { ref: cab.id });
+      sanitizeAlignments(spec);
       return spec;
     }
 
@@ -167,6 +257,7 @@ export default function specReducer(state, action) {
       if (swapIdx < 0 || swapIdx >= layout.length) return spec;
 
       [layout[idx], layout[swapIdx]] = [layout[swapIdx], layout[idx]];
+      sanitizeAlignments(spec);
       return spec;
     }
 
@@ -191,11 +282,16 @@ export default function specReducer(state, action) {
         (action.targetRow === "base" || action.targetRow === "tall");
 
       if (!sameLowerRun) {
+        const sourceCenterX = centerXForRef(spec, spec[currentKey], action.id);
         if (!removeRefFromLayout(spec[currentKey], action.id)) return spec;
-        spec[targetKey].push({ ref: action.id });
+        const insertAt =
+          sourceCenterX == null
+            ? spec[targetKey].length
+            : bestInsertIndexForCenterX(spec, spec[targetKey], action.id, sourceCenterX);
+        spec[targetKey].splice(insertAt, 0, { ref: action.id });
       }
 
-      applyRowDefaults(spec.cabinets[cabIdx], action.targetRow);
+      moveCabinetToRow(spec.cabinets[cabIdx], action.targetRow);
 
       if (currentRow === "wall") {
         spec.alignment = (spec.alignment || []).filter((a) => a.wall !== action.id);
@@ -233,7 +329,7 @@ export default function specReducer(state, action) {
       targetLayout.splice(insertAt, 0, { ref: action.id });
 
       if (targetRow !== currentRow) {
-        applyRowDefaults(cab, targetRow);
+        moveCabinetToRow(cab, targetRow);
       } else if (targetRow === "wall" && typeof action.targetYOffset === "number") {
         cab.yOffset = Math.max(0, action.targetYOffset);
       }
@@ -335,6 +431,7 @@ export default function specReducer(state, action) {
           layout.splice(afterIdx, 0, makeSpacer(shrink));
         }
       }
+      sanitizeAlignments(spec);
       return spec;
     }
 
@@ -361,6 +458,7 @@ export default function specReducer(state, action) {
       if (fromIdx === toIdx) return spec;
       const [item] = layout.splice(fromIdx, 1);
       layout.splice(toIdx, 0, item);
+      sanitizeAlignments(spec);
       return spec;
     }
 
@@ -368,6 +466,7 @@ export default function specReducer(state, action) {
       const cab = spec.cabinets.find((c) => c.id === action.id);
       if (cab && (action.field === "width" || action.field === "height" || action.field === "depth")) {
         cab[action.field] = action.value;
+        sanitizeAlignments(spec);
       }
       return spec;
     }
@@ -435,6 +534,7 @@ export default function specReducer(state, action) {
       if (refIdx !== -1) {
         spec[layoutKey].splice(refIdx + 1, 0, { ref: action.newId });
       }
+      sanitizeAlignments(spec);
       return spec;
     }
 
@@ -606,6 +706,7 @@ export default function specReducer(state, action) {
       if (!layoutKey) return spec;
       const pos = Math.min(action.position, spec[layoutKey].length);
       spec[layoutKey].splice(pos, 0, action.gap);
+      sanitizeAlignments(spec);
       return spec;
     }
 
@@ -616,6 +717,7 @@ export default function specReducer(state, action) {
       // Only delete if it's a gap (not a ref)
       if (item && !item.ref) {
         spec[layoutKey].splice(action.position, 1);
+        sanitizeAlignments(spec);
       }
       return spec;
     }
@@ -626,6 +728,7 @@ export default function specReducer(state, action) {
       const item = spec[layoutKey][action.position];
       if (item && !item.ref) {
         Object.assign(item, action.updates);
+        sanitizeAlignments(spec);
       }
       return spec;
     }

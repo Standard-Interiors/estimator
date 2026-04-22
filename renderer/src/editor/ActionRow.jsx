@@ -227,12 +227,14 @@ export default function ActionRow({ cabId, spec, dispatch, onSelect, isAlignedWa
           fontFamily: "'DM Sans',sans-serif",
           lineHeight: 1.4,
         }}>
-          Clear Align Over to edit this wall cabinet's slot or spacing.
+          Clear Align Over to edit this wall cabinet's slot, spacing, or insert position.
         </div>
       )}
       <div style={{ display: "flex", gap: 6 }}>
-        {pillBtn("+ Before", handleAddBefore, "#1a1a2a", rowColor)}
-        {pillBtn("+ After", handleAddAfter, "#1a1a2a", rowColor)}
+        {pillBtn("+ Before", isAlignedWall ? undefined : handleAddBefore, "#1a1a2a",
+          isAlignedWall ? "#444" : rowColor, isAlignedWall ? { opacity: 0.4 } : undefined)}
+        {pillBtn("+ After", isAlignedWall ? undefined : handleAddAfter, "#1a1a2a",
+          isAlignedWall ? "#444" : rowColor, isAlignedWall ? { opacity: 0.4 } : undefined)}
         {pillBtn(confirmDelete ? "Confirm?" : "Delete", handleDelete,
           confirmDelete ? "#e04040" : "#1a1a2a",
           confirmDelete ? "#fff" : "#e04040")}
