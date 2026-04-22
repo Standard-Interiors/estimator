@@ -97,23 +97,42 @@ export default function InteractiveRender({ spec, selectedId, isMobile, onSelect
     prevWasGap = !item.ref;
   });
 
+  const baseCabItems = lowerItems.filter((item) => item.cab && item.cab.row !== "tall");
+  const tallCabItems = lowerItems.filter((item) => item.cab && item.cab.row === "tall");
+  const lowerLane = (cab) => (cab?.lane === "back" ? "back" : "front");
+  const lowerLaneOffset = (cab) => (lowerLane(cab) === "back" ? dp(LOWER_BACK_LANE) : { x: 0, y: 0 });
+  const lowerVerticalOffset = (cab) => (cab?.row === "tall" ? (cab.yOffset || 0) * SC : 0);
+  const supportsVerticalPlacement = (row) => row === "wall" || row === "tall";
   const maxWH = Math.max(...wallItems.filter(w => w.cab).map(w => (w.cab.height || 30)), 30) * SC;
   const WTOP = WBOT - maxWH;
   // Cap visual depth at 30" for viewBox sizing — prevents extreme depths from blowing up the layout
   const ddMax = dp(Math.min(30, Math.max(...(spec.cabinets||[]).map(c=>c.depth||(c.row==="wall"?12:24)), 24)));
   const svgW = Math.max(bx, wx) + PAD + ddMax.x + 20;
-  const maxTallH = Math.max(...lowerItems.filter((item) => item.cab?.row === "tall").map((item) => item.cab.height || 84), 0) * SC;
-  const tallTop = maxTallH > 0 ? FLOOR - TOE - maxTallH : null;
+  const wallBounds = wallItems.filter((item) => item.cab).map((item) => {
+    const cab = item.cab;
+    const top = WTOP + (cab.yOffset || 0) * SC;
+    const bottom = top + (cab.height || 30) * SC;
+    return { top: top - 28, bottom: bottom + 12 };
+  });
+  const tallBounds = tallCabItems.map((item) => {
+    const cab = item.cab;
+    const laneOffset = lowerLaneOffset(cab);
+    const top = FLOOR - TOE - (cab.height || 84) * SC + laneOffset.y + lowerVerticalOffset(cab);
+    const bottom = top + (cab.height || 84) * SC + TOE;
+    return { top: top - 20, bottom: bottom + 34 };
+  });
 
-  // Tight viewBox: crop unused vertical whitespace
-  const wallTop = wallItems.some(w => w.cab) ? WTOP - 28 : CTTOP - 12;
-  const contentTop = tallTop !== null ? Math.min(wallTop, tallTop - 20) : wallTop;
-  const contentBottom = FLOOR + 42;
+  // Tight viewBox: crop unused vertical whitespace while still keeping moved talls visible.
+  const contentTop = Math.min(
+    wallBounds.length ? Math.min(...wallBounds.map((b) => b.top)) : CTTOP - 12,
+    tallBounds.length ? Math.min(...tallBounds.map((b) => b.top)) : Number.POSITIVE_INFINITY,
+  );
+  const contentBottom = Math.max(
+    FLOOR + 42,
+    wallBounds.length ? Math.max(...wallBounds.map((b) => b.bottom)) : FLOOR + 42,
+    tallBounds.length ? Math.max(...tallBounds.map((b) => b.bottom)) : FLOOR + 42,
+  );
   const svgH = contentBottom - contentTop;
-  const baseCabItems = lowerItems.filter((item) => item.cab && item.cab.row !== "tall");
-  const tallCabItems = lowerItems.filter((item) => item.cab && item.cab.row === "tall");
-  const lowerLane = (cab) => (cab?.lane === "back" ? "back" : "front");
-  const lowerLaneOffset = (cab) => (lowerLane(cab) === "back" ? dp(LOWER_BACK_LANE) : { x: 0, y: 0 });
   const buildCounterSegments = (lane) => {
     const segments = [];
     let currentCounter = null;
@@ -210,8 +229,8 @@ export default function InteractiveRender({ spec, selectedId, isMobile, onSelect
       ? currentIndex
       : getInsertIndexAtX(targetItems, activeDrag.svgX);
     const currentYOffset = cabMap[activeDrag.id]?.yOffset || 0;
-    const targetYOffset = targetRow === "wall"
-      ? Math.max(0, activeDrag.row === "wall" ? currentYOffset + (activeDrag.dyInches || 0) : 0)
+    const targetYOffset = supportsVerticalPlacement(targetRow)
+      ? currentYOffset + (activeDrag.dyInches || 0)
       : undefined;
     const currentItem = currentItems.find((item) => item.id === activeDrag.id);
 
@@ -260,15 +279,15 @@ export default function InteractiveRender({ spec, selectedId, isMobile, onSelect
     const dxSvg = rawDx / svgScale;
     const snapInchX = drag.lockHorizontal ? 0 : Math.round(dxSvg / SC);
     const snappedDx = snapInchX * SC * svgScale;
-    // Vertical snap (wall cabinets only)
+    // Vertical snap for rows that persist vertical offset.
     let snappedDy = 0, snapInchY = 0;
-    if (drag.row === "wall") {
+    if (supportsVerticalPlacement(drag.row)) {
       const dySvg = rawDy / svgScale;
       snapInchY = Math.round(dySvg / SC);
       snappedDy = snapInchY * SC * svgScale;
     }
     setDrag(d => ({ ...d, dx: snappedDx, dy: snappedDy, dxInches: snapInchX, dyInches: snapInchY, svgX, svgY, started: true }));
-  }, [drag]);
+  }, [drag, supportsVerticalPlacement]);
 
   const onPointerUp = useCallback((e) => {
     if (!drag) return;
@@ -282,16 +301,16 @@ export default function InteractiveRender({ spec, selectedId, isMobile, onSelect
         if (drag.dxInches && drag.dxInches !== 0 && onNudge) {
           onNudge(drag.id, drag.dxInches);
         }
-        if (drag.dyInches && drag.dyInches !== 0 && onNudgeVertical && drag.row === "wall") {
+        if (drag.dyInches && drag.dyInches !== 0 && onNudgeVertical && supportsVerticalPlacement(drag.row)) {
           onNudgeVertical(drag.id, drag.dyInches);
         }
       }
     }
     setDrag(null);
-  }, [drag, onNudge, onNudgeVertical, onPlaceCabinet]);
+  }, [drag, onNudge, onNudgeVertical, onPlaceCabinet, supportsVerticalPlacement]);
 
   const highlightRect = (x, cy, w, h, row) => {
-    const color = row === "base" ? "#D94420" : "#1a6fbf";
+    const color = row === "wall" ? "#1a6fbf" : "#D94420";
     return (
       <rect x={x - 1.5} y={cy - 1.5} width={w * SC + 3} height={h * SC + 3}
         fill={color} fillOpacity={0.08} stroke={color} strokeWidth={2.5}
@@ -303,8 +322,8 @@ export default function InteractiveRender({ spec, selectedId, isMobile, onSelect
   const dropColor = dropPlacement?.targetRow === "wall" ? "#1a6fbf" : "#D94420";
   const dropTop = dropPlacement?.targetRow === "wall"
     ? WTOP - 8
-    : (tallTop !== null ? Math.min(CTTOP, tallTop) : CTTOP) - 8;
-  const dropBottom = dropPlacement?.targetRow === "wall" ? WBOT + 8 : FLOOR + 8;
+    : contentTop + 8;
+  const dropBottom = dropPlacement?.targetRow === "wall" ? Math.max(WBOT + 8, contentBottom - 24) : contentBottom - 8;
 
   return (
     <div style={{
@@ -509,40 +528,45 @@ export default function InteractiveRender({ spec, selectedId, isMobile, onSelect
         {backTallCabItems.map(ti => {
           const c = ti.cab, ch = c.height || 84, d = c.depth || 24, cy = FLOOR - TOE - ch * SC;
           const laneOffset = lowerLaneOffset(c);
+          const verticalOffset = lowerVerticalOffset(c);
           const drawX = ti.x + laneOffset.x;
-          const drawY = cy + laneOffset.y;
+          const drawY = cy + laneOffset.y + verticalOffset;
           const isSelected = selectedId === ti.id;
           const isDragging = drag?.started && drag.id === ti.id;
-          const dragTx = isDragging ? `translate(${drag.dx / (svgRef.current ? svgRef.current.getBoundingClientRect().width / svgW : 1)}, 0)` : undefined;
+          const svgScale = svgRef.current ? svgRef.current.getBoundingClientRect().width / svgW : 1;
+          const dragTx = isDragging ? `translate(${drag.dx / svgScale}, ${drag.dy / svgScale})` : undefined;
           const cs = confStyle(c);
           return (<g key={`t-${ti.id}`} onClick={!drag?.started ? handleClick(ti.id) : undefined} onDoubleClick={handleDblClick(ti.id)} onContextMenu={handleContextMenu(ti.id, "tall")} onPointerDown={onPointerDown(ti.id, "tall")} style={{ cursor: isDragging ? "grabbing" : "grab" }} transform={dragTx}>
             <rect x={drawX} y={drawY - 4} width={c.width * SC} height={ch * SC + 8 + TOE + 30} fill="transparent" />
-            {isSelected && highlightRect(drawX, drawY, c.width, ch, "base")}
+            {isSelected && highlightRect(drawX, drawY, c.width, ch, "tall")}
             <Box3D cx={drawX} cy={drawY} w={c.width} h={ch} depth={d} stroke={cs.stroke} dash={cs.dash} />
-            <rect x={drawX + 2 * SC} y={FLOOR - TOE + laneOffset.y} width={Math.max(0, c.width * SC - 4 * SC)} height={TOE} fill="none" stroke="#ccc" strokeWidth={0.4} />
+            <rect x={drawX + 2 * SC} y={FLOOR - TOE + laneOffset.y + verticalOffset} width={Math.max(0, c.width * SC - 4 * SC)} height={TOE} fill="none" stroke="#ccc" strokeWidth={0.4} />
             <Face cab={c} cx={drawX} cy={drawY} w={c.width} h={ch} />
-            <text x={drawX + c.width * SC / 2} y={FLOOR + 13 + laneOffset.y} textAnchor="middle" fontSize={9} fill={cs.stroke || "#D94420"} fontWeight={700} fontFamily="monospace">{ti.id}</text>
-            <text x={drawX + c.width * SC / 2} y={FLOOR + 23 + laneOffset.y} textAnchor="middle" fontSize={6.5} fill="#888" fontFamily="monospace">{`${c.width}w ${ch}h ${d}d`}</text>
-            {isDragging && <text x={drawX + c.width * SC / 2} y={drawY - 8} textAnchor="middle" fontSize={10} fill="#D94420" fontWeight={700} fontFamily="monospace">{drag.dxInches > 0 ? "+" : ""}{drag.dxInches}"</text>}
+            <text x={drawX + c.width * SC / 2} y={FLOOR + 13 + laneOffset.y + verticalOffset} textAnchor="middle" fontSize={9} fill={cs.stroke || "#D94420"} fontWeight={700} fontFamily="monospace">{ti.id}</text>
+            <text x={drawX + c.width * SC / 2} y={FLOOR + 23 + laneOffset.y + verticalOffset} textAnchor="middle" fontSize={6.5} fill="#888" fontFamily="monospace">{`${c.width}w ${ch}h ${d}d`}</text>
+            {isDragging && (drag.dxInches !== 0 || drag.dyInches !== 0) && <text x={drawX + c.width * SC / 2} y={drawY - 8} textAnchor="middle" fontSize={10} fill="#D94420" fontWeight={700} fontFamily="monospace">{drag.dxInches !== 0 ? `${drag.dxInches > 0 ? "+" : ""}${drag.dxInches}"` : ""}{drag.dxInches !== 0 && drag.dyInches !== 0 ? " " : ""}{drag.dyInches !== 0 ? `${drag.dyInches > 0 ? "↓" : "↑"}${Math.abs(drag.dyInches)}"` : ""}</text>}
           </g>);
         })}
 
         {/* Tall cabinets render after uppers so a pantry/oven stack stays visually in front of bridge cabinets. */}
         {frontTallCabItems.map(ti => {
           const c = ti.cab, ch = c.height || 84, d = c.depth || 24, cy = FLOOR - TOE - ch * SC;
+          const verticalOffset = lowerVerticalOffset(c);
+          const drawY = cy + verticalOffset;
           const isSelected = selectedId === ti.id;
           const isDragging = drag?.started && drag.id === ti.id;
-          const dragTx = isDragging ? `translate(${drag.dx / (svgRef.current ? svgRef.current.getBoundingClientRect().width / svgW : 1)}, 0)` : undefined;
+          const svgScale = svgRef.current ? svgRef.current.getBoundingClientRect().width / svgW : 1;
+          const dragTx = isDragging ? `translate(${drag.dx / svgScale}, ${drag.dy / svgScale})` : undefined;
           const cs = confStyle(c);
           return (<g key={`t-${ti.id}`} onClick={!drag?.started ? handleClick(ti.id) : undefined} onDoubleClick={handleDblClick(ti.id)} onContextMenu={handleContextMenu(ti.id, "tall")} onPointerDown={onPointerDown(ti.id, "tall")} style={{ cursor: isDragging ? "grabbing" : "grab" }} transform={dragTx}>
-            <rect x={ti.x} y={cy - 4} width={c.width * SC} height={ch * SC + 8 + TOE + 30} fill="transparent" />
-            {isSelected && highlightRect(ti.x, cy, c.width, ch, "base")}
-            <Box3D cx={ti.x} cy={cy} w={c.width} h={ch} depth={d} stroke={cs.stroke} dash={cs.dash} />
-            <rect x={ti.x + 2 * SC} y={FLOOR - TOE} width={Math.max(0, c.width * SC - 4 * SC)} height={TOE} fill="none" stroke="#ccc" strokeWidth={0.4} />
-            <Face cab={c} cx={ti.x} cy={cy} w={c.width} h={ch} />
-            <text x={ti.x + c.width * SC / 2} y={FLOOR + 13} textAnchor="middle" fontSize={9} fill={cs.stroke || "#D94420"} fontWeight={700} fontFamily="monospace">{ti.id}</text>
-            <text x={ti.x + c.width * SC / 2} y={FLOOR + 23} textAnchor="middle" fontSize={6.5} fill="#888" fontFamily="monospace">{`${c.width}w ${ch}h ${d}d`}</text>
-            {isDragging && <text x={ti.x + c.width * SC / 2} y={cy - 8} textAnchor="middle" fontSize={10} fill="#D94420" fontWeight={700} fontFamily="monospace">{drag.dxInches > 0 ? "+" : ""}{drag.dxInches}"</text>}
+            <rect x={ti.x} y={drawY - 4} width={c.width * SC} height={ch * SC + 8 + TOE + 30} fill="transparent" />
+            {isSelected && highlightRect(ti.x, drawY, c.width, ch, "tall")}
+            <Box3D cx={ti.x} cy={drawY} w={c.width} h={ch} depth={d} stroke={cs.stroke} dash={cs.dash} />
+            <rect x={ti.x + 2 * SC} y={FLOOR - TOE + verticalOffset} width={Math.max(0, c.width * SC - 4 * SC)} height={TOE} fill="none" stroke="#ccc" strokeWidth={0.4} />
+            <Face cab={c} cx={ti.x} cy={drawY} w={c.width} h={ch} />
+            <text x={ti.x + c.width * SC / 2} y={FLOOR + 13 + verticalOffset} textAnchor="middle" fontSize={9} fill={cs.stroke || "#D94420"} fontWeight={700} fontFamily="monospace">{ti.id}</text>
+            <text x={ti.x + c.width * SC / 2} y={FLOOR + 23 + verticalOffset} textAnchor="middle" fontSize={6.5} fill="#888" fontFamily="monospace">{`${c.width}w ${ch}h ${d}d`}</text>
+            {isDragging && (drag.dxInches !== 0 || drag.dyInches !== 0) && <text x={ti.x + c.width * SC / 2} y={drawY - 8} textAnchor="middle" fontSize={10} fill="#D94420" fontWeight={700} fontFamily="monospace">{drag.dxInches !== 0 ? `${drag.dxInches > 0 ? "+" : ""}${drag.dxInches}"` : ""}{drag.dxInches !== 0 && drag.dyInches !== 0 ? " " : ""}{drag.dyInches !== 0 ? `${drag.dyInches > 0 ? "↓" : "↑"}${Math.abs(drag.dyInches)}"` : ""}</text>}
           </g>);
         })}
 

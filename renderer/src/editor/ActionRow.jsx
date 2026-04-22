@@ -17,7 +17,7 @@ export default function ActionRow({ cabId, spec, dispatch, onSelect, isAlignedWa
   const refIdx = layout.findIndex(item => item.ref === cabId);
   const placementSeed = row === "wall"
     ? { yOffset: cab.yOffset }
-    : { lane: cab.lane };
+    : { lane: cab.lane, yOffset: row === "tall" ? cab.yOffset : undefined };
 
   const handleAddBefore = () => {
     const newId = generateId(row, spec);
@@ -102,6 +102,7 @@ export default function ActionRow({ cabId, spec, dispatch, onSelect, isAlignedWa
   const canSplit = cab.width >= 12;
   const canMoveLeft = !isAlignedWall && refIdx > 0;
   const canMoveRight = !isAlignedWall && refIdx < layout.length - 1;
+  const canMoveVertical = row === "wall" || row === "tall";
 
   // Merge — only available when there's an adjacent neighbor in the same row
   const leftNeighborRef = refIdx > 0 ? layout[refIdx - 1] : null;
@@ -120,6 +121,12 @@ export default function ActionRow({ cabId, spec, dispatch, onSelect, isAlignedWa
   };
   const handleMoveRight = () => {
     if (canMoveRight) dispatch({ type: "MOVE_CABINET", id: cabId, direction: "right" });
+  };
+  const handleMoveUp = () => {
+    if (canMoveVertical) dispatch({ type: "NUDGE_VERTICAL", id: cabId, amount: -3 });
+  };
+  const handleMoveDown = () => {
+    if (canMoveVertical) dispatch({ type: "NUDGE_VERTICAL", id: cabId, amount: 3 });
   };
 
   const handleMergeLeft = () => {
@@ -204,6 +211,12 @@ export default function ActionRow({ cabId, spec, dispatch, onSelect, isAlignedWa
         {pillBtn("Split", canSplit ? handleSplitStart : undefined, "#1a1a2a",
           canSplit ? "#ccc" : "#444", canSplit ? {} : { opacity: 0.4 })}
       </div>
+      {canMoveVertical && (
+        <div style={{ display: "flex", gap: 6 }}>
+          {pillBtn("\u25B2 Up", handleMoveUp, "#1a1a2a", rowColor)}
+          {pillBtn("Down \u25BC", handleMoveDown, "#1a1a2a", rowColor)}
+        </div>
+      )}
       <div style={{ display: "flex", gap: 6 }}>
         {pillBtn(canMergeLeft ? `\u2190 Merge ${leftNeighbor.id}` : "\u2190 Merge",
           canMergeLeft ? handleMergeLeft : undefined, "#1a1a2a",

@@ -203,12 +203,12 @@ export function defaultCabinet(row, type, placement = {}) {
     },
   };
 
-  if (isWall) {
-    if (typeof placement.yOffset === "number") {
-      cab.yOffset = Math.max(0, placement.yOffset);
-    }
-  } else {
+  if (!isWall) {
     cab.lane = placement.lane === "back" ? "back" : "front";
+  }
+
+  if ((isWall || isTall) && typeof placement.yOffset === "number") {
+    cab.yOffset = isWall ? Math.max(0, placement.yOffset) : placement.yOffset;
   }
 
   return cab;

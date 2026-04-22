@@ -658,14 +658,14 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
       }
       if (e.key === "ArrowUp") {
         e.preventDefault();
-        if (cabMap2[selectedId]?.row === "wall") {
+        if (cabMap2[selectedId]?.row === "wall" || cabMap2[selectedId]?.row === "tall") {
           dispatch({ type: "NUDGE_VERTICAL", id: selectedId, amount: e.shiftKey ? -0.5 : -1 });
         }
         return;
       }
       if (e.key === "ArrowDown") {
         e.preventDefault();
-        if (cabMap2[selectedId]?.row === "wall") {
+        if (cabMap2[selectedId]?.row === "wall" || cabMap2[selectedId]?.row === "tall") {
           dispatch({ type: "NUDGE_VERTICAL", id: selectedId, amount: e.shiftKey ? 0.5 : 1 });
         }
         return;
@@ -1391,6 +1391,26 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
                       label:`Move ${lane}`,
                       action:()=>{dispatch({type:"SET_LANE",id:renderCtxMenu.id,lane});setSelectedId(renderCtxMenu.id);setRenderCtxMenu(null);}
                     })) : []),
+                    ...(!ctxWallAligned && spec[layoutKeyForCabinetRow(ctxCab.row)]?.some((item) => item.ref === renderCtxMenu.id) ? [
+                      {
+                        label:"Move slot left",
+                        action:()=>{dispatch({type:"MOVE_CABINET",id:renderCtxMenu.id,direction:"left"});setSelectedId(renderCtxMenu.id);setRenderCtxMenu(null);}
+                      },
+                      {
+                        label:"Move slot right",
+                        action:()=>{dispatch({type:"MOVE_CABINET",id:renderCtxMenu.id,direction:"right"});setSelectedId(renderCtxMenu.id);setRenderCtxMenu(null);}
+                      },
+                    ] : []),
+                    ...((ctxCab.row === "wall" || ctxCab.row === "tall") ? [
+                      {
+                        label:"Move up",
+                        action:()=>{dispatch({type:"NUDGE_VERTICAL",id:renderCtxMenu.id,amount:-3});setSelectedId(renderCtxMenu.id);setRenderCtxMenu(null);}
+                      },
+                      {
+                        label:"Move down",
+                        action:()=>{dispatch({type:"NUDGE_VERTICAL",id:renderCtxMenu.id,amount:3});setSelectedId(renderCtxMenu.id);setRenderCtxMenu(null);}
+                      },
+                    ] : []),
                     ...(!ctxWallAligned ? [
                       {label:"+ Space Left",action:()=>{const layout=spec[layoutKeyForCabinetRow(ctxCab.row)]||[];const pos=layout.findIndex(i=>i.ref===renderCtxMenu.id);dispatch({type:"ADD_GAP",row:ctxCab.row,position:Math.max(pos,0),gap:{type:"filler",label:"Filler",width:3}});setRenderCtxMenu(null);}},
                       {label:"+ Space Right",action:()=>{const layout=spec[layoutKeyForCabinetRow(ctxCab.row)]||[];const pos=layout.findIndex(i=>i.ref===renderCtxMenu.id);dispatch({type:"ADD_GAP",row:ctxCab.row,position:pos+1,gap:{type:"filler",label:"Filler",width:3}});setRenderCtxMenu(null);}},
@@ -1473,10 +1493,12 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
                     }}
                     onSelectId={setSelectedId}
                     alignableBaseTargets={alignableBaseTargets}
-                    onMoveLeft={sel.row === "wall" && selectedAlignmentBaseId ? undefined : () => handleNudge(sel.id, -3)}
-                    onMoveRight={sel.row === "wall" && selectedAlignmentBaseId ? undefined : () => handleNudge(sel.id, 3)}
-                    onMoveUp={sel.row === "wall" ? () => dispatch({ type: "NUDGE_VERTICAL", id: sel.id, amount: -3 }) : undefined}
-                    onMoveDown={sel.row === "wall" ? () => dispatch({ type: "NUDGE_VERTICAL", id: sel.id, amount: 3 }) : undefined}
+                    onSlotLeft={sel.row === "wall" && selectedAlignmentBaseId ? undefined : () => dispatch({ type: "MOVE_CABINET", id: sel.id, direction: "left" })}
+                    onSlotRight={sel.row === "wall" && selectedAlignmentBaseId ? undefined : () => dispatch({ type: "MOVE_CABINET", id: sel.id, direction: "right" })}
+                    onSpaceLeft={sel.row === "wall" && selectedAlignmentBaseId ? undefined : () => handleNudge(sel.id, -3)}
+                    onSpaceRight={sel.row === "wall" && selectedAlignmentBaseId ? undefined : () => handleNudge(sel.id, 3)}
+                    onMoveUp={sel.row === "wall" || sel.row === "tall" ? () => dispatch({ type: "NUDGE_VERTICAL", id: sel.id, amount: -3 }) : undefined}
+                    onMoveDown={sel.row === "wall" || sel.row === "tall" ? () => dispatch({ type: "NUDGE_VERTICAL", id: sel.id, amount: 3 }) : undefined}
                     onDelete={() => setPendingDelete(sel.id)}
                     onAddGap={sel.row === "wall" && selectedAlignmentBaseId ? undefined : () => {
                       const layout=spec[layoutKeyForCabinetRow(sel.row)]||[];
@@ -1486,7 +1508,7 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
                     onAddCab={() => {
                       const placement = sel.row === "wall"
                         ? { yOffset: sel.yOffset }
-                        : { lane: sel.lane };
+                        : { lane: sel.lane, yOffset: sel.row === "tall" ? sel.yOffset : undefined };
                       const id=generateId(sel.row,spec),cab=defaultCabinet(sel.row, undefined, placement);cab.id=id;
                       const layout=spec[layoutKeyForCabinetRow(sel.row)]||[];
                       const pos=layout.findIndex(i=>i.ref===sel.id);

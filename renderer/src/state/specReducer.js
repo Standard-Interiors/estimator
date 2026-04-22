@@ -56,6 +56,21 @@ function isFrontBaseCabinet(cab) {
   return !!cab && cab.row === "base" && (cab.lane || "front") !== "back";
 }
 
+function rowSupportsLane(row) {
+  return row === "base" || row === "tall";
+}
+
+function rowSupportsVerticalOffset(row) {
+  return row === "wall" || row === "tall";
+}
+
+function normalizeYOffset(row, yOffset) {
+  if (!rowSupportsVerticalOffset(row)) return undefined;
+  const value = Number.isFinite(yOffset) ? Math.round(yOffset * 4) / 4 : 0;
+  if (row === "wall") return Math.max(0, value);
+  return Math.max(-96, Math.min(96, value));
+}
+
 function sanitizeAlignments(spec) {
   const cabMap = new Map((spec.cabinets || []).map((cab) => [cab.id, cab]));
   const lowerXById = new Map();
@@ -116,7 +131,7 @@ function typeMatchesRow(type, row) {
 }
 
 function normalizeLane(row, lane) {
-  if (row === "wall") return undefined;
+  if (!rowSupportsLane(row)) return undefined;
   return lane === "back" ? "back" : "front";
 }
 
@@ -134,31 +149,38 @@ function initializeCabinetForRow(cab, targetRow) {
     cab.depth = defaultDepthForRow(targetRow);
   }
 
-  if (targetRow === "wall") {
-    cab.yOffset = Math.max(0, cab.yOffset || 0);
-    delete cab.lane;
-    return;
+  if (rowSupportsVerticalOffset(targetRow)) {
+    cab.yOffset = normalizeYOffset(targetRow, cab.yOffset);
+  } else {
+    delete cab.yOffset;
   }
 
-  delete cab.yOffset;
-  cab.lane = normalizeLane(targetRow, cab.lane);
+  if (rowSupportsLane(targetRow)) {
+    cab.lane = normalizeLane(targetRow, cab.lane);
+  } else {
+    delete cab.lane;
+  }
 }
 
-function moveCabinetToRow(cab, targetRow) {
+function moveCabinetToRow(cab, targetRow, sourceRow = cab.row) {
   cab.row = targetRow;
 
   if (!typeMatchesRow(cab.type, targetRow)) {
     cab.type = defaultTypeForRow(targetRow);
   }
 
-  if (targetRow === "wall") {
-    cab.yOffset = Math.max(0, cab.yOffset || 0);
-    delete cab.lane;
-    return;
+  if (rowSupportsVerticalOffset(targetRow)) {
+    const seedYOffset = sourceRow === targetRow ? cab.yOffset : 0;
+    cab.yOffset = normalizeYOffset(targetRow, seedYOffset);
+  } else {
+    delete cab.yOffset;
   }
 
-  delete cab.yOffset;
-  cab.lane = normalizeLane(targetRow, cab.lane);
+  if (rowSupportsLane(targetRow)) {
+    cab.lane = normalizeLane(targetRow, cab.lane);
+  } else {
+    delete cab.lane;
+  }
 }
 
 function removeRefFromLayout(layout, id) {
@@ -291,7 +313,7 @@ export default function specReducer(state, action) {
         spec[targetKey].splice(insertAt, 0, { ref: action.id });
       }
 
-      moveCabinetToRow(spec.cabinets[cabIdx], action.targetRow);
+      moveCabinetToRow(spec.cabinets[cabIdx], action.targetRow, currentRow);
 
       if (currentRow === "wall") {
         spec.alignment = (spec.alignment || []).filter((a) => a.wall !== action.id);
@@ -329,17 +351,18 @@ export default function specReducer(state, action) {
       targetLayout.splice(insertAt, 0, { ref: action.id });
 
       if (targetRow !== currentRow) {
-        moveCabinetToRow(cab, targetRow);
-      } else if (targetRow === "wall" && typeof action.targetYOffset === "number") {
-        cab.yOffset = Math.max(0, action.targetYOffset);
+        moveCabinetToRow(cab, targetRow, currentRow);
       }
-
-      if (targetRow !== "wall") {
+      if (rowSupportsVerticalOffset(targetRow) && typeof action.targetYOffset === "number") {
+        cab.yOffset = normalizeYOffset(targetRow, action.targetYOffset);
+      }
+      if (!rowSupportsVerticalOffset(targetRow)) {
         delete cab.yOffset;
-        cab.lane = normalizeLane(targetRow, cab.lane);
-      } else if (targetRow === "wall" && currentRow !== "wall") {
-        cab.yOffset = Math.max(0, action.targetYOffset || 0);
+      }
+      if (!rowSupportsLane(targetRow)) {
         delete cab.lane;
+      } else {
+        cab.lane = normalizeLane(targetRow, cab.lane);
       }
 
       if (currentRow === "wall") {
@@ -436,14 +459,14 @@ export default function specReducer(state, action) {
     }
 
     case "NUDGE_VERTICAL": {
-      // Move a wall cabinet up/down by adjusting its yOffset (inches from top).
+      // Move a wall or tall cabinet up/down by adjusting its vertical offset.
       // action: { id, amount } — positive = down, negative = up
       const cabIdx = findCabinetIndex(spec, action.id);
       if (cabIdx === -1) return spec;
       const cab = spec.cabinets[cabIdx];
-      if (cab.row !== "wall") return spec; // only wall cabinets can be nudged vertically
+      if (!rowSupportsVerticalOffset(cab.row)) return spec;
       const cur = cab.yOffset || 0;
-      cab.yOffset = Math.max(0, cur + (action.amount || 0));
+      cab.yOffset = normalizeYOffset(cab.row, cur + (action.amount || 0));
       return spec;
     }
 
@@ -819,7 +842,12 @@ export default function specReducer(state, action) {
       loaded.cabinets.forEach((cab) => {
         if (cab?.row === "wall") {
           delete cab.lane;
+          cab.yOffset = normalizeYOffset("wall", cab.yOffset);
+        } else if (cab?.row === "tall") {
+          cab.lane = normalizeLane(cab.row, cab.lane);
+          cab.yOffset = normalizeYOffset("tall", cab.yOffset);
         } else if (cab) {
+          delete cab.yOffset;
           cab.lane = normalizeLane(cab.row, cab.lane);
         }
         const layoutKey = getLayoutKey(cab?.row);

@@ -333,3 +333,26 @@ Review:
 - With `W3` aligned over `B3`, `Meta+ArrowRight` showed `Clear Align to edit wall slot` and created no new `PATCH`.
 - On mobile, aligned `W3` still showed `+ Before` / `+ After` visually, but clicking `+ Before` created no new network request and did not insert a cabinet, which matches the intended lockout.
 - After local verification, the proxied production room was restored to `wall_layout = [W1, W2, W3, W4, W5]` and `alignment: []`.
+
+# Tall Cabinet 3D Controls + Production Audit (2026-04-22)
+
+- [x] Re-open the active desktop/mobile editor and reducer paths to confirm what movement axes already exist for tall cabinets
+- [x] Identify the real UX gap between cabinet placement controls and spacing controls before changing the model
+- [x] Add truthful desktop controls for tall-cabinet left/right slot placement, up/down vertical movement, and front/back lane movement
+- [x] Add matching mobile controls so tall-cabinet 3D movement exists on both editor paths
+- [x] Extend the persisted movement model and renderer so tall-cabinet vertical movement actually saves and renders correctly
+- [x] Re-verify the new 3D movement controls in Chrome MCP on real production data through localhost proxy
+- [ ] Deploy the updated editor and re-verify the shipped behavior in Chrome MCP
+- [ ] Open every production project in Chrome MCP, spot-check each room/render/photo/editor state, and capture ranked suspicious findings
+
+## Review Notes
+
+- Desktop currently exposes spacing edits (`Space ←`, `→ Space`) where a cabinet maker would expect placement controls, so the bottom bar still lies about what "move" means.
+- `T1` already has persisted left/right slot placement and front/back lane placement, but tall cabinets still have no persisted vertical movement path. Only wall cabinets own `yOffset`.
+- Mobile already has honest slot-move controls, so the parity gap is now mostly desktop placement wording plus missing tall up/down controls on both paths.
+- Chrome MCP proof on localhost proxy with real Wall 3 data:
+- Desktop now shows `← Slot`, `Slot →`, `↑`, `↓`, and the existing `Space ←`, `→ Space` separately when `T1` is selected.
+- Clicking `↑` on `T1` saved `yOffset: -3`, clicking `back` saved `lane: "back"`, and clicking `← Slot` reordered `base_layout` so `T1` moved ahead of the refrigerator opening.
+- Mobile now shows the same full movement set for `T1`: `◀ Slot`, `Slot ▶`, `▲ Up`, `Down ▼`, plus the existing `Front` / `Back` lane pills.
+- Regression check still passed: `B3 -> → Space` warned `Warning: spacing edit resized the refrigerator gap` and changed the opening without breaking undo.
+- After verification, the proxied production room was restored to the clean baseline: `base_layout = [range, B2, B3, fridge, T1]`, `T1.lane = "front"`, `T1.yOffset = 0`.
