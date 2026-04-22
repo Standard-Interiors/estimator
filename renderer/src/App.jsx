@@ -279,6 +279,66 @@ function getNudgeWarning(spec, id, amount) {
   return `Warning: spacing edit resized the ${label} gap`;
 }
 
+function isFrontBaseAlignmentTarget(cab) {
+  return !!cab && cab.row === "base" && (cab.lane || "front") !== "back";
+}
+
+function getAlignmentBaseId(spec, wallId) {
+  return (spec?.alignment || []).find((entry) => entry.wall === wallId)?.base || null;
+}
+
+function getAlignableBaseTargets(spec) {
+  const cabMap = {};
+  (spec?.cabinets || []).forEach((cab) => { cabMap[cab.id] = cab; });
+  return (spec?.base_layout || [])
+    .map((item) => (item?.ref ? cabMap[item.ref] : null))
+    .filter((cab) => isFrontBaseAlignmentTarget(cab));
+}
+
+function getWallAlignmentEligibility(spec, wallId, baseId) {
+  const wallCab = (spec?.cabinets || []).find((cab) => cab.id === wallId);
+  const baseCab = (spec?.cabinets || []).find((cab) => cab.id === baseId);
+  if (!wallCab || wallCab.row !== "wall") {
+    return { ok: false, reason: "Select an upper cabinet first" };
+  }
+  if (!isFrontBaseAlignmentTarget(baseCab)) {
+    return { ok: false, reason: "Tap a front base cabinet to align this upper" };
+  }
+
+  const cabMap = {};
+  (spec?.cabinets || []).forEach((cab) => { cabMap[cab.id] = cab; });
+  const lowerX = {};
+  let bx = 0;
+  (spec?.base_layout || []).forEach((item) => {
+    const id = item.ref || item.id;
+    const cab = cabMap[id];
+    const width = cab ? cab.width : (item.width || 30);
+    lowerX[id] = bx;
+    bx += width;
+  });
+
+  let wx = 0;
+  let prevWasGap = false;
+  for (const item of spec?.wall_layout || []) {
+    const id = item.ref || item.id;
+    const cab = cabMap[id];
+    const width = cab ? cab.width : (item.width || 30);
+    if (id === wallId) {
+      if (prevWasGap) {
+        return { ok: false, reason: "Clear the wall gap before aligning this upper" };
+      }
+      if (lowerX[baseId] < wx) {
+        return { ok: false, reason: "That anchor would overlap the previous upper cabinet" };
+      }
+      return { ok: true };
+    }
+    wx += width;
+    prevWasGap = !item.ref;
+  }
+
+  return { ok: false, reason: "That upper is not in the current wall run" };
+}
+
 function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack }) {
   const { spec, dispatch, undo, redo, canUndo, canRedo, undoLabel, redoLabel } = useSpecState(EMPTY_SPEC);
   const { isMobile, isLandscape } = useIsMobile();
@@ -304,6 +364,7 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
   const [selectedId, setSelectedId] = useState(null);
   const [editingSectionIdx, setEditingSectionIdx] = useState(null); // drill-down into door/drawer
   const [selectedGapItem, setSelectedGapItem] = useState(null);
+  const [alignmentTargetWallId, setAlignmentTargetWallId] = useState(null);
   const [renderCtxMenu, setRenderCtxMenu] = useState(null); // { x, y, id, row }
   const [pendingDelete, setPendingDelete] = useState(null); // cabinet id to confirm delete
   const [isDragging, setIsDragging] = useState(false);
@@ -396,6 +457,11 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
     }
   }, []);
 
+  const clearEditorNotice = useCallback(() => {
+    clearTimeout(editorNoticeTimer.current);
+    setEditorNotice(null);
+  }, []);
+
   const handleNudge = useCallback((id, amount) => {
     const warning = getNudgeWarning(specRef.current, id, amount);
     if (warning) showEditorNotice(warning, 4000);
@@ -405,6 +471,19 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
   const handlePlaceCabinet = useCallback(({ id, targetRow, targetIndex, targetYOffset }) => {
     dispatch({ type: "PLACE_CABINET", id, targetRow, targetIndex, targetYOffset });
   }, [dispatch]);
+
+  const startAlignmentPick = useCallback((wallId) => {
+    setAlignmentTargetWallId(wallId);
+    setSelectedId(wallId);
+    setSelectedGapItem(null);
+    setEditingSectionIdx(null);
+    showEditorNotice(`Tap a front base cabinet to align ${wallId} over it`, 0);
+  }, [showEditorNotice]);
+
+  const cancelAlignmentPick = useCallback(() => {
+    setAlignmentTargetWallId(null);
+    clearEditorNotice();
+  }, [clearEditorNotice]);
 
   const hydrateRoomSnapshot = useCallback((room, { activateTab = false, resetSelection = false, preserveImages = false } = {}) => {
     clearTimeout(saveTimer.current);
@@ -432,6 +511,7 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
       setSelectedGapItem(null);
       setEditingSectionIdx(null);
     }
+    setAlignmentTargetWallId(null);
     setEditorNotice(null);
   }, [dispatch, normalizeLoadedSpec]);
 
@@ -549,21 +629,25 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
       if (document.activeElement?.tagName === "INPUT" || document.activeElement?.tagName === "SELECT" || document.activeElement?.tagName === "TEXTAREA") return;
       if ((e.metaKey||e.ctrlKey) && e.key === "z") { e.preventDefault(); if(e.shiftKey) redo(); else undo(); return; }
       if (!selectedId) return;
+      const cabMap2 = {}; (spec.cabinets || []).forEach(c => { cabMap2[c.id] = c; });
+      const selectedCab = cabMap2[selectedId];
+      const selectedWallAlignment = selectedCab?.row === "wall" ? getAlignmentBaseId(spec, selectedId) : null;
       if (e.key === "ArrowLeft") {
         e.preventDefault();
         if (e.metaKey || e.ctrlKey) dispatch({ type: "MOVE_CABINET", id: selectedId, direction: "left" });
+        else if (selectedWallAlignment) showEditorNotice("Clear Align to edit wall spacing", 3000);
         else handleNudge(selectedId, e.shiftKey ? -0.5 : -1);
         return;
       }
       if (e.key === "ArrowRight") {
         e.preventDefault();
         if (e.metaKey || e.ctrlKey) dispatch({ type: "MOVE_CABINET", id: selectedId, direction: "right" });
+        else if (selectedWallAlignment) showEditorNotice("Clear Align to edit wall spacing", 3000);
         else handleNudge(selectedId, e.shiftKey ? 0.5 : 1);
         return;
       }
       if (e.key === "ArrowUp") {
         e.preventDefault();
-        const cabMap2 = {}; (spec.cabinets || []).forEach(c => { cabMap2[c.id] = c; });
         if (cabMap2[selectedId]?.row === "wall") {
           dispatch({ type: "NUDGE_VERTICAL", id: selectedId, amount: e.shiftKey ? -0.5 : -1 });
         }
@@ -571,13 +655,15 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
       }
       if (e.key === "ArrowDown") {
         e.preventDefault();
-        const cabMap2 = {}; (spec.cabinets || []).forEach(c => { cabMap2[c.id] = c; });
         if (cabMap2[selectedId]?.row === "wall") {
           dispatch({ type: "NUDGE_VERTICAL", id: selectedId, amount: e.shiftKey ? 0.5 : 1 });
         }
         return;
       }
-      if (e.key === "Escape") { setSelectedId(null); setSelectedGapItem(null); return; }
+      if (e.key === "Escape") {
+        if (alignmentTargetWallId) { cancelAlignmentPick(); return; }
+        setSelectedId(null); setSelectedGapItem(null); return;
+      }
       if (e.key === "Delete" || e.key === "Backspace") {
         setPendingDelete(selectedId); return;
       }
@@ -608,7 +694,7 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [tab, selectedId, spec, dispatch, handleNudge, undo, redo]);
+  }, [tab, selectedId, spec, dispatch, handleNudge, undo, redo, alignmentTargetWallId, cancelAlignmentPick, showEditorNotice]);
 
   const loadWireframe = () => { dispatch({ type: "LOAD_SPEC", spec: JSON.parse(JSON.stringify(WIREFRAME_SPEC)) }); setMode("loaded"); setTab("render"); };
 
@@ -808,18 +894,58 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
     dispatch({ type: "LOAD_SPEC", spec: { base_layout: [], wall_layout: [], alignment: [], cabinets: [] } });
     setMode("home"); setJsonInput(""); setJsonError(null); setWireframePreview(null); setPhotoFile(null); setPhotoPreview(null); setUploadStatus(""); setDragTarget(null);
     setSelectedId(null); setSelectedGapItem(null);
+    setAlignmentTargetWallId(null);
+    clearEditorNotice();
   };
 
   const handleSelect = (id) => {
+    if (alignmentTargetWallId) {
+      if (!id) {
+        cancelAlignmentPick();
+        return;
+      }
+      if (id === alignmentTargetWallId) {
+        setSelectedId(id);
+        setEditingSectionIdx(null);
+        setSelectedGapItem(null);
+        return;
+      }
+      const targetCab = specRef.current?.cabinets?.find((cab) => cab.id === id);
+      if (!isFrontBaseAlignmentTarget(targetCab)) {
+        showEditorNotice("Tap a front base cabinet to align this upper", 3000);
+        return;
+      }
+      const result = getWallAlignmentEligibility(specRef.current, alignmentTargetWallId, id);
+      if (!result.ok) {
+        showEditorNotice(result.reason, 4000);
+        return;
+      }
+      dispatch({ type: "SET_ALIGNMENT", wall: alignmentTargetWallId, base: id });
+      setSelectedId(alignmentTargetWallId);
+      setEditingSectionIdx(null);
+      setSelectedGapItem(null);
+      setAlignmentTargetWallId(null);
+      showEditorNotice(`Aligned ${alignmentTargetWallId} over ${id}`, 3000);
+      return;
+    }
     setSelectedId(id);
     setEditingSectionIdx(null);
     if (id) setSelectedGapItem(null);
   };
 
   const handleGapSelect = (item) => {
+    if (alignmentTargetWallId) {
+      showEditorNotice("Tap a front base cabinet to align this upper", 3000);
+      return;
+    }
     setSelectedGapItem(item);
     if (item) setSelectedId(null);
   };
+
+  const selectedAlignmentBaseId = selectedId ? getAlignmentBaseId(spec, selectedId) : null;
+  const selectedCab = selectedId ? spec.cabinets.find((cab) => cab.id === selectedId) : null;
+  const selectedWallIsAligned = selectedCab?.row === "wall" && !!selectedAlignmentBaseId;
+  const alignableBaseTargets = getAlignableBaseTargets(spec);
 
   const hasSpec = mode === "loaded" && spec;
 
@@ -1193,10 +1319,14 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
                   </div>
                 </div>
                 {/* No overlapping thumbnails — photo is in sidebar, plan is a tab */}
-                <InteractiveRender spec={spec} selectedId={selectedId} isMobile={isMobile} onSelect={(id)=>{handleSelect(id);setRenderCtxMenu(null);}}
+                <InteractiveRender spec={spec} selectedId={selectedId} isMobile={isMobile} alignmentTargetWallId={alignmentTargetWallId} onSelect={(id)=>{handleSelect(id);setRenderCtxMenu(null);}}
                   onDoubleClick={(id)=>{setSelectedId(id);setTimeout(()=>{if(widthInputRef.current){widthInputRef.current.focus();widthInputRef.current.select();}},50);}}
                   onContextMenu={(ctx)=>setRenderCtxMenu(ctx)}
                   onGapSelect={(item)=>{
+                    if (alignmentTargetWallId) {
+                      showEditorNotice("Tap a front base cabinet to align this upper", 3000);
+                      return;
+                    }
                     setSelectedId(null);setRenderCtxMenu(null);
                     // Enrich with rowName/idx like Plan tab does
                     const bIdx=(spec.base_layout||[]).indexOf(item);
@@ -1214,10 +1344,22 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
                   const cabMap2={}; (spec.cabinets||[]).forEach(c=>{cabMap2[c.id]=c;});
                   const ctxCab=cabMap2[renderCtxMenu.id];
                   if(!ctxCab) return null;
+                  const ctxAlignmentBaseId = getAlignmentBaseId(spec, renderCtxMenu.id);
+                  const ctxWallAligned = ctxCab.row === "wall" && !!ctxAlignmentBaseId;
                   const items=[
                     {label:"Duplicate (⌘D)",action:()=>{const newId=generateId(ctxCab.row,spec);dispatch({type:"DUPLICATE_CABINET",id:renderCtxMenu.id,newId});setSelectedId(newId);setRenderCtxMenu(null);}},
                     {label:"Set Width…",action:()=>{setSelectedId(renderCtxMenu.id);setRenderCtxMenu(null);setTimeout(()=>{if(widthInputRef.current){widthInputRef.current.focus();widthInputRef.current.select();}},50);}},
                     ...(ctxCab.width>=12?[{label:"Split in Half",action:()=>{const half=Math.round(ctxCab.width/2*4)/4;const leftW=half;const rightW=Math.round((ctxCab.width-half)*4)/4;const leftId=generateId(ctxCab.row,spec);const tempSpec={...spec,cabinets:[...spec.cabinets,{id:leftId,row:ctxCab.row}]};const rightId=generateId(ctxCab.row,tempSpec);dispatch({type:"SPLIT_CABINET",id:renderCtxMenu.id,leftId,rightId,leftWidth:leftW,rightWidth:rightW});setSelectedId(leftId);setRenderCtxMenu(null);}}]:[]),
+                    ...(ctxCab.row === "wall" ? [
+                      {
+                        label: alignmentTargetWallId === renderCtxMenu.id ? "Cancel Align Over" : "Align Over…",
+                        action:()=>{setRenderCtxMenu(null); alignmentTargetWallId === renderCtxMenu.id ? cancelAlignmentPick() : startAlignmentPick(renderCtxMenu.id);}
+                      },
+                      ...(ctxAlignmentBaseId ? [{
+                        label:`Clear Align (${ctxAlignmentBaseId})`,
+                        action:()=>{dispatch({type:"REMOVE_ALIGNMENT",wall:renderCtxMenu.id});setSelectedId(renderCtxMenu.id);setRenderCtxMenu(null);}
+                      }] : []),
+                    ] : []),
                     ...(["base","wall","tall"].filter((row)=>row!==ctxCab.row).map((row)=>({
                       label:`Move to ${row}`,
                       action:()=>{dispatch({type:"MOVE_ROW",id:renderCtxMenu.id,targetRow:row});setSelectedId(renderCtxMenu.id);setRenderCtxMenu(null);}
@@ -1226,8 +1368,10 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
                       label:`Move ${lane}`,
                       action:()=>{dispatch({type:"SET_LANE",id:renderCtxMenu.id,lane});setSelectedId(renderCtxMenu.id);setRenderCtxMenu(null);}
                     })) : []),
-                    {label:"+ Space Left",action:()=>{const layout=spec[layoutKeyForCabinetRow(ctxCab.row)]||[];const pos=layout.findIndex(i=>i.ref===renderCtxMenu.id);dispatch({type:"ADD_GAP",row:ctxCab.row,position:Math.max(pos,0),gap:{type:"filler",label:"Filler",width:3}});setRenderCtxMenu(null);}},
-                    {label:"+ Space Right",action:()=>{const layout=spec[layoutKeyForCabinetRow(ctxCab.row)]||[];const pos=layout.findIndex(i=>i.ref===renderCtxMenu.id);dispatch({type:"ADD_GAP",row:ctxCab.row,position:pos+1,gap:{type:"filler",label:"Filler",width:3}});setRenderCtxMenu(null);}},
+                    ...(!ctxWallAligned ? [
+                      {label:"+ Space Left",action:()=>{const layout=spec[layoutKeyForCabinetRow(ctxCab.row)]||[];const pos=layout.findIndex(i=>i.ref===renderCtxMenu.id);dispatch({type:"ADD_GAP",row:ctxCab.row,position:Math.max(pos,0),gap:{type:"filler",label:"Filler",width:3}});setRenderCtxMenu(null);}},
+                      {label:"+ Space Right",action:()=>{const layout=spec[layoutKeyForCabinetRow(ctxCab.row)]||[];const pos=layout.findIndex(i=>i.ref===renderCtxMenu.id);dispatch({type:"ADD_GAP",row:ctxCab.row,position:pos+1,gap:{type:"filler",label:"Filler",width:3}});setRenderCtxMenu(null);}},
+                    ] : []),
                     {label:"Delete",action:()=>{setPendingDelete(renderCtxMenu.id);setRenderCtxMenu(null);},color:"#e04040"},
                   ];
                   return <div style={{position:"fixed",left:renderCtxMenu.x,top:renderCtxMenu.y,background:"#1a1a2a",border:"1px solid #2a2a3a",borderRadius:8,padding:4,zIndex:9999,minWidth:160,boxShadow:"0 8px 24px rgba(0,0,0,0.5)"}}
@@ -1276,24 +1420,42 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
               {sel && !selectedGapItem && editingSectionIdx === null && (
                 isMobile ? (
                   <div style={{maxHeight:isLandscape?"40vh":"50vh",overflowY:"auto",WebkitOverflowScrolling:"touch"}}>
-                    <BottomSheet key={selectedId || "none"} spec={spec} selectedId={selectedId} dispatch={dispatch} onSelect={handleSelect} onSectionClick={(idx) => setEditingSectionIdx(idx)} />
+                    <BottomSheet
+                      key={selectedId || "none"}
+                      spec={spec}
+                      selectedId={selectedId}
+                      dispatch={dispatch}
+                      onSelect={handleSelect}
+                      currentAlignmentBaseId={selectedAlignmentBaseId}
+                      isAligningOver={alignmentTargetWallId === sel.id}
+                      onStartAlign={sel.row === "wall" ? () => startAlignmentPick(sel.id) : undefined}
+                      onCancelAlign={alignmentTargetWallId === sel.id ? cancelAlignmentPick : undefined}
+                      onClearAlign={selectedWallIsAligned ? () => dispatch({ type: "REMOVE_ALIGNMENT", wall: sel.id }) : undefined}
+                      onSectionClick={(idx) => setEditingSectionIdx(idx)}
+                    />
                   </div>
                 ) : (
                   <CabinetEditBar
                     cab={sel} spec={spec} dispatch={dispatch} selColor={selColor}
                     widthInputRef={widthInputRef}
+                    currentAlignmentBaseId={selectedAlignmentBaseId}
+                    isAligningOver={alignmentTargetWallId === sel.id}
+                    onStartAlign={sel.row === "wall" ? () => startAlignmentPick(sel.id) : undefined}
+                    onCancelAlign={alignmentTargetWallId === sel.id ? cancelAlignmentPick : undefined}
+                    onClearAlign={selectedWallIsAligned ? () => dispatch({ type: "REMOVE_ALIGNMENT", wall: sel.id }) : undefined}
                     onSelectNext={() => {
                       const allRefs=[...(spec.base_layout||[]),...(spec.wall_layout||[])].filter(i=>i.ref);
                       const idx=allRefs.findIndex(i=>i.ref===sel.id);
                       if(idx!==-1&&idx<allRefs.length-1){setSelectedId(allRefs[idx+1].ref);setTimeout(()=>{if(widthInputRef.current){widthInputRef.current.focus();widthInputRef.current.select();}},50);}
                     }}
                     onSelectId={setSelectedId}
-                    onMoveLeft={() => handleNudge(sel.id, -3)}
-                    onMoveRight={() => handleNudge(sel.id, 3)}
+                    alignableBaseTargets={alignableBaseTargets}
+                    onMoveLeft={sel.row === "wall" && selectedAlignmentBaseId ? undefined : () => handleNudge(sel.id, -3)}
+                    onMoveRight={sel.row === "wall" && selectedAlignmentBaseId ? undefined : () => handleNudge(sel.id, 3)}
                     onMoveUp={sel.row === "wall" ? () => dispatch({ type: "NUDGE_VERTICAL", id: sel.id, amount: -3 }) : undefined}
                     onMoveDown={sel.row === "wall" ? () => dispatch({ type: "NUDGE_VERTICAL", id: sel.id, amount: 3 }) : undefined}
                     onDelete={() => setPendingDelete(sel.id)}
-                    onAddGap={() => {
+                    onAddGap={sel.row === "wall" && selectedAlignmentBaseId ? undefined : () => {
                       const layout=spec[layoutKeyForCabinetRow(sel.row)]||[];
                       const pos=layout.findIndex(i=>i.ref===sel.id);
                       dispatch({type:"ADD_GAP",row:sel.row,position:Math.max(pos,0),gap:{type:"filler",label:"Filler",width:3}});

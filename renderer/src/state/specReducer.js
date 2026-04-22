@@ -42,6 +42,28 @@ function defaultTypeForRow(row) {
   return "base";
 }
 
+function isFrontBaseCabinet(cab) {
+  return !!cab && cab.row === "base" && (cab.lane || "front") !== "back";
+}
+
+function sanitizeAlignments(spec) {
+  const cabMap = new Map((spec.cabinets || []).map((cab) => [cab.id, cab]));
+  const seenWalls = new Set();
+  const seenBases = new Set();
+
+  spec.alignment = (spec.alignment || []).filter((entry) => {
+    if (!entry?.wall || !entry?.base) return false;
+    const wallCab = cabMap.get(entry.wall);
+    const baseCab = cabMap.get(entry.base);
+    if (!wallCab || wallCab.row !== "wall") return false;
+    if (!isFrontBaseCabinet(baseCab)) return false;
+    if (seenWalls.has(entry.wall) || seenBases.has(entry.base)) return false;
+    seenWalls.add(entry.wall);
+    seenBases.add(entry.base);
+    return true;
+  });
+}
+
 function typeMatchesRow(type, row) {
   if (!type) return false;
   if (row === "wall") return type === "wall" || type.startsWith("wall_");
@@ -129,6 +151,7 @@ export default function specReducer(state, action) {
       spec.alignment = spec.alignment.filter(
         (a) => a.wall !== action.id && a.base !== action.id
       );
+      sanitizeAlignments(spec);
       return spec;
     }
 
@@ -181,6 +204,8 @@ export default function specReducer(state, action) {
         spec.alignment = (spec.alignment || []).filter((a) => a.base !== action.id);
       }
 
+      sanitizeAlignments(spec);
+
       return spec;
     }
 
@@ -228,6 +253,8 @@ export default function specReducer(state, action) {
         spec.alignment = (spec.alignment || []).filter((a) => a.base !== action.id);
       }
 
+      sanitizeAlignments(spec);
+
       return spec;
     }
 
@@ -240,6 +267,7 @@ export default function specReducer(state, action) {
       const nextLane = normalizeLane(cab.row, action.lane);
       if ((cab.lane || "front") === nextLane) return state;
       cab.lane = nextLane;
+      sanitizeAlignments(spec);
       return spec;
     }
 
@@ -480,18 +508,16 @@ export default function specReducer(state, action) {
       const tgtRefIdx = findRefIndex(spec[layoutKey], action.targetId);
       if (tgtRefIdx !== -1) spec[layoutKey].splice(tgtRefIdx, 1);
 
-      // Remap alignments that referenced the target to now reference the source
-      spec.alignment = spec.alignment
-        .map((a) => {
-          if (a.wall === action.targetId) return { ...a, wall: action.sourceId };
-          if (a.base === action.targetId) return { ...a, base: action.sourceId };
-          return a;
-        })
-        // Deduplicate — if source was already aligned, drop the duplicate
-        .filter((a, i, arr) => {
-          const key = `${a.wall}-${a.base}`;
-          return arr.findIndex((x) => `${x.wall}-${x.base}` === key) === i;
-        });
+      // Merging changes the physical box identity enough that any existing
+      // upper/lower anchor should be re-picked instead of guessed.
+      spec.alignment = (spec.alignment || []).filter(
+        (a) =>
+          a.wall !== action.sourceId &&
+          a.wall !== action.targetId &&
+          a.base !== action.sourceId &&
+          a.base !== action.targetId
+      );
+      sanitizeAlignments(spec);
 
       return spec;
     }
@@ -534,12 +560,12 @@ export default function specReducer(state, action) {
         }
       }
 
-      // Update alignments that referenced the original
-      spec.alignment = spec.alignment.map((a) => {
-        if (a.wall === action.id) return { ...a, wall: action.leftId };
-        if (a.base === action.id) return { ...a, base: action.leftId };
-        return a;
-      });
+      // Splitting also changes the physical box identity enough that anchored
+      // uppers should be re-picked instead of silently snapping to one half.
+      spec.alignment = (spec.alignment || []).filter(
+        (a) => a.wall !== action.id && a.base !== action.id
+      );
+      sanitizeAlignments(spec);
       return spec;
     }
 
@@ -607,17 +633,27 @@ export default function specReducer(state, action) {
     // ── Alignment ───────────────────────────────────────────────────
 
     case "SET_ALIGNMENT": {
+      const wallCab = spec.cabinets.find((c) => c.id === action.wall);
+      const baseCab = spec.cabinets.find((c) => c.id === action.base);
+      if (!wallCab || wallCab.row !== "wall") return state;
+      if (!isFrontBaseCabinet(baseCab)) return state;
+
+      spec.alignment = (spec.alignment || []).filter(
+        (a) => a.wall !== action.wall && a.base !== action.base
+      );
       const existing = spec.alignment.findIndex((a) => a.wall === action.wall);
       if (existing !== -1) {
         spec.alignment[existing].base = action.base;
       } else {
         spec.alignment.push({ wall: action.wall, base: action.base });
       }
+      sanitizeAlignments(spec);
       return spec;
     }
 
     case "REMOVE_ALIGNMENT": {
       spec.alignment = spec.alignment.filter((a) => a.wall !== action.wall);
+      sanitizeAlignments(spec);
       return spec;
     }
 
@@ -684,6 +720,7 @@ export default function specReducer(state, action) {
         loaded[layoutKey].push({ ref: cab.id });
         placed.add(cab.id);
       });
+      sanitizeAlignments(loaded);
       return loaded;
     }
 

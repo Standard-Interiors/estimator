@@ -32,7 +32,7 @@ function sectionSummary(sec) {
   return s;
 }
 
-export default function CabinetEditBar({ cab, spec, dispatch, selColor, widthInputRef, onSelectNext, onSelectId, onDelete, onAddGap, onAddCab, onMoveLeft, onMoveRight, onMoveUp, onMoveDown, onSectionClick }) {
+export default function CabinetEditBar({ cab, spec, dispatch, selColor, widthInputRef, currentAlignmentBaseId, isAligningOver, onStartAlign, onCancelAlign, onClearAlign, onSelectNext, onSelectId, onDelete, onAddGap, onAddCab, onMoveLeft, onMoveRight, onMoveUp, onMoveDown, onSectionClick }) {
   const [editingSec, setEditingSec] = useState(null); // index of section being edited
   const [showSecPicker, setShowSecPicker] = useState(false);
   const sections = cab?.face?.sections || [];
@@ -170,6 +170,27 @@ export default function CabinetEditBar({ cab, spec, dispatch, selColor, widthInp
           </div>
         )}
 
+        {cab.row === "wall" && (
+          <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
+            <button
+              style={btnStyle(!!isAligningOver)}
+              onClick={isAligningOver ? onCancelAlign : onStartAlign}
+              title={isAligningOver ? `Cancel aligning ${cab.id}` : `Pick the base cabinet this upper should sit over`}
+            >
+              {isAligningOver ? "Cancel Align" : "Align Over"}
+            </button>
+            {currentAlignmentBaseId && (
+              <button
+                style={btnStyle(true)}
+                onClick={onClearAlign}
+                title={`Currently aligned over ${currentAlignmentBaseId}. Click to clear.`}
+              >
+                Over {currentAlignmentBaseId}
+              </button>
+            )}
+          </div>
+        )}
+
         <span style={{ width: 1, height: 20, background: "#1a1a2a", flexShrink: 0 }} />
 
         {/* Dimensions — key includes current value so external changes (merge,
@@ -213,7 +234,7 @@ export default function CabinetEditBar({ cab, spec, dispatch, selColor, widthInp
           style={{ height: 32, padding: "0 8px", borderRadius: 6, background: "#1a1a2a", border: "1px solid #2a2a3a", color: selColor, fontWeight: 600, fontSize: 11, cursor: "pointer", fontFamily: SANS }}>
           Merge {rightNeighbor.id} &#8594;
         </button>}
-        <button onClick={onAddGap} style={{ height: 32, padding: "0 8px", borderRadius: 6, background: "#1a1a2a", border: "1px solid #2a2a3a", color: "#888", fontWeight: 600, fontSize: 11, cursor: "pointer", fontFamily: SANS }}>Filler</button>
+        {onAddGap && <button onClick={onAddGap} style={{ height: 32, padding: "0 8px", borderRadius: 6, background: "#1a1a2a", border: "1px solid #2a2a3a", color: "#888", fontWeight: 600, fontSize: 11, cursor: "pointer", fontFamily: SANS }}>Filler</button>}
         <button onClick={onAddCab} style={{ height: 32, padding: "0 8px", borderRadius: 6, background: "#1a1a2a", border: "1px solid #2a2a3a", color: selColor, fontWeight: 600, fontSize: 11, cursor: "pointer", fontFamily: SANS }}>+ Cab</button>
         <button
           onClick={() => dispatch({ type: "SET_EXCLUDE_FROM_CUTLIST", id: cab.id, value: !cab.exclude_from_cutlist })}
@@ -230,6 +251,12 @@ export default function CabinetEditBar({ cab, spec, dispatch, selColor, widthInp
         >{cab.exclude_from_cutlist ? "Dup \u2713" : "Dup?"}</button>
         <button onClick={onDelete} style={{ height: 32, padding: "0 8px", borderRadius: 6, background: "#1a1a2a", border: "1px solid #2a2a3a", color: "#e04040", fontWeight: 600, fontSize: 11, cursor: "pointer", fontFamily: SANS }}>Del</button>
       </div>
+
+      {cab.row === "wall" && isAligningOver && (
+        <div style={{ padding: "5px 10px", borderBottom: "1px solid #111118", color: "#1a6fbf", fontSize: 10, fontFamily: MONO }}>
+          Tap a front base cabinet in 3D to align {cab.id} over it.
+        </div>
+      )}
 
       {/* Width quick-pick chips — 1-click for standard sizes. Free input stays above. */}
       <div style={{ display: "flex", alignItems: "center", gap: 4, padding: "4px 10px", borderBottom: "1px solid #111118" }}>

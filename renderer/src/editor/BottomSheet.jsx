@@ -30,7 +30,18 @@ function sectionSummary(sec) {
   return s;
 }
 
-export default function BottomSheet({ spec, selectedId, dispatch, onSelect, onSectionClick }) {
+export default function BottomSheet({
+  spec,
+  selectedId,
+  dispatch,
+  onSelect,
+  currentAlignmentBaseId,
+  isAligningOver,
+  onStartAlign,
+  onCancelAlign,
+  onClearAlign,
+  onSectionClick,
+}) {
   const [showMore, setShowMore] = useState(false);
   const [editingFaceSectionIdx, setEditingFaceSectionIdx] = useState(null);
   const [showSectionPicker, setShowSectionPicker] = useState(false);
@@ -161,6 +172,63 @@ export default function BottomSheet({ spec, selectedId, dispatch, onSelect, onSe
           {["base", "wall", "tall"].map(rowPill)}
         </div>
       </div>
+
+      {row === "wall" && (
+        <div style={{ marginBottom: 12 }}>
+          <div style={{
+            fontSize: 10, color: "#666", fontWeight: 600,
+            fontFamily: "'DM Sans',sans-serif", marginBottom: 6, letterSpacing: "0.05em"
+          }}>ALIGN OVER</div>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            <button
+              onClick={isAligningOver ? onCancelAlign : onStartAlign}
+              style={{
+                minHeight: 34,
+                borderRadius: 18,
+                padding: "0 12px",
+                background: isAligningOver ? rowColor : "#14141e",
+                border: isAligningOver ? `2px solid ${rowColor}` : "1px solid #2a2a3a",
+                color: isAligningOver ? "#fff" : "#999",
+                fontWeight: isAligningOver ? 700 : 500,
+                fontSize: 10,
+                fontFamily: "'DM Sans',sans-serif",
+                cursor: "pointer",
+              }}
+            >
+              {isAligningOver ? "Cancel Align" : "Align Over"}
+            </button>
+            {currentAlignmentBaseId && (
+              <button
+                onClick={onClearAlign}
+                style={{
+                  minHeight: 34,
+                  borderRadius: 18,
+                  padding: "0 12px",
+                  background: `${rowColor}22`,
+                  border: `2px solid ${rowColor}`,
+                  color: rowColor,
+                  fontWeight: 700,
+                  fontSize: 10,
+                  fontFamily: "'DM Sans',sans-serif",
+                  cursor: "pointer",
+                }}
+              >
+                Over {currentAlignmentBaseId}
+              </button>
+            )}
+          </div>
+          {isAligningOver && (
+            <div style={{
+              marginTop: 6,
+              color: rowColor,
+              fontSize: 10,
+              fontFamily: "'DM Sans',sans-serif",
+            }}>
+              Tap a front base cabinet in 3D to align {cab.id} over it.
+            </div>
+          )}
+        </div>
+      )}
 
       {row !== "wall" && (
         <div style={{ marginBottom: 12 }}>
@@ -555,7 +623,13 @@ export default function BottomSheet({ spec, selectedId, dispatch, onSelect, onSe
 
       {/* Action row */}
       <div style={{ marginBottom: 10 }}>
-        <ActionRow cabId={cab.id} spec={spec} dispatch={dispatch} onSelect={onSelect} />
+        <ActionRow
+          cabId={cab.id}
+          spec={spec}
+          dispatch={dispatch}
+          onSelect={onSelect}
+          isAlignedWall={cab.row === "wall" && !!currentAlignmentBaseId}
+        />
       </div>
 
       {/* Duplicate of another photo — exclude from cut list but keep in layout */}

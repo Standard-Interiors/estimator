@@ -298,3 +298,12 @@
 - Reviewer convergence for the next batch:
 - Keep the lane feature, but do not pretend it solves every correction problem.
 - Make placement defaults truthful, make movement language truthful, and give mobile the same spacing repair power as desktop.
+
+# Editor Correction Iteration 2 (2026-04-22)
+
+- [ ] Re-open the active alignment model in code and verify exactly how uppers anchor to lowers today
+- [ ] Use Chrome MCP on real field data to prove the current editor still lacks a direct upper-alignment correction path
+- [ ] Decide the smallest truthful editor affordance for fixing bad upper alignment without rewriting extraction
+- [ ] Implement the alignment correction flow on the active production editor path
+- [ ] Re-verify the alignment correction flow in Chrome MCP locally on real data
+- [ ] Deploy, Chrome MCP verify on the real site, and restore production data to the clean baseline

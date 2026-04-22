@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { generateId, defaultCabinet, layoutKeyForCabinetRow } from "../state/specHelpers";
 
-export default function ActionRow({ cabId, spec, dispatch, onSelect }) {
+export default function ActionRow({ cabId, spec, dispatch, onSelect, isAlignedWall = false }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [splitting, setSplitting] = useState(false);
   const [splitLeft, setSplitLeft] = useState("");
@@ -100,8 +100,8 @@ export default function ActionRow({ cabId, spec, dispatch, onSelect }) {
 
   const rowColor = row === "wall" ? "#1a6fbf" : "#D94420";
   const canSplit = cab.width >= 12;
-  const canMoveLeft = refIdx > 0;
-  const canMoveRight = refIdx < layout.length - 1;
+  const canMoveLeft = !isAlignedWall && refIdx > 0;
+  const canMoveRight = !isAlignedWall && refIdx < layout.length - 1;
 
   // Merge — only available when there's an adjacent neighbor in the same row
   const leftNeighborRef = canMoveLeft ? layout[refIdx - 1] : null;
@@ -215,9 +215,21 @@ export default function ActionRow({ cabId, spec, dispatch, onSelect }) {
           canMergeRight ? {} : { opacity: 0.4 })}
       </div>
       <div style={{ display: "flex", gap: 6 }}>
-        {pillBtn("+ Space \u2190", handleAddSpaceBefore, "#1a1a2a", rowColor)}
-        {pillBtn("Space \u2192 +", handleAddSpaceAfter, "#1a1a2a", rowColor)}
+        {pillBtn("+ Space \u2190", isAlignedWall ? undefined : handleAddSpaceBefore, "#1a1a2a",
+          isAlignedWall ? "#444" : rowColor, isAlignedWall ? { opacity: 0.4 } : undefined)}
+        {pillBtn("Space \u2192 +", isAlignedWall ? undefined : handleAddSpaceAfter, "#1a1a2a",
+          isAlignedWall ? "#444" : rowColor, isAlignedWall ? { opacity: 0.4 } : undefined)}
       </div>
+      {isAlignedWall && (
+        <div style={{
+          fontSize: 11,
+          color: "#1a6fbf",
+          fontFamily: "'DM Sans',sans-serif",
+          lineHeight: 1.4,
+        }}>
+          Clear Align Over to edit this wall cabinet's slot or spacing.
+        </div>
+      )}
       <div style={{ display: "flex", gap: 6 }}>
         {pillBtn("+ Before", handleAddBefore, "#1a1a2a", rowColor)}
         {pillBtn("+ After", handleAddAfter, "#1a1a2a", rowColor)}

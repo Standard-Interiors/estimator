@@ -70,7 +70,7 @@ function Face({ cab, cx, cy, w, h }) {
   return <>{els}</>;
 }
 
-export default function InteractiveRender({ spec, selectedId, isMobile, onSelect, onDoubleClick, onContextMenu: onCtxMenu, onGapSelect, onNudge, onNudgeVertical, onPlaceCabinet }) {
+export default function InteractiveRender({ spec, selectedId, isMobile, onSelect, onDoubleClick, onContextMenu: onCtxMenu, onGapSelect, onNudge, onNudgeVertical, onPlaceCabinet, alignmentTargetWallId = null }) {
   if (!spec?.cabinets?.length) return <div style={{ color: "#555", padding: 20, textAlign: "center" }}>No cabinets loaded</div>;
 
   const cabMap = {}; spec.cabinets.forEach(c => { cabMap[c.id] = c; });
@@ -85,11 +85,15 @@ export default function InteractiveRender({ spec, selectedId, isMobile, onSelect
   const bMap = {}; lowerItems.forEach(b => { bMap[b.id] = b; });
 
   const aMap = {}; (spec.alignment || []).forEach(a => { aMap[a.wall] = a.base; });
-  const wallItems = []; let wx = PAD;
+  const wallItems = []; let wx = PAD; let prevWasGap = false;
   (spec.wall_layout || []).forEach(item => {
     const id = item.ref || item.id, cab = cabMap[id], w = cab ? cab.width : (item.width || 30);
-    if (aMap[id] && bMap[aMap[id]]) wx = bMap[aMap[id]].x;
+    if (!prevWasGap && aMap[id] && bMap[aMap[id]]) {
+      const alignX = bMap[aMap[id]].x;
+      if (alignX >= wx) wx = alignX;
+    }
     wallItems.push({ id, x: wx, w, cab, item }); wx += w * SC;
+    prevWasGap = !item.ref;
   });
 
   const maxWH = Math.max(...wallItems.filter(w => w.cab).map(w => (w.cab.height || 30)), 30) * SC;
@@ -220,10 +224,11 @@ export default function InteractiveRender({ spec, selectedId, isMobile, onSelect
   const onPointerDown = useCallback((id, row) => (e) => {
     if (e.button !== 0) return; // left click only
     e.stopPropagation();
+    if (alignmentTargetWallId) return;
     e.currentTarget.setPointerCapture(e.pointerId);
     onSelect(id);
     setDrag({ id, row, startClientX: e.clientX, startClientY: e.clientY, dx: 0, dy: 0, started: false });
-  }, [onSelect]);
+  }, [alignmentTargetWallId, onSelect]);
 
   const onPointerMove = useCallback((e) => {
     if (!drag) return;
@@ -340,12 +345,29 @@ export default function InteractiveRender({ spec, selectedId, isMobile, onSelect
           const drawX = bi.x + laneOffset.x;
           const drawY = cy + laneOffset.y;
           const isSelected = selectedId === bi.id;
+          const isAlignmentCandidate =
+            !!alignmentTargetWallId && c.row === "base" && lowerLane(c) === "front";
           const isDragging = drag?.started && drag.id === bi.id;
           const dragTx = isDragging ? `translate(${drag.dx / (svgRef.current ? svgRef.current.getBoundingClientRect().width / svgW : 1)}, 0)` : undefined;
           const cs = confStyle(c);
           return (<g key={`b-${bi.id}`} onClick={!drag?.started ? handleClick(bi.id) : undefined} onDoubleClick={handleDblClick(bi.id)} onContextMenu={handleContextMenu(bi.id, "base")} onPointerDown={onPointerDown(bi.id, "base")} style={{ cursor: isDragging ? "grabbing" : "grab" }} transform={dragTx}>
             <rect x={drawX} y={drawY - 4} width={c.width * SC} height={ch * SC + 8 + TOE + 30} fill="transparent" />
             {isSelected && highlightRect(drawX, drawY, c.width, ch, "base")}
+            {isAlignmentCandidate && (
+              <rect
+                x={drawX - 2}
+                y={drawY - 2}
+                width={c.width * SC + 4}
+                height={ch * SC + 4}
+                fill="#1a6fbf"
+                fillOpacity={0.06}
+                stroke="#1a6fbf"
+                strokeWidth={1.5}
+                strokeDasharray="4,3"
+                rx={2}
+                style={{ pointerEvents: "none" }}
+              />
+            )}
             <Box3D cx={drawX} cy={drawY} w={c.width} h={ch} depth={d} stroke={cs.stroke} dash={cs.dash} />
             <rect x={drawX + 2 * SC} y={FLOOR - TOE + laneOffset.y} width={Math.max(0, c.width * SC - 4 * SC)} height={TOE} fill="none" stroke="#ccc" strokeWidth={0.4} />
             <Face cab={c} cx={drawX} cy={drawY} w={c.width} h={ch} />
@@ -358,12 +380,29 @@ export default function InteractiveRender({ spec, selectedId, isMobile, onSelect
         {frontBaseCabItems.map(bi => {
           const c = bi.cab, ch = c.height || 34.5, d = c.depth || 24, cy = FLOOR - TOE - ch * SC;
           const isSelected = selectedId === bi.id;
+          const isAlignmentCandidate =
+            !!alignmentTargetWallId && c.row === "base" && lowerLane(c) === "front";
           const isDragging = drag?.started && drag.id === bi.id;
           const dragTx = isDragging ? `translate(${drag.dx / (svgRef.current ? svgRef.current.getBoundingClientRect().width / svgW : 1)}, 0)` : undefined;
           const cs = confStyle(c);
           return (<g key={`b-${bi.id}`} onClick={!drag?.started ? handleClick(bi.id) : undefined} onDoubleClick={handleDblClick(bi.id)} onContextMenu={handleContextMenu(bi.id, "base")} onPointerDown={onPointerDown(bi.id, "base")} style={{ cursor: isDragging ? "grabbing" : "grab" }} transform={dragTx}>
             <rect x={bi.x} y={cy - 4} width={c.width * SC} height={ch * SC + 8 + TOE + 30} fill="transparent" />
             {isSelected && highlightRect(bi.x, cy, c.width, ch, "base")}
+            {isAlignmentCandidate && (
+              <rect
+                x={bi.x - 2}
+                y={cy - 2}
+                width={c.width * SC + 4}
+                height={ch * SC + 4}
+                fill="#1a6fbf"
+                fillOpacity={0.06}
+                stroke="#1a6fbf"
+                strokeWidth={1.5}
+                strokeDasharray="4,3"
+                rx={2}
+                style={{ pointerEvents: "none" }}
+              />
+            )}
             <Box3D cx={bi.x} cy={cy} w={c.width} h={ch} depth={d} stroke={cs.stroke} dash={cs.dash} />
             <rect x={bi.x + 2 * SC} y={FLOOR - TOE} width={Math.max(0, c.width * SC - 4 * SC)} height={TOE} fill="none" stroke="#ccc" strokeWidth={0.4} />
             <Face cab={c} cx={bi.x} cy={cy} w={c.width} h={ch} />

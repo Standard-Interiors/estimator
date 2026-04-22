@@ -103,3 +103,6 @@ If the user asks how to move something in a direction like front/back, do not in
 
 ### 20. Use Chrome MCP for all verification unless the user explicitly changes that
 If runtime behavior needs to be checked, stay inside Chrome MCP for the full verification loop instead of mixing in other browser drivers or partial fallbacks. If Chrome MCP gets awkward, solve the interaction problem there rather than silently switching tools.
+
+### 21. When the user asks for sustained iteration, one clean batch is not a stopping point
+If the user explicitly asks for a long-running multi-iteration push, do not treat a successful patch/deploy cycle as the natural end of the turn. Finish the batch, then immediately start the next fresh-eye review cycle and keep going until you hit a real blocker or the user redirects.
