@@ -342,8 +342,8 @@ Review:
 - [x] Add matching mobile controls so tall-cabinet 3D movement exists on both editor paths
 - [x] Extend the persisted movement model and renderer so tall-cabinet vertical movement actually saves and renders correctly
 - [x] Re-verify the new 3D movement controls in Chrome MCP on real production data through localhost proxy
-- [ ] Deploy the updated editor and re-verify the shipped behavior in Chrome MCP
-- [ ] Open every production project in Chrome MCP, spot-check each room/render/photo/editor state, and capture ranked suspicious findings
+- [x] Deploy the updated editor and re-verify the shipped behavior in Chrome MCP
+- [x] Open every production project in Chrome MCP, spot-check each room/render/photo/editor state, and capture ranked suspicious findings
 
 ## Review Notes
 
@@ -356,3 +356,13 @@ Review:
 - Mobile now shows the same full movement set for `T1`: `◀ Slot`, `Slot ▶`, `▲ Up`, `Down ▼`, plus the existing `Front` / `Back` lane pills.
 - Regression check still passed: `B3 -> → Space` warned `Warning: spacing edit resized the refrigerator gap` and changed the opening without breaking undo.
 - After verification, the proxied production room was restored to the clean baseline: `base_layout = [range, B2, B3, fridge, T1]`, `T1.lane = "front"`, `T1.yOffset = 0`.
+- Fly deploy completed from commit `9e7364e` as image `registry.fly.io/cabinet-estimator:deployment-01KPVK6CX0SQ97XJP7BQ28Y2M9`.
+- Chrome MCP live proof on `cabinet-estimator.fly.dev`:
+- `Wall 3` now ships the new desktop controls for `T1`: `← Slot`, `Slot →`, `↑`, `↓`, `front`, and `back`.
+- Clicking live `↑` on `T1` saved `yOffset: -3` in `PATCH /api/rooms/24ca994d2d3db8de/spec`, confirming the deployed build persists tall vertical movement.
+- After the live proof, `Wall 3` was restored again to `T1.lane = "front"` and `T1.yOffset = 0`.
+- Chrome MCP production audit findings after opening every project and scanning every room via the live `/api` from the browser:
+- `P1` Duplicate/copy media loss: `The Heights by Marston Lake (copy)` keeps its room specs, but all 3 rooms have `photo=false` and `wireframe=false`, and the room UI no longer shows a `Photo` tab.
+- `P1` Duplicate empty projects exist: `Lambertson Farms 1516` (`1165b9e914a1aab8`) and `Lambertson Farms 631` (`e8036b825308817c`) both open to `0 rooms · 0 walls`, which looks like duplicate/project-creation leakage rather than a real project state.
+- `P2` Empty unfinished room remains in production: `Bell` → `Wall 1` (`067d7a058d10ca15`) opens to the fresh extraction/upload screen with no photo, no wireframe, and no cabinets.
+- `P2` Upper alignment still looks under-modeled across field data: 24 live rooms have both base and wall cabinets but `alignment: []`. I spot-checked `Velo A104` → `Wall 1`, and it does render with no persisted alignment anchors at all.
