@@ -1215,6 +1215,10 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
                       label:`Move to ${row}`,
                       action:()=>{dispatch({type:"MOVE_ROW",id:renderCtxMenu.id,targetRow:row});setSelectedId(renderCtxMenu.id);setRenderCtxMenu(null);}
                     }))),
+                    ...((ctxCab.row !== "wall") ? ["front","back"].filter((lane)=>(ctxCab.lane||"front")!==lane).map((lane)=>({
+                      label:`Move ${lane}`,
+                      action:()=>{dispatch({type:"SET_LANE",id:renderCtxMenu.id,lane});setSelectedId(renderCtxMenu.id);setRenderCtxMenu(null);}
+                    })) : []),
                     {label:"+ Space Left",action:()=>{const layout=spec[layoutKeyForCabinetRow(ctxCab.row)]||[];const pos=layout.findIndex(i=>i.ref===renderCtxMenu.id);dispatch({type:"ADD_GAP",row:ctxCab.row,position:Math.max(pos,0),gap:{type:"filler",label:"Filler",width:3}});setRenderCtxMenu(null);}},
                     {label:"+ Space Right",action:()=>{const layout=spec[layoutKeyForCabinetRow(ctxCab.row)]||[];const pos=layout.findIndex(i=>i.ref===renderCtxMenu.id);dispatch({type:"ADD_GAP",row:ctxCab.row,position:pos+1,gap:{type:"filler",label:"Filler",width:3}});setRenderCtxMenu(null);}},
                     {label:"Delete",action:()=>{setPendingDelete(renderCtxMenu.id);setRenderCtxMenu(null);},color:"#e04040"},

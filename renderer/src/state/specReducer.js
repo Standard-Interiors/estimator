@@ -54,6 +54,11 @@ function typeMatchesRow(type, row) {
   );
 }
 
+function normalizeLane(row, lane) {
+  if (row === "wall") return undefined;
+  return lane === "back" ? "back" : "front";
+}
+
 function applyRowDefaults(cab, targetRow) {
   cab.row = targetRow;
 
@@ -65,6 +70,7 @@ function applyRowDefaults(cab, targetRow) {
     if (cab.height === 34.5 || cab.height === 84) cab.height = 30;
     if (cab.depth === 24) cab.depth = 12;
     cab.yOffset = Math.max(0, cab.yOffset || 0);
+    delete cab.lane;
     return;
   }
 
@@ -72,12 +78,14 @@ function applyRowDefaults(cab, targetRow) {
     if (cab.height === 34.5 || cab.height === 30) cab.height = 84;
     if (cab.depth === 12) cab.depth = 24;
     delete cab.yOffset;
+    cab.lane = normalizeLane(targetRow, cab.lane);
     return;
   }
 
   if (cab.height === 30 || cab.height === 84) cab.height = 34.5;
   if (cab.depth === 12) cab.depth = 24;
   delete cab.yOffset;
+  cab.lane = normalizeLane(targetRow, cab.lane);
 }
 
 function removeRefFromLayout(layout, id) {
@@ -205,8 +213,10 @@ export default function specReducer(state, action) {
 
       if (targetRow !== "wall") {
         delete cab.yOffset;
+        cab.lane = normalizeLane(targetRow, cab.lane);
       } else if (targetRow === "wall" && currentRow !== "wall") {
         cab.yOffset = Math.max(0, action.targetYOffset || 0);
+        delete cab.lane;
       }
 
       if (currentRow === "wall") {
@@ -216,6 +226,18 @@ export default function specReducer(state, action) {
         spec.alignment = (spec.alignment || []).filter((a) => a.base !== action.id);
       }
 
+      return spec;
+    }
+
+    case "SET_LANE": {
+      const cabIdx = findCabinetIndex(spec, action.id);
+      if (cabIdx === -1) return state;
+      const cab = spec.cabinets[cabIdx];
+      if (cab.row === "wall") return state;
+
+      const nextLane = normalizeLane(cab.row, action.lane);
+      if ((cab.lane || "front") === nextLane) return state;
+      cab.lane = nextLane;
       return spec;
     }
 
@@ -650,6 +672,11 @@ export default function specReducer(state, action) {
           .map((item) => item.ref)
       );
       loaded.cabinets.forEach((cab) => {
+        if (cab?.row === "wall") {
+          delete cab.lane;
+        } else if (cab) {
+          cab.lane = normalizeLane(cab.row, cab.lane);
+        }
         const layoutKey = getLayoutKey(cab?.row);
         if (!layoutKey || placed.has(cab.id)) return;
         loaded[layoutKey].push({ ref: cab.id });

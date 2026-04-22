@@ -4,6 +4,7 @@ import { useCallback, useState, useRef } from "react";
 const SC = 2.5;
 const IDX = 0.42;
 const IDY = -0.32;
+const LOWER_BACK_LANE = 12;
 function dp(depth) { const v = depth || 0; return { x: v * SC * IDX, y: v * SC * IDY }; }
 
 // Confidence → visual style
@@ -106,22 +107,39 @@ export default function InteractiveRender({ spec, selectedId, isMobile, onSelect
   const svgH = contentBottom - contentTop;
   const baseCabItems = lowerItems.filter((item) => item.cab && item.cab.row !== "tall");
   const tallCabItems = lowerItems.filter((item) => item.cab && item.cab.row === "tall");
-  const counterSegments = [];
-  let currentCounter = null;
-  lowerItems.forEach((item) => {
-    if (item.cab?.row === "tall") {
-      if (currentCounter) counterSegments.push(currentCounter);
-      currentCounter = null;
-      return;
-    }
-    const x2 = item.x + item.w * SC;
-    if (!currentCounter) {
-      currentCounter = { x: item.x, w: item.w };
-      return;
-    }
-    currentCounter.w = (x2 - currentCounter.x) / SC;
-  });
-  if (currentCounter) counterSegments.push(currentCounter);
+  const lowerLane = (cab) => (cab?.lane === "back" ? "back" : "front");
+  const lowerLaneOffset = (cab) => (lowerLane(cab) === "back" ? dp(LOWER_BACK_LANE) : { x: 0, y: 0 });
+  const buildCounterSegments = (lane) => {
+    const segments = [];
+    let currentCounter = null;
+    lowerItems.forEach((item) => {
+      const itemLane = item.cab ? lowerLane(item.cab) : "front";
+      if (itemLane !== lane) {
+        if (currentCounter) segments.push(currentCounter);
+        currentCounter = null;
+        return;
+      }
+      if (item.cab?.row === "tall") {
+        if (currentCounter) segments.push(currentCounter);
+        currentCounter = null;
+        return;
+      }
+      const x2 = item.x + item.w * SC;
+      if (!currentCounter) {
+        currentCounter = { x: item.x, w: item.w, lane };
+        return;
+      }
+      currentCounter.w = (x2 - currentCounter.x) / SC;
+    });
+    if (currentCounter) segments.push(currentCounter);
+    return segments;
+  };
+  const frontCounterSegments = buildCounterSegments("front");
+  const backCounterSegments = buildCounterSegments("back");
+  const frontBaseCabItems = baseCabItems.filter((item) => lowerLane(item.cab) === "front");
+  const backBaseCabItems = baseCabItems.filter((item) => lowerLane(item.cab) === "back");
+  const frontTallCabItems = tallCabItems.filter((item) => lowerLane(item.cab) === "front");
+  const backTallCabItems = tallCabItems.filter((item) => lowerLane(item.cab) === "back");
 
   const handleClick = useCallback((id) => (e) => {
     e.stopPropagation();
@@ -279,8 +297,26 @@ export default function InteractiveRender({ spec, selectedId, isMobile, onSelect
       <svg ref={svgRef} viewBox={`0 ${contentTop} ${svgW} ${svgH}`}
         onPointerMove={onPointerMove} onPointerUp={onPointerUp}
         style={{ display: "block", width: "100%", maxWidth: isMobile ? "100%" : svgW * 2, height: "auto", cursor: drag?.started ? "grabbing" : "pointer", touchAction: "none" }}>
-        {counterSegments.map((segment, idx) => (
-          <Box3D key={`ct-under-${idx}`} cx={segment.x} cy={CTTOP} w={segment.w} h={1.5} depth={25.5} front="none" top="none" side="none" stroke="#888" sw={0.8} />
+        {backCounterSegments.map((segment, idx) => {
+          const offset = dp(LOWER_BACK_LANE);
+          return (
+            <Box3D
+              key={`ct-under-back-${idx}`}
+              cx={segment.x + offset.x}
+              cy={CTTOP + offset.y}
+              w={segment.w}
+              h={1.5}
+              depth={25.5}
+              front="none"
+              top="none"
+              side="none"
+              stroke="#888"
+              sw={0.8}
+            />
+          );
+        })}
+        {frontCounterSegments.map((segment, idx) => (
+          <Box3D key={`ct-under-front-${idx}`} cx={segment.x} cy={CTTOP} w={segment.w} h={1.5} depth={25.5} front="none" top="none" side="none" stroke="#888" sw={0.8} />
         ))}
 
         {dropPlacement && (
@@ -298,7 +334,28 @@ export default function InteractiveRender({ spec, selectedId, isMobile, onSelect
         )}
 
         {/* Lower cabinets first (bases only here; talls render later so bridge uppers don't cut through them) */}
-        {baseCabItems.map(bi => {
+        {backBaseCabItems.map(bi => {
+          const c = bi.cab, ch = c.height || 34.5, d = c.depth || 24, cy = FLOOR - TOE - ch * SC;
+          const laneOffset = lowerLaneOffset(c);
+          const drawX = bi.x + laneOffset.x;
+          const drawY = cy + laneOffset.y;
+          const isSelected = selectedId === bi.id;
+          const isDragging = drag?.started && drag.id === bi.id;
+          const dragTx = isDragging ? `translate(${drag.dx / (svgRef.current ? svgRef.current.getBoundingClientRect().width / svgW : 1)}, 0)` : undefined;
+          const cs = confStyle(c);
+          return (<g key={`b-${bi.id}`} onClick={!drag?.started ? handleClick(bi.id) : undefined} onDoubleClick={handleDblClick(bi.id)} onContextMenu={handleContextMenu(bi.id, "base")} onPointerDown={onPointerDown(bi.id, "base")} style={{ cursor: isDragging ? "grabbing" : "grab" }} transform={dragTx}>
+            <rect x={drawX} y={drawY - 4} width={c.width * SC} height={ch * SC + 8 + TOE + 30} fill="transparent" />
+            {isSelected && highlightRect(drawX, drawY, c.width, ch, "base")}
+            <Box3D cx={drawX} cy={drawY} w={c.width} h={ch} depth={d} stroke={cs.stroke} dash={cs.dash} />
+            <rect x={drawX + 2 * SC} y={FLOOR - TOE + laneOffset.y} width={Math.max(0, c.width * SC - 4 * SC)} height={TOE} fill="none" stroke="#ccc" strokeWidth={0.4} />
+            <Face cab={c} cx={drawX} cy={drawY} w={c.width} h={ch} />
+            <text x={drawX + c.width * SC / 2} y={FLOOR + 13 + laneOffset.y} textAnchor="middle" fontSize={9} fill={cs.stroke || "#D94420"} fontWeight={700} fontFamily="monospace">{bi.id}</text>
+            <text x={drawX + c.width * SC / 2} y={FLOOR + 23 + laneOffset.y} textAnchor="middle" fontSize={6.5} fill="#888" fontFamily="monospace">{c.width < 21 ? `${c.width}w` : `${c.width}w ${ch}h ${d}d`}</text>
+            {isDragging && <text x={drawX + c.width * SC / 2} y={drawY - 8} textAnchor="middle" fontSize={10} fill="#D94420" fontWeight={700} fontFamily="monospace">{drag.dxInches > 0 ? "+" : ""}{drag.dxInches}"</text>}
+          </g>);
+        })}
+
+        {frontBaseCabItems.map(bi => {
           const c = bi.cab, ch = c.height || 34.5, d = c.depth || 24, cy = FLOOR - TOE - ch * SC;
           const isSelected = selectedId === bi.id;
           const isDragging = drag?.started && drag.id === bi.id;
@@ -330,8 +387,26 @@ export default function InteractiveRender({ spec, selectedId, isMobile, onSelect
             </g>);
         })}
 
-        {counterSegments.map((segment, idx) => (
-          <Box3D key={`ct-top-${idx}`} cx={segment.x} cy={CTTOP} w={segment.w} h={1.5} depth={25.5} front="none" top="none" side="none" stroke="#444" sw={1.3} />
+        {backCounterSegments.map((segment, idx) => {
+          const offset = dp(LOWER_BACK_LANE);
+          return (
+            <Box3D
+              key={`ct-top-back-${idx}`}
+              cx={segment.x + offset.x}
+              cy={CTTOP + offset.y}
+              w={segment.w}
+              h={1.5}
+              depth={25.5}
+              front="none"
+              top="none"
+              side="none"
+              stroke="#444"
+              sw={1.3}
+            />
+          );
+        })}
+        {frontCounterSegments.map((segment, idx) => (
+          <Box3D key={`ct-top-front-${idx}`} cx={segment.x} cy={CTTOP} w={segment.w} h={1.5} depth={25.5} front="none" top="none" side="none" stroke="#444" sw={1.3} />
         ))}
 
         {/* Wall cabinets first — top-aligned (all tops at WTOP) */}
@@ -370,8 +445,30 @@ export default function InteractiveRender({ spec, selectedId, isMobile, onSelect
             </g>);
         })}
 
+        {/* Back-lane talls keep tall-specific rendering, but shift onto the setback lane. */}
+        {backTallCabItems.map(ti => {
+          const c = ti.cab, ch = c.height || 84, d = c.depth || 24, cy = FLOOR - TOE - ch * SC;
+          const laneOffset = lowerLaneOffset(c);
+          const drawX = ti.x + laneOffset.x;
+          const drawY = cy + laneOffset.y;
+          const isSelected = selectedId === ti.id;
+          const isDragging = drag?.started && drag.id === ti.id;
+          const dragTx = isDragging ? `translate(${drag.dx / (svgRef.current ? svgRef.current.getBoundingClientRect().width / svgW : 1)}, 0)` : undefined;
+          const cs = confStyle(c);
+          return (<g key={`t-${ti.id}`} onClick={!drag?.started ? handleClick(ti.id) : undefined} onDoubleClick={handleDblClick(ti.id)} onContextMenu={handleContextMenu(ti.id, "tall")} onPointerDown={onPointerDown(ti.id, "tall")} style={{ cursor: isDragging ? "grabbing" : "grab" }} transform={dragTx}>
+            <rect x={drawX} y={drawY - 4} width={c.width * SC} height={ch * SC + 8 + TOE + 30} fill="transparent" />
+            {isSelected && highlightRect(drawX, drawY, c.width, ch, "base")}
+            <Box3D cx={drawX} cy={drawY} w={c.width} h={ch} depth={d} stroke={cs.stroke} dash={cs.dash} />
+            <rect x={drawX + 2 * SC} y={FLOOR - TOE + laneOffset.y} width={Math.max(0, c.width * SC - 4 * SC)} height={TOE} fill="none" stroke="#ccc" strokeWidth={0.4} />
+            <Face cab={c} cx={drawX} cy={drawY} w={c.width} h={ch} />
+            <text x={drawX + c.width * SC / 2} y={FLOOR + 13 + laneOffset.y} textAnchor="middle" fontSize={9} fill={cs.stroke || "#D94420"} fontWeight={700} fontFamily="monospace">{ti.id}</text>
+            <text x={drawX + c.width * SC / 2} y={FLOOR + 23 + laneOffset.y} textAnchor="middle" fontSize={6.5} fill="#888" fontFamily="monospace">{`${c.width}w ${ch}h ${d}d`}</text>
+            {isDragging && <text x={drawX + c.width * SC / 2} y={drawY - 8} textAnchor="middle" fontSize={10} fill="#D94420" fontWeight={700} fontFamily="monospace">{drag.dxInches > 0 ? "+" : ""}{drag.dxInches}"</text>}
+          </g>);
+        })}
+
         {/* Tall cabinets render after uppers so a pantry/oven stack stays visually in front of bridge cabinets. */}
-        {tallCabItems.map(ti => {
+        {frontTallCabItems.map(ti => {
           const c = ti.cab, ch = c.height || 84, d = c.depth || 24, cy = FLOOR - TOE - ch * SC;
           const isSelected = selectedId === ti.id;
           const isDragging = drag?.started && drag.id === ti.id;

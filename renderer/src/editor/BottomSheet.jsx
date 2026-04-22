@@ -162,6 +162,43 @@ export default function BottomSheet({ spec, selectedId, dispatch, onSelect, onSe
         </div>
       </div>
 
+      {row !== "wall" && (
+        <div style={{ marginBottom: 12 }}>
+          <div style={{
+            fontSize: 10, color: "#666", fontWeight: 600,
+            fontFamily: "'DM Sans',sans-serif", marginBottom: 6, letterSpacing: "0.05em"
+          }}>LANE</div>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            {["front", "back"].map((lane) => {
+              const active = (cab.lane || "front") === lane;
+              return (
+                <button
+                  key={lane}
+                  onClick={() => {
+                    if (!active) dispatch({ type: "SET_LANE", id: cab.id, lane });
+                  }}
+                  style={{
+                    minHeight: 34,
+                    borderRadius: 18,
+                    padding: "0 12px",
+                    background: active ? rowColor : "#14141e",
+                    border: active ? `2px solid ${rowColor}` : "1px solid #2a2a3a",
+                    color: active ? "#fff" : "#999",
+                    fontWeight: active ? 700 : 500,
+                    fontSize: 10,
+                    fontFamily: "'DM Sans',sans-serif",
+                    cursor: "pointer",
+                    textTransform: "capitalize",
+                  }}
+                >
+                  {lane}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Width grid */}
       <div style={{ marginBottom: 12 }}>
         <div style={{

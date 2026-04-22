@@ -97,3 +97,6 @@ If the user is talking about fixing AI output in the editor, a correct-looking r
 
 ### 18. When the editor needs more freedom, prefer slot placement over fake geometry edits
 If 3D drag is supposed to let the cabinet maker fix AI layout mistakes, do not keep routing it through nudge math that only stretches nearby gaps. Keep layout order as the source of truth, make drag commit a real slot change, and expose row changes explicitly instead of hiding them behind unpredictable drag behavior.
+
+### 19. Verify the missing movement axis before answering like the feature exists
+If the user asks how to move something in a direction like front/back, do not infer that the new placement system already supports that axis. Re-check the active editor controls and reducer model first, then answer with the exact current capability gap before promising the next fix.

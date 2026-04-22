@@ -6,6 +6,7 @@ const SANS = "'DM Sans',sans-serif";
 
 const TYPE_MAP = { base: BASE_TYPES, wall: WALL_TYPES, tall: TALL_TYPES };
 const ROWS = ["base", "wall", "tall"];
+const LANES = ["front", "back"];
 
 const SEC_LABELS = {
   drawer: "Drawer",
@@ -148,6 +149,26 @@ export default function CabinetEditBar({ cab, spec, dispatch, selColor, widthInp
             );
           })}
         </div>
+
+        {cab.row !== "wall" && (
+          <div style={{ display: "flex", gap: 3 }}>
+            {LANES.map((lane) => {
+              const active = (cab.lane || "front") === lane;
+              return (
+                <button
+                  key={lane}
+                  style={btnStyle(active)}
+                  onClick={() => {
+                    if (!active) dispatch({ type: "SET_LANE", id: cab.id, lane });
+                  }}
+                  title={`Move ${cab.id} to the ${lane} lane`}
+                >
+                  {lane}
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         <span style={{ width: 1, height: 20, background: "#1a1a2a", flexShrink: 0 }} />
 

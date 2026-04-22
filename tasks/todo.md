@@ -168,6 +168,29 @@
 - Explicit row controls now exist on desktop and mobile; locally, `T1 -> wall` converted the cabinet into the wall run with wall controls and wall dimensions, then undo restored the original tall state.
 - Precision nudge still works separately: `B3` move-right still warns and resizes the refrigerator opening instead of silently reordering.
 - The temporary local real-data verification path restored Wall 3 to its original saved state after testing.
+
+# Front / Back Move Review
+
+- [x] Confirm the active desktop/mobile editor files and current movement affordances in the requested review scope
+- [x] Trace how non-wall and wall movement are exposed in `InteractiveRender.jsx`, `CabinetEditBar.jsx`, `BottomSheet.jsx`, `ActionRow.jsx`, and `App.jsx`
+- [x] Decide whether true non-wall front/back movement is the right UX primitive
+- [x] Identify parity and regression risks before any implementation work
+- [x] Return verdict, recommended UX, and recommendation
+
+## Front / Back Move Notes
+
+- Verdict for this review: qualified no. Do not add a generic true front/back move for non-wall cabinets in the current editor model.
+- Real `Wall 3` / `T1` read: the pantry is already modeled correctly as a tall cabinet in the lower run, placed in a specific `base_layout` slot to the right of the refrigerator opening. The bug that mattered there was wrong slot/row semantics, not a missing depth-plane control.
+- Why: the active affordances already give a clear correction stack for non-wall cabinets: reorder in 3D (`InteractiveRender.jsx`), explicit row changes on desktop and mobile (`CabinetEditBar.jsx`, `BottomSheet.jsx`), and direct depth editing on both surfaces. A new front/back move would overlap with depth editing and row changes without a clear visual lane model.
+- `InteractiveRender.jsx` only teaches two movement metaphors today: horizontal slot placement for lower/tall cabinets and vertical offset for wall cabinets. The drop preview is a single vertical insertion line, so adding non-wall front/back to the same drag would be ambiguous.
+- Persisted-state read: wall cabinets own a first-class placement offset (`yOffset`), but non-wall cabinets do not. Base and tall cabinets only persist `row`, `depth`, and their position in `base_layout`, so a real front/back axis would require a new lower-run lane field instead of reusing `depth`.
+- Desktop has no explicit non-wall front/back control in `CabinetEditBar.jsx`; it exposes left/right nudge plus wall-only up/down. Mobile is even tighter: `ActionRow.jsx` only exposes left/right move, split, merge, add before/after, and delete, while `BottomSheet.jsx` exposes row pills and depth edits but no movement axis beyond row changes.
+- If this ever becomes a real need outside `Wall 3`, the safe version is an explicit discrete lane/setback concept with matching render guides, counter logic, and overlap rules. It should not ship as a free diagonal drag or as an overloaded `depth` edit.
+- Main parity risk: a desktop-only drag/context-menu solution would immediately diverge from mobile because the mobile path has no equivalent affordance or hint space for a hidden third movement axis.
+- Main regression risks:
+- Counter segments only break on tall-row membership, not on lower z-position, so a moved-back `T1` would still cut the counter as if it remained on the front plane.
+- Tall cabinets are rendered after uppers to keep them visually in front of bridge cabinets; a free lower front/back axis would reopen overlap bugs without a new occlusion model.
+- In the current 2.5D view, a non-wall front/back drag would read like a diagonal slide, so users could not easily tell whether they changed slot order, changed depth, or moved the cabinet onto another lane.
 # Production Editor Drag/Reorder Review (2026-04-21)
 
 - [x] Confirm the active production editor files and interaction path for desktop/mobile
@@ -179,19 +202,30 @@
 
 ## Review Notes
 
-- Active production path confirmed:
-- Desktop uses `InteractiveRender.jsx` + `CabinetEditBar.jsx` via `App.jsx`.
-- Mobile uses `InteractiveRender.jsx` + `BottomSheet.jsx` + `ActionRow.jsx` via `App.jsx`.
-- Current 3D drag is a disguised nudge:
-- `InteractiveRender.jsx` converts pointer delta into snapped inch deltas, then calls `onNudge` / `onNudgeVertical` on pointer-up instead of committing placement.
-- Desktop arrows and plain keyboard arrows already use the same nudge path; Cmd/Ctrl + arrows and mobile `ActionRow` use discrete swap-style moves.
-- Root cause for tall-cabinet placement pain:
-- Lower placement is derived entirely from `base_layout`, which mixes bases, talls, and openings.
-- A tall like `T1` can visually move during drag preview, but drop only resizes/adds gap stock; it never changes its slot in `base_layout`, so it cannot truly move past adjacent openings/cabinets.
-- Recommended design direction:
-- Keep nudge as a precision spacing tool for arrows/keyboard.
-- Make 3D drag commit a placement action that reorders a cabinet ref inside the correct layout row instead of resizing gaps.
-- For wall cabinets, horizontal drag should update order plus alignment anchor; vertical drag should continue to affect `yOffset`.
+# Front/Back State Model Review (2026-04-21)
+
+- [x] Confirm the active production files and current placement/state entry points for front/back questions
+- [x] Trace how `InteractiveRender.jsx` and `App.jsx` currently represent row changes versus spacing/nudges
+- [x] Inspect `specReducer.js` and `specHelpers.js` for the persisted model shape and reducer implications of true front/back movement
+- [x] Decide whether true front/back movement should exist for non-wall cabinets from a state-model perspective
+- [x] Return verdict, recommended data shape if applicable, top risks, and recommendation
+
+## Review Notes
+
+- Scope for this pass: state-model and reducer implications only, using the active production files the user named.
+- Current persisted model is still run-based, not free-placement:
+- `specHelpers.layoutKeyForCabinetRow` only maps cabinets into `wall_layout` or `base_layout`; tall cabinets stay in `base_layout` and are distinguished only by `cab.row === "tall"`.
+- `InteractiveRender.jsx` derives all lower/tall x positions from `base_layout` order, all wall x positions from `wall_layout`, and only wall cabinets get an extra persisted placement field (`yOffset`).
+- `PLACE_CABINET` in `specReducer.js` moves a cabinet by row + insertion index, and optionally wall `targetYOffset`; there is no non-wall front/back coordinate in state.
+- `App.jsx` reinforces that shape:
+- load normalization backfills only `width`, `height`, and `depth`.
+- keyboard up/down only dispatch `NUDGE_VERTICAL` for `row === "wall"`.
+- row changes are explicit `MOVE_ROW` actions, not inferred from drag.
+- Verdict from a reducer/state perspective: do not add arbitrary non-wall front/back movement on top of the current model. The current schema only safely represents horizontal slot order plus wall vertical offset.
+- If product pressure later forces it, the least-bad schema is a first-class placement object on cabinets, e.g. `placement: { lane: "front" | "back", depthOffset: number }`, while keeping `row` and layout order as separate concepts. Do not overload `depth`, `row`, or gap items to fake this.
+- The reducer cost would be broader than one new field:
+- `MOVE_ROW`, `PLACE_CABINET`, `LOAD_SPEC`, `ADD_CABINET`, duplication/split/merge, and any helper that totals or rebuilds runs would need explicit rules for how lane/depth placement interacts with lower-run openings, counter segmentation, and default dimensions.
+- Recommendation: keep the current model centered on slot placement + explicit row changes unless the team is ready to define non-wall depth lanes as a first-class layout concept across the whole spec.
 
 # Production Editor Free Placement Regression Review (2026-04-21)
 
@@ -208,3 +242,22 @@
 - Alignment is still derived from `wall_layout` order plus `alignment` references, not from persisted wall positions. Moving bases/walls between rows or allowing arbitrary placement will make upper cabinets jump unless alignment semantics are redesigned together.
 - Desktop and mobile movement semantics are not equivalent today. Desktop uses nudge + filler semantics; mobile action buttons use neighbor swaps and have no row/vertical placement controls, so parity is a real regression risk.
 - Undo/autosave are currently safe because drag emits one action on pointer-up. Live placement updates would need batching/commit semantics or they will flood history, trigger autosave churn, and make conflict recovery much harsher.
+
+# Front/Back Product Review (2026-04-21)
+
+- [x] Review Wall 3 / T1 against the field photo, wireframe, and current production editor paths
+- [x] Trace the persisted state model for lower/tall placement, row changes, drag placement, and depth edits
+- [x] Decide whether true non-wall front/back movement is the right correction primitive for a cabinet maker
+- [x] Record a product recommendation with workflow impact, useful cases, and confusion risks
+
+## Review Notes
+
+- The current production model only persists two placement lanes: `wall_layout` and `base_layout`. Tall cabinets are first-class by `row: "tall"`, but they still live inside the single lower run rather than a separate front/back plan model.
+- `InteractiveRender.jsx` now does true slot placement left/right, and wall cabinets can keep a real vertical offset. Non-wall cabinets do not have a persisted front/back coordinate today.
+- Desktop and mobile already expose the controls cabinet makers actually use most for correction: left/right slot order, explicit row changes, width/height/depth edits, split/merge, and filler/opening edits.
+- On Wall 3, `T1` is fundamentally a "which lower-run slot is this box in?" problem. The successful fix was real slot placement plus explicit row change, not a need to float the pantry forward/back in space.
+- From a shop workflow perspective, arbitrary non-wall front/back movement would blur two different ideas that cabinet makers treat separately:
+- cabinet depth/projection (how deep the box is), which the editor already captures as `depth`
+- layout/run membership (which wall/run/return the box belongs to), which the editor now partly captures with row changes and slot placement
+- A free front/back drag would imply room-plan precision the current data model does not actually own. That is risky because a cabinet maker may read a 3D offset as something that should drive cut list, fillers, scribes, or appliance clearances when it is only a cosmetic placement.
+- If a future field pattern shows repeated need beyond left/right + row changes, the more useful primitive is an explicit non-wall lane/run control such as `main run` / `return` / `island face` or a simple `flush` / `stepped` offset, not unconstrained front/back dragging.

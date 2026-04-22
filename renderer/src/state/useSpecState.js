@@ -28,6 +28,8 @@ function actionLabel(action) {
       return `Move ${action.id} ${action.direction}`;
     case "MOVE_ROW":
       return `Move ${action.id} to ${action.targetRow}`;
+    case "SET_LANE":
+      return `Move ${action.id} ${action.lane === "back" ? "back" : "front"}`;
     case "PLACE_CABINET":
       return `Place ${action.id}`;
     case "NUDGE_CABINET":
