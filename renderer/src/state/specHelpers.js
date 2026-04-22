@@ -1,5 +1,6 @@
 export const STANDARD_WIDTHS = [9, 12, 15, 18, 21, 24, 27, 30, 33, 36, 42, 48];
 export const WALL_HEIGHTS = [12, 15, 18, 24, 30, 36, 42];
+export const TALL_HEIGHTS = [84, 90, 96];
 export const BASE_HEIGHT = 34.5;
 export const BASE_DEPTH = 24;
 export const WALL_DEPTH = 12;
@@ -215,11 +216,24 @@ export function defaultGap(label = "Opening", width = 30) {
 }
 
 /**
+ * Production specs only store two layout arrays today:
+ * - wall_layout for upper cabinets
+ * - base_layout for the whole lower run (bases, talls, and lower openings)
+ * Tall cabinets stay first-class via cab.row === "tall", but they still live
+ * in the lower layout so AI output does not need a schema change.
+ */
+export function layoutKeyForCabinetRow(row) {
+  if (row === "wall") return "wall_layout";
+  if (row === "base" || row === "tall") return "base_layout";
+  return null;
+}
+
+/**
  * Sum all widths in a layout row (both cabinet refs and gaps).
  * Cabinet widths are looked up from spec.cabinets.
  */
 export function totalRun(spec, row) {
-  const layoutKey = row === "base" ? "base_layout" : "wall_layout";
+  const layoutKey = layoutKeyForCabinetRow(row);
   const layout = spec[layoutKey];
   if (!layout) return 0;
 

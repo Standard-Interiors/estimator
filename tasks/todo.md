@@ -116,7 +116,7 @@
 - [x] Replace the hard stop on opening-resizing nudges with a warning-first flow
 - [x] Re-run Chrome MCP checks on desktop nudge, drag nudge, keyboard nudge, and undo history
 - [x] Re-check conflict recovery and mobile editing to make sure the warning change did not regress earlier fixes
-- [ ] If clean, commit, push, deploy, and verify the live site behavior matches local
+- [x] If clean, commit, push, deploy, and verify the live site behavior matches local
 
 ## Warning Follow-up Review
 
@@ -124,3 +124,17 @@
 - Mobile still shows face-section editing controls, and split mode still clears when switching cabinets.
 - Conflict recovery still works: a stale save reloads the newer room snapshot instead of leaving ghost edits onscreen.
 - Chrome MCP did not give me a reliable drag gesture repro path for the SVG cabinet drag itself, but that path still routes through the same `handleNudge` warning callback used by button and keyboard nudges.
+- Live Fly verification on `Wall 3` matches local: `B3` can move right again, the refrigerator gap shrinks from `30"` to `27"`, the warning banner appears, and undo restores the original layout.
+
+# Tall Cabinet Recovery
+
+- [x] Compare the live `Wall 3` render against the original photo and wireframe
+- [x] Trace why `T1` renders and edits badly in the current frontend
+- [ ] Make tall cabinets first-class in the production editor flow without requiring AI output changes
+- [ ] Verify the `Wall 3` scenario in Chrome MCP on local and live data
+
+## Tall Cabinet Recovery Notes
+
+- The photo and wireframe both show a real tall pantry to the right of the refrigerator. The bad screenshot is not just "AI guessed wrong."
+- The frontend only has `base_layout` and `wall_layout`. `T1` exists as `row: "tall"`, but it is carried inside `base_layout`, so base-row rendering logic incorrectly gives it countertop/base-neighbor behavior.
+- Desktop and mobile editor paths both have row-to-layout logic that only understands `base` and `wall`, so tall cabinets lose merge/add-gap/add-cab safety and mobile type controls regress to wall behavior.

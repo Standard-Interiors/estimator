@@ -2,7 +2,7 @@ import { useState } from "react";
 import WidthGrid from "./WidthGrid";
 import ActionRow from "./ActionRow";
 import {
-  BASE_TYPES, WALL_TYPES, WALL_HEIGHTS, BASE_HEIGHT,
+  BASE_TYPES, WALL_TYPES, TALL_TYPES, WALL_HEIGHTS, TALL_HEIGHTS, BASE_HEIGHT,
   BASE_DEPTH, WALL_DEPTH, SECTION_TYPES, calcDoorSizes, resolveShopProfile
 } from "../state/specHelpers";
 
@@ -53,10 +53,10 @@ export default function BottomSheet({ spec, selectedId, dispatch, onSelect, onSe
   }
 
   const row = cab.row;
-  const rowColor = row === "base" ? "#D94420" : "#1a6fbf";
-  const types = row === "base" ? BASE_TYPES : WALL_TYPES;
-  const heightPresets = row === "base" ? [BASE_HEIGHT] : WALL_HEIGHTS;
-  const depthPresets = row === "base" ? [BASE_DEPTH] : [WALL_DEPTH];
+  const rowColor = row === "wall" ? "#1a6fbf" : "#D94420";
+  const types = row === "base" ? BASE_TYPES : row === "tall" ? TALL_TYPES : WALL_TYPES;
+  const heightPresets = row === "base" ? [BASE_HEIGHT] : row === "tall" ? TALL_HEIGHTS : WALL_HEIGHTS;
+  const depthPresets = row === "wall" ? [WALL_DEPTH] : [BASE_DEPTH];
 
   const handleWidthChange = (w) => {
     dispatch({ type: "SET_DIMENSION", id: cab.id, field: "width", value: w });
@@ -76,7 +76,7 @@ export default function BottomSheet({ spec, selectedId, dispatch, onSelect, onSe
 
   const typePill = (t) => {
     const active = cab.type === t;
-    const label = t.replace("base_", "").replace("wall_", "").replace("_", " ");
+    const label = t.replace(/^(base|wall|tall)_/, "").replace(/_/g, " ");
     return (
       <button key={t} onClick={() => handleTypeChange(t)} style={{
         minHeight: 36, borderRadius: 20, padding: "0 14px",

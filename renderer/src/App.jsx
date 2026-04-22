@@ -6,7 +6,7 @@ import InteractiveRender from "./editor/InteractiveRender";
 import CabinetEditBar from "./editor/CabinetEditBar";
 import DoorDetailView from "./editor/DoorDetailView";
 import BottomSheet from "./editor/BottomSheet";
-import { defaultCabinet, generateId, calcDoorSizes, formatFraction, calcScribeNotes, loadShopProfile, saveShopProfile, resolveShopProfile, isShopProfileConfigured, markShopProfileConfigured, calcFullCutList, calcProjectCutList } from "./state/specHelpers";
+import { defaultCabinet, generateId, calcDoorSizes, formatFraction, calcScribeNotes, loadShopProfile, saveShopProfile, resolveShopProfile, isShopProfileConfigured, markShopProfileConfigured, calcFullCutList, calcProjectCutList, layoutKeyForCabinetRow } from "./state/specHelpers";
 import ProjectList from "./pages/ProjectList";
 import ProjectDetail from "./pages/ProjectDetail";
 import ProjectCutList from "./pages/ProjectCutList";
@@ -363,8 +363,19 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
     nextSpec.cabinets = Array.isArray(nextSpec.cabinets) ? nextSpec.cabinets : [];
     nextSpec.cabinets.forEach((c) => {
       if (!c.depth) c.depth = c.row === "wall" ? 12 : 24;
-      if (!c.height) c.height = c.row === "wall" ? 30 : 34.5;
+      if (!c.height) c.height = c.row === "wall" ? 30 : c.row === "tall" ? 84 : 34.5;
       if (!c.width) c.width = 24;
+    });
+    const placed = new Set(
+      [...nextSpec.base_layout, ...nextSpec.wall_layout]
+        .filter((item) => item?.ref)
+        .map((item) => item.ref)
+    );
+    nextSpec.cabinets.forEach((cab) => {
+      const layoutKey = layoutKeyForCabinetRow(cab?.row);
+      if (!layoutKey || placed.has(cab.id)) return;
+      nextSpec[layoutKey].push({ ref: cab.id });
+      placed.add(cab.id);
     });
     return nextSpec;
   }, []);
@@ -1121,7 +1132,12 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
           (spec.cabinets || []).forEach(c => { cabMap[c.id] = c; });
           const sel = selectedId ? cabMap[selectedId] : null;
           const selColor = sel?.row === "wall" ? "#1a6fbf" : "#D94420";
-          const baseRun = (spec.base_layout||[]).reduce((s,i)=>s+(i.ref?cabMap[i.ref]?.width||0:i.width||0),0);
+          const lowerRun = (spec.base_layout||[]).reduce((s,i)=>s+(i.ref?cabMap[i.ref]?.width||0:i.width||0),0);
+          const tallRun = (spec.base_layout||[]).reduce((s, i) => {
+            if (!i.ref) return s;
+            return cabMap[i.ref]?.row === "tall" ? s + (cabMap[i.ref]?.width || 0) : s;
+          }, 0);
+          const baseRun = Math.max(0, lowerRun - tallRun);
           const wallRun = (spec.wall_layout||[]).reduce((s,i)=>s+(i.ref?cabMap[i.ref]?.width||0:i.width||0),0);
 
           return (
@@ -1135,6 +1151,7 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
                 <span style={{flex:1}}/>
                 <span style={{color:"#555"}}>{cabCount}{isMobile?"":" cabs"}</span>
                 <span style={{color:"#D94420",fontWeight:600}}>{isMobile?"B":"Base"} {baseRun}"</span>
+                {tallRun > 0 && <span style={{color:"#c2410c",fontWeight:600}}>{isMobile?"T":"Tall"} {tallRun}"</span>}
                 <span style={{color:"#1a6fbf",fontWeight:600}}>{isMobile?"W":"Wall"} {wallRun}"</span>
                 {!isMobile && <>
                   <span style={{color:"#222"}}>|</span>
@@ -1144,7 +1161,7 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
                     onKeyDown={e=>{if(e.key==="Enter")e.target.blur();}}
                     style={{width:42,height:24,background:"#0a0a14",border:"1px solid #2a2a3a",borderRadius:4,color:"#ccc",textAlign:"center",fontSize:12,fontFamily:"'JetBrains Mono',monospace",fontWeight:600}}
                   />
-                  {wallLength && (()=>{const maxRun=Math.max(baseRun,wallRun);const filler=wallLength-maxRun;return <span style={{color:filler<0?"#e04040":filler>6?"#e0a020":"#22c55e",fontWeight:700,fontSize:11,padding:"2px 6px",background:filler<0?"rgba(224,64,64,0.1)":"rgba(34,197,94,0.1)",borderRadius:3}}>{filler>=0?`+${filler}" filler`:`${filler}" over!`}</span>;})()}
+                  {wallLength && (()=>{const maxRun=Math.max(lowerRun,wallRun);const filler=wallLength-maxRun;return <span style={{color:filler<0?"#e04040":filler>6?"#e0a020":"#22c55e",fontWeight:700,fontSize:11,padding:"2px 6px",background:filler<0?"rgba(224,64,64,0.1)":"rgba(34,197,94,0.1)",borderRadius:3}}>{filler>=0?`+${filler}" filler`:`${filler}" over!`}</span>;})()}
                   <span style={{color:"#222"}}>|</span>
                   <button onClick={()=>window.print()} style={{height:24,padding:"0 10px",borderRadius:4,background:"#1a1a2a",border:"1px solid #2a2a3a",color:"#888",fontSize:10,fontWeight:600,cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>Print</button>
                 </>}
@@ -1161,7 +1178,7 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
                     <span style={{fontSize:11,fontFamily:"monospace",color:"#555"}}>{new Date().toLocaleDateString()}</span>
                   </div>
                   <div style={{fontSize:11,fontFamily:"monospace",color:"#444",marginTop:2}}>
-                    {cabCount} cabinets · Base: {baseRun}" · Wall: {wallRun}"
+                    {cabCount} cabinets · Base: {baseRun}"{tallRun > 0 ? ` · Tall: ${tallRun}"` : ""} · Wall: {wallRun}"
                   </div>
                 </div>
                 {/* No overlapping thumbnails — photo is in sidebar, plan is a tab */}
@@ -1189,8 +1206,8 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
                     {label:"Duplicate (⌘D)",action:()=>{const newId=generateId(ctxCab.row,spec);dispatch({type:"DUPLICATE_CABINET",id:renderCtxMenu.id,newId});setSelectedId(newId);setRenderCtxMenu(null);}},
                     {label:"Set Width…",action:()=>{setSelectedId(renderCtxMenu.id);setRenderCtxMenu(null);setTimeout(()=>{if(widthInputRef.current){widthInputRef.current.focus();widthInputRef.current.select();}},50);}},
                     ...(ctxCab.width>=12?[{label:"Split in Half",action:()=>{const half=Math.round(ctxCab.width/2*4)/4;const leftW=half;const rightW=Math.round((ctxCab.width-half)*4)/4;const leftId=generateId(ctxCab.row,spec);const tempSpec={...spec,cabinets:[...spec.cabinets,{id:leftId,row:ctxCab.row}]};const rightId=generateId(ctxCab.row,tempSpec);dispatch({type:"SPLIT_CABINET",id:renderCtxMenu.id,leftId,rightId,leftWidth:leftW,rightWidth:rightW});setSelectedId(leftId);setRenderCtxMenu(null);}}]:[]),
-                    {label:"+ Space Left",action:()=>{const layout=spec[ctxCab.row==="base"?"base_layout":"wall_layout"]||[];const pos=layout.findIndex(i=>i.ref===renderCtxMenu.id);dispatch({type:"ADD_GAP",row:ctxCab.row,position:Math.max(pos,0),gap:{type:"filler",label:"Filler",width:3}});setRenderCtxMenu(null);}},
-                    {label:"+ Space Right",action:()=>{const layout=spec[ctxCab.row==="base"?"base_layout":"wall_layout"]||[];const pos=layout.findIndex(i=>i.ref===renderCtxMenu.id);dispatch({type:"ADD_GAP",row:ctxCab.row,position:pos+1,gap:{type:"filler",label:"Filler",width:3}});setRenderCtxMenu(null);}},
+                    {label:"+ Space Left",action:()=>{const layout=spec[layoutKeyForCabinetRow(ctxCab.row)]||[];const pos=layout.findIndex(i=>i.ref===renderCtxMenu.id);dispatch({type:"ADD_GAP",row:ctxCab.row,position:Math.max(pos,0),gap:{type:"filler",label:"Filler",width:3}});setRenderCtxMenu(null);}},
+                    {label:"+ Space Right",action:()=>{const layout=spec[layoutKeyForCabinetRow(ctxCab.row)]||[];const pos=layout.findIndex(i=>i.ref===renderCtxMenu.id);dispatch({type:"ADD_GAP",row:ctxCab.row,position:pos+1,gap:{type:"filler",label:"Filler",width:3}});setRenderCtxMenu(null);}},
                     {label:"Delete",action:()=>{setPendingDelete(renderCtxMenu.id);setRenderCtxMenu(null);},color:"#e04040"},
                   ];
                   return <div style={{position:"fixed",left:renderCtxMenu.x,top:renderCtxMenu.y,background:"#1a1a2a",border:"1px solid #2a2a3a",borderRadius:8,padding:4,zIndex:9999,minWidth:160,boxShadow:"0 8px 24px rgba(0,0,0,0.5)"}}
@@ -1257,13 +1274,13 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
                     onMoveDown={sel.row === "wall" ? () => dispatch({ type: "NUDGE_VERTICAL", id: sel.id, amount: 3 }) : undefined}
                     onDelete={() => setPendingDelete(sel.id)}
                     onAddGap={() => {
-                      const layout=spec[sel.row==="base"?"base_layout":"wall_layout"]||[];
+                      const layout=spec[layoutKeyForCabinetRow(sel.row)]||[];
                       const pos=layout.findIndex(i=>i.ref===sel.id);
                       dispatch({type:"ADD_GAP",row:sel.row,position:Math.max(pos,0),gap:{type:"filler",label:"Filler",width:3}});
                     }}
                     onAddCab={() => {
                       const id=generateId(sel.row,spec),cab=defaultCabinet(sel.row);cab.id=id;
-                      const layout=spec[sel.row==="base"?"base_layout":"wall_layout"]||[];
+                      const layout=spec[layoutKeyForCabinetRow(sel.row)]||[];
                       const pos=layout.findIndex(i=>i.ref===sel.id);
                       dispatch({type:"ADD_CABINET",row:sel.row,position:pos+1,cabinet:cab});setSelectedId(id);
                     }}
@@ -1311,6 +1328,10 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
                     const id=generateId("wall",spec),cab=defaultCabinet("wall");cab.id=id;
                     dispatch({type:"ADD_CABINET",row:"wall",position:(spec.wall_layout||[]).length,cabinet:cab});setSelectedId(id);
                   }} style={{height:isMobile?40:32,padding:"0 10px",borderRadius:6,background:"#1a1a2a",border:"1px solid #2a2a3a",color:"#1a6fbf",fontWeight:600,fontSize:11,cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>+ Wall</button>
+                  <button onClick={()=>{
+                    const id=generateId("tall",spec),cab=defaultCabinet("tall");cab.id=id;
+                    dispatch({type:"ADD_CABINET",row:"tall",position:(spec.base_layout||[]).length,cabinet:cab});setSelectedId(id);
+                  }} style={{height:isMobile?40:32,padding:"0 10px",borderRadius:6,background:"#1a1a2a",border:"1px solid #2a2a3a",color:"#c2410c",fontWeight:600,fontSize:11,cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>+ Tall</button>
                   {!isMobile && <button onClick={reset} style={{height:32,padding:"0 10px",borderRadius:6,background:"transparent",border:"1px solid #2a2a3a",color:"#555",fontWeight:600,fontSize:11,cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>Start Over</button>}
                 </div>
               )}

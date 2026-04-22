@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { SECTION_TYPES, BASE_TYPES, WALL_TYPES, TALL_TYPES, STANDARD_WIDTHS, generateId, defaultCabinet, calcDoorSizes, formatFraction, calcScribeNotes, resolveShopProfile } from "../state/specHelpers";
+import { SECTION_TYPES, BASE_TYPES, WALL_TYPES, TALL_TYPES, STANDARD_WIDTHS, generateId, defaultCabinet, calcDoorSizes, formatFraction, calcScribeNotes, resolveShopProfile, layoutKeyForCabinetRow } from "../state/specHelpers";
 
 const MONO = "'JetBrains Mono',monospace";
 const SANS = "'DM Sans',sans-serif";
@@ -43,7 +43,7 @@ export default function CabinetEditBar({ cab, spec, dispatch, selColor, widthInp
   const types = TYPE_MAP[cab.row] || BASE_TYPES;
 
   // Merge neighbors — compute from layout so we can show "Merge ← B2" / "Merge B4 →"
-  const layoutKey = cab.row === "base" ? "base_layout" : cab.row === "wall" ? "wall_layout" : null;
+  const layoutKey = layoutKeyForCabinetRow(cab.row);
   const layout = layoutKey ? (spec[layoutKey] || []) : [];
   const myRefIdx = layout.findIndex(item => item.ref === cab.id);
   const leftNeighborRef = myRefIdx > 0 ? layout[myRefIdx - 1] : null;

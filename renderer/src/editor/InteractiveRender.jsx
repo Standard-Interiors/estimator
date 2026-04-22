@@ -76,12 +76,12 @@ export default function InteractiveRender({ spec, selectedId, isMobile, onSelect
   const PAD = 45, FLOOR = 450, TOE = 4.5 * SC, CTH = 1.5 * SC, GAP = 18 * SC;
   const CTTOP = FLOOR - TOE - 34.5 * SC - CTH, WBOT = CTTOP - GAP;
 
-  const baseItems = []; let bx = PAD;
+  const lowerItems = []; let bx = PAD;
   (spec.base_layout || []).forEach(item => {
     const id = item.ref || item.id, cab = cabMap[id], w = cab ? cab.width : (item.width || 30);
-    baseItems.push({ id, x: bx, w, cab, item }); bx += w * SC;
+    lowerItems.push({ id, x: bx, w, cab, item }); bx += w * SC;
   });
-  const bMap = {}; baseItems.forEach(b => { bMap[b.id] = b; });
+  const bMap = {}; lowerItems.forEach(b => { bMap[b.id] = b; });
 
   const aMap = {}; (spec.alignment || []).forEach(a => { aMap[a.wall] = a.base; });
   const wallItems = []; let wx = PAD;
@@ -96,16 +96,32 @@ export default function InteractiveRender({ spec, selectedId, isMobile, onSelect
   // Cap visual depth at 30" for viewBox sizing — prevents extreme depths from blowing up the layout
   const ddMax = dp(Math.min(30, Math.max(...(spec.cabinets||[]).map(c=>c.depth||(c.row==="wall"?12:24)), 24)));
   const svgW = Math.max(bx, wx) + PAD + ddMax.x + 20;
+  const maxTallH = Math.max(...lowerItems.filter((item) => item.cab?.row === "tall").map((item) => item.cab.height || 84), 0) * SC;
+  const tallTop = maxTallH > 0 ? FLOOR - TOE - maxTallH : null;
 
   // Tight viewBox: crop unused vertical whitespace
-  const contentTop = wallItems.some(w => w.cab) ? WTOP - 28 : CTTOP - 12;
+  const wallTop = wallItems.some(w => w.cab) ? WTOP - 28 : CTTOP - 12;
+  const contentTop = tallTop !== null ? Math.min(wallTop, tallTop - 20) : wallTop;
   const contentBottom = FLOOR + 42;
   const svgH = contentBottom - contentTop;
-
-  const lastCabItem = (spec.base_layout || []).filter(i => i.ref).slice(-1)[0];
-  const lastB = lastCabItem ? bMap[lastCabItem.ref] : null;
-  const ctR = lastB ? lastB.x + lastB.w * SC : bx;
-  const ctW = (ctR - PAD) / SC;
+  const baseCabItems = lowerItems.filter((item) => item.cab && item.cab.row !== "tall");
+  const tallCabItems = lowerItems.filter((item) => item.cab && item.cab.row === "tall");
+  const counterSegments = [];
+  let currentCounter = null;
+  lowerItems.forEach((item) => {
+    if (item.cab?.row === "tall") {
+      if (currentCounter) counterSegments.push(currentCounter);
+      currentCounter = null;
+      return;
+    }
+    const x2 = item.x + item.w * SC;
+    if (!currentCounter) {
+      currentCounter = { x: item.x, w: item.w };
+      return;
+    }
+    currentCounter.w = (x2 - currentCounter.x) / SC;
+  });
+  if (currentCounter) counterSegments.push(currentCounter);
 
   const handleClick = useCallback((id) => (e) => {
     e.stopPropagation();
@@ -198,10 +214,12 @@ export default function InteractiveRender({ spec, selectedId, isMobile, onSelect
       <svg ref={svgRef} viewBox={`0 ${contentTop} ${svgW} ${svgH}`}
         onPointerMove={onPointerMove} onPointerUp={onPointerUp}
         style={{ display: "block", width: "100%", maxWidth: isMobile ? "100%" : svgW * 2, height: "auto", cursor: drag?.started ? "grabbing" : "pointer", touchAction: "none" }}>
-        <Box3D cx={PAD} cy={CTTOP} w={ctW} h={1.5} depth={25.5} front="none" top="none" side="none" stroke="#888" sw={0.8} />
+        {counterSegments.map((segment, idx) => (
+          <Box3D key={`ct-under-${idx}`} cx={segment.x} cy={CTTOP} w={segment.w} h={1.5} depth={25.5} front="none" top="none" side="none" stroke="#888" sw={0.8} />
+        ))}
 
-        {/* Base cabinets first (below gaps in z-order) */}
-        {baseItems.filter(bi => bi.cab).map(bi => {
+        {/* Lower cabinets first (bases only here; talls render later so bridge uppers don't cut through them) */}
+        {baseCabItems.map(bi => {
           const c = bi.cab, ch = c.height || 34.5, d = c.depth || 24, cy = FLOOR - TOE - ch * SC;
           const isSelected = selectedId === bi.id;
           const isDragging = drag?.started && drag.id === bi.id;
@@ -218,8 +236,8 @@ export default function InteractiveRender({ spec, selectedId, isMobile, onSelect
             {isDragging && <text x={bi.x + c.width * SC / 2} y={cy - 8} textAnchor="middle" fontSize={10} fill="#D94420" fontWeight={700} fontFamily="monospace">{drag.dxInches > 0 ? "+" : ""}{drag.dxInches}"</text>}
           </g>);
         })}
-        {/* Base gaps on top (clickable) */}
-        {baseItems.filter(bi => !bi.cab).map(bi => {
+        {/* Lower-row gaps on top (clickable) */}
+        {lowerItems.filter(bi => !bi.cab).map(bi => {
             const gapW = bi.w * SC, midX = bi.x + gapW / 2;
             const label = (bi.item?.label || "").toUpperCase();
             const dimY = FLOOR - TOE - 34.5 * SC / 2;
@@ -233,7 +251,9 @@ export default function InteractiveRender({ spec, selectedId, isMobile, onSelect
             </g>);
         })}
 
-        <Box3D cx={PAD} cy={CTTOP} w={ctW} h={1.5} depth={25.5} front="none" top="none" side="none" stroke="#444" sw={1.3} />
+        {counterSegments.map((segment, idx) => (
+          <Box3D key={`ct-top-${idx}`} cx={segment.x} cy={CTTOP} w={segment.w} h={1.5} depth={25.5} front="none" top="none" side="none" stroke="#444" sw={1.3} />
+        ))}
 
         {/* Wall cabinets first — top-aligned (all tops at WTOP) */}
         {wallItems.filter(wi => wi.cab).map(wi => {
@@ -269,6 +289,25 @@ export default function InteractiveRender({ spec, selectedId, isMobile, onSelect
               <text x={midX} y={dimY - 4} textAnchor="middle" fontSize={8} fill="#999" fontWeight={600} fontFamily="monospace">{wi.w}"</text>
               {label && <text x={midX} y={dimY + 11} textAnchor="middle" fontSize={7} fill="#aaa" fontFamily="monospace">{label}</text>}
             </g>);
+        })}
+
+        {/* Tall cabinets render after uppers so a pantry/oven stack stays visually in front of bridge cabinets. */}
+        {tallCabItems.map(ti => {
+          const c = ti.cab, ch = c.height || 84, d = c.depth || 24, cy = FLOOR - TOE - ch * SC;
+          const isSelected = selectedId === ti.id;
+          const isDragging = drag?.started && drag.id === ti.id;
+          const dragTx = isDragging ? `translate(${drag.dx / (svgRef.current ? svgRef.current.getBoundingClientRect().width / svgW : 1)}, 0)` : undefined;
+          const cs = confStyle(c);
+          return (<g key={`t-${ti.id}`} onClick={!drag?.started ? handleClick(ti.id) : undefined} onDoubleClick={handleDblClick(ti.id)} onContextMenu={handleContextMenu(ti.id, "tall")} onPointerDown={onPointerDown(ti.id, "tall")} style={{ cursor: isDragging ? "grabbing" : "grab" }} transform={dragTx}>
+            <rect x={ti.x} y={cy - 4} width={c.width * SC} height={ch * SC + 8 + TOE + 30} fill="transparent" />
+            {isSelected && highlightRect(ti.x, cy, c.width, ch, "base")}
+            <Box3D cx={ti.x} cy={cy} w={c.width} h={ch} depth={d} stroke={cs.stroke} dash={cs.dash} />
+            <rect x={ti.x + 2 * SC} y={FLOOR - TOE} width={Math.max(0, c.width * SC - 4 * SC)} height={TOE} fill="none" stroke="#ccc" strokeWidth={0.4} />
+            <Face cab={c} cx={ti.x} cy={cy} w={c.width} h={ch} />
+            <text x={ti.x + c.width * SC / 2} y={FLOOR + 13} textAnchor="middle" fontSize={9} fill={cs.stroke || "#D94420"} fontWeight={700} fontFamily="monospace">{ti.id}</text>
+            <text x={ti.x + c.width * SC / 2} y={FLOOR + 23} textAnchor="middle" fontSize={6.5} fill="#888" fontFamily="monospace">{`${c.width}w ${ch}h ${d}d`}</text>
+            {isDragging && <text x={ti.x + c.width * SC / 2} y={cy - 8} textAnchor="middle" fontSize={10} fill="#D94420" fontWeight={700} fontFamily="monospace">{drag.dxInches > 0 ? "+" : ""}{drag.dxInches}"</text>}
+          </g>);
         })}
 
         {wallItems.length > 0 && (() => {

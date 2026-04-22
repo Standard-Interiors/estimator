@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { generateId, defaultCabinet } from "../state/specHelpers";
+import { generateId, defaultCabinet, layoutKeyForCabinetRow } from "../state/specHelpers";
 
 export default function ActionRow({ cabId, spec, dispatch, onSelect }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -12,7 +12,7 @@ export default function ActionRow({ cabId, spec, dispatch, onSelect }) {
   if (!cab) return null;
 
   const row = cab.row;
-  const layoutKey = row === "base" ? "base_layout" : "wall_layout";
+  const layoutKey = layoutKeyForCabinetRow(row);
   const layout = spec[layoutKey] || [];
   const refIdx = layout.findIndex(item => item.ref === cabId);
 
@@ -77,7 +77,7 @@ export default function ActionRow({ cabId, spec, dispatch, onSelect }) {
     if (onSelect) onSelect(null);
   };
 
-  const rowColor = row === "base" ? "#D94420" : "#1a6fbf";
+  const rowColor = row === "wall" ? "#1a6fbf" : "#D94420";
   const canSplit = cab.width >= 12;
   const canMoveLeft = refIdx > 0;
   const canMoveRight = refIdx < layout.length - 1;

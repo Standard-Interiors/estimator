@@ -11,8 +11,8 @@ function clone(obj) {
 }
 
 function getLayoutKey(row) {
-  if (row === "base") return "base_layout";
   if (row === "wall") return "wall_layout";
+  if (row === "base" || row === "tall") return "base_layout";
   return null;
 }
 
@@ -25,9 +25,11 @@ function findRefIndex(layout, id) {
 }
 
 function rowForCabinet(spec, id) {
-  if (spec.base_layout.some((item) => item.ref === id)) return "base";
-  if (spec.wall_layout.some((item) => item.ref === id)) return "wall";
-  return null;
+  const cab = spec.cabinets.find((c) => c.id === id);
+  if (!cab) return null;
+  if (spec.wall_layout.some((item) => item.ref === id)) return cab.row || "wall";
+  if (spec.base_layout.some((item) => item.ref === id)) return cab.row || "base";
+  return cab.row || null;
 }
 
 function isExplicitSpacer(item) {
@@ -84,8 +86,8 @@ export default function specReducer(state, action) {
     }
 
     case "MOVE_ROW": {
-      // Move a cabinet between base and wall rows
-      // action: { id, targetRow } — "base" or "wall"
+      // Move a cabinet between lower/wall rows.
+      // action: { id, targetRow } — "base", "wall", or "tall"
       const currentRow = rowForCabinet(spec, action.id);
       if (!currentRow || currentRow === action.targetRow) return spec;
 
@@ -107,16 +109,25 @@ export default function specReducer(state, action) {
         spec.cabinets[cabIdx].row = action.targetRow;
         // Adjust default dimensions for new row
         if (action.targetRow === "wall") {
-          if (spec.cabinets[cabIdx].height === 34.5) spec.cabinets[cabIdx].height = 30;
+          if (spec.cabinets[cabIdx].height === 34.5 || spec.cabinets[cabIdx].height === 84) {
+            spec.cabinets[cabIdx].height = 30;
+          }
           if (spec.cabinets[cabIdx].depth === 24) spec.cabinets[cabIdx].depth = 12;
+        } else if (action.targetRow === "tall") {
+          if (spec.cabinets[cabIdx].height === 34.5 || spec.cabinets[cabIdx].height === 30) {
+            spec.cabinets[cabIdx].height = 84;
+          }
+          if (spec.cabinets[cabIdx].depth === 12) spec.cabinets[cabIdx].depth = 24;
         } else {
-          if (spec.cabinets[cabIdx].height === 30) spec.cabinets[cabIdx].height = 34.5;
+          if (spec.cabinets[cabIdx].height === 30 || spec.cabinets[cabIdx].height === 84) {
+            spec.cabinets[cabIdx].height = 34.5;
+          }
           if (spec.cabinets[cabIdx].depth === 12) spec.cabinets[cabIdx].depth = 24;
         }
         // Update ID prefix — ensure uniqueness
         const oldId = spec.cabinets[cabIdx].id;
-        const prefix = action.targetRow === "wall" ? "W" : "B";
-        const num = oldId.replace(/^[BW]/, "");
+        const prefix = action.targetRow === "wall" ? "W" : action.targetRow === "tall" ? "T" : "B";
+        const num = oldId.replace(/^[BWT]/, "");
         let newId = prefix + num;
         // If ID already taken, find next available number
         const existingIds = new Set(spec.cabinets.map(c => c.id));
@@ -562,6 +573,17 @@ export default function specReducer(state, action) {
       loaded.alignment = Array.isArray(loaded.alignment)
         ? loaded.alignment.filter((a) => a?.wall && a?.base)
         : [];
+      const placed = new Set(
+        [...loaded.base_layout, ...loaded.wall_layout]
+          .filter((item) => item?.ref)
+          .map((item) => item.ref)
+      );
+      loaded.cabinets.forEach((cab) => {
+        const layoutKey = getLayoutKey(cab?.row);
+        if (!layoutKey || placed.has(cab.id)) return;
+        loaded[layoutKey].push({ ref: cab.id });
+        placed.add(cab.id);
+      });
       return loaded;
     }
 
