@@ -238,6 +238,21 @@
 ## Review Notes
 
 - Highest-risk behavior if row changes are added: `MOVE_ROW` rewrites row, dimensions, and the cabinet ID prefix, but the active editor selection still keys off the old `selectedId`. Without consuming `_movedTo`, the row-changed cabinet immediately loses selection and the bottom editor path goes blank.
+
+# UI Parity Review After Lane Feature (2026-04-22)
+
+- [x] Confirm the active production editor path in `App.jsx` still routes desktop and mobile through the expected components
+- [x] Inspect `InteractiveRender.jsx`, `CabinetEditBar.jsx`, `BottomSheet.jsx`, `ActionRow.jsx`, and `App.jsx` only
+- [x] Compare desktop vs mobile correction affordances for a bad `T1`-style scenario after the lane feature
+- [x] Record only concrete desktop/mobile mismatches or affordance gaps with file references
+
+## Review Notes
+
+- Production path still matches the project rules: `InteractiveRender` is shared, desktop uses `CabinetEditBar`, mobile uses `BottomSheet` + `ActionRow`.
+- Concrete parity gaps confirmed from the active files:
+- Mobile still cannot insert a new filler/opening next to the selected cabinet. Desktop can via `CabinetEditBar` and the 3D context menu; mobile only adds cabinets before/after.
+- The render-toolbar `Photo` button is still shown on mobile, but the only photo panel it toggles is desktop-only, so mobile loses in-editor photo reference during correction.
+- "Move" is not parity-safe across devices: desktop move buttons nudge openings via `NUDGE_CABINET`, while mobile move buttons reorder via `MOVE_CABINET`.
 - Highest-risk behavior if free placement is added on the current drag path: desktop drag still resolves to `NUDGE_CABINET`, which mutates adjacent non-ref layout items rather than storing an independent x-position. That means openings/appliance gaps are likely to be rewritten instead of the cabinet simply moving.
 - Alignment is still derived from `wall_layout` order plus `alignment` references, not from persisted wall positions. Moving bases/walls between rows or allowing arbitrary placement will make upper cabinets jump unless alignment semantics are redesigned together.
 - Desktop and mobile movement semantics are not equivalent today. Desktop uses nudge + filler semantics; mobile action buttons use neighbor swaps and have no row/vertical placement controls, so parity is a real regression risk.
@@ -261,3 +276,25 @@
 - layout/run membership (which wall/run/return the box belongs to), which the editor now partly captures with row changes and slot placement
 - A free front/back drag would imply room-plan precision the current data model does not actually own. That is risky because a cabinet maker may read a 3D offset as something that should drive cut list, fillers, scribes, or appliance clearances when it is only a cosmetic placement.
 - If a future field pattern shows repeated need beyond left/right + row changes, the more useful primitive is an explicit non-wall lane/run control such as `main run` / `return` / `island face` or a simple `flush` / `stepped` offset, not unconstrained front/back dragging.
+
+# Editor Correction Iteration (2026-04-22)
+
+- [x] Re-open the live `Wall 3` screen in Chrome MCP and verify remaining post-lane correction gaps
+- [x] Re-run parallel staff-level SWE reviews plus a shop-domain review before the next patch
+- [x] Prove in Chrome MCP that new lower cabinets save without explicit `lane`
+- [x] Prove in Chrome MCP that mobile `Move` reorders while desktop `Move` still edits spacing
+- [x] Prove in Chrome MCP that mobile still cannot insert spacing items next to a cabinet
+- [ ] Fix add flows so new cabinets carry explicit placement defaults and inherit nearby placement context
+- [ ] Separate slot movement wording from spacing wording so the editor does not lie about what `Move` does
+- [ ] Add mobile spacing insertion parity and fix the mobile `Photo` affordance on the render tab
+- [ ] Re-verify the full correction flow in Chrome MCP on real `Wall 3` data
+- [ ] Deploy, re-test in Chrome MCP on the real site, and restore production data to the clean baseline
+
+## Review Notes
+
+- Chrome MCP proof: adding `B4` on live `Wall 3` saved a new cabinet with no `lane` field at all, while existing lower/tall cabinets did persist `lane`.
+- Chrome MCP proof: in mobile layout, `Move ▶` on `B3` reordered the run, while in desktop layout the left arrow on `B3` showed `Warning: move resized the refrigerator gap` and changed the opening widths.
+- Chrome MCP proof: mobile `ActionRow` still exposes `Move`, `Split`, `Merge`, `+ Before`, `+ After`, and `Delete`, but no way to insert a filler/opening beside the selected cabinet.
+- Reviewer convergence for the next batch:
+- Keep the lane feature, but do not pretend it solves every correction problem.
+- Make placement defaults truthful, make movement language truthful, and give mobile the same spacing repair power as desktop.

@@ -276,7 +276,7 @@ function getNudgeWarning(spec, id, amount) {
   if (!gapItem || gapItem.ref || isExplicitSpacerEntry(gapItem)) return null;
 
   const label = (gapItem.label || gapItem.type || "opening").toLowerCase();
-  return `Warning: move resized the ${label} gap`;
+  return `Warning: spacing edit resized the ${label} gap`;
 }
 
 function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack }) {
@@ -878,11 +878,18 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
             ))}
             {/* Photo toggle — only on render tab */}
             {tab === "render" && photoPreview && (
-              <button onClick={()=>setShowPhotoSidebar(!showPhotoSidebar)} style={{
-                background:showPhotoSidebar?"#1a1a2a":"transparent",color:showPhotoSidebar?"#fff":"#555",
-                border:`1px solid ${showPhotoSidebar?"#2a2a3a":"transparent"}`,
+              <button onClick={()=>{
+                if (isMobile) {
+                  setTab("photo");
+                  setShowMoreMenu(false);
+                  return;
+                }
+                setShowPhotoSidebar(!showPhotoSidebar);
+              }} style={{
+                background:!isMobile && showPhotoSidebar?"#1a1a2a":"transparent",color:!isMobile && showPhotoSidebar?"#fff":"#555",
+                border:`1px solid ${!isMobile && showPhotoSidebar?"#2a2a3a":"transparent"}`,
                 padding:"4px 10px",borderRadius:5,fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:"inherit"
-              }}>Photo</button>
+              }}>{isMobile ? "Open Photo" : "Photo"}</button>
             )}
             {/* Shop Profile — visually distinct from tabs */}
             <span style={{width:1,height:16,background:"#1a1a2a",margin:"0 2px"}}/>
@@ -1292,7 +1299,10 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
                       dispatch({type:"ADD_GAP",row:sel.row,position:Math.max(pos,0),gap:{type:"filler",label:"Filler",width:3}});
                     }}
                     onAddCab={() => {
-                      const id=generateId(sel.row,spec),cab=defaultCabinet(sel.row);cab.id=id;
+                      const placement = sel.row === "wall"
+                        ? { yOffset: sel.yOffset }
+                        : { lane: sel.lane };
+                      const id=generateId(sel.row,spec),cab=defaultCabinet(sel.row, undefined, placement);cab.id=id;
                       const layout=spec[layoutKeyForCabinetRow(sel.row)]||[];
                       const pos=layout.findIndex(i=>i.ref===sel.id);
                       dispatch({type:"ADD_CABINET",row:sel.row,position:pos+1,cabinet:cab});setSelectedId(id);

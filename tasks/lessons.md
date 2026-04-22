@@ -100,3 +100,6 @@ If 3D drag is supposed to let the cabinet maker fix AI layout mistakes, do not k
 
 ### 19. Verify the missing movement axis before answering like the feature exists
 If the user asks how to move something in a direction like front/back, do not infer that the new placement system already supports that axis. Re-check the active editor controls and reducer model first, then answer with the exact current capability gap before promising the next fix.
+
+### 20. Use Chrome MCP for all verification unless the user explicitly changes that
+If runtime behavior needs to be checked, stay inside Chrome MCP for the full verification loop instead of mixing in other browser drivers or partial fallbacks. If Chrome MCP gets awkward, solve the interaction problem there rather than silently switching tools.

@@ -173,9 +173,10 @@ export function generateId(row, spec) {
 }
 
 /**
- * Return a cabinet template with standard dimensions and a single-door face.
+ * Return a cabinet template with standard dimensions, a single-door face,
+ * and sane placement defaults for the requested row.
  */
-export function defaultCabinet(row, type) {
+export function defaultCabinet(row, type, placement = {}) {
   const isWall = row === "wall";
   const isTall = row === "tall";
 
@@ -183,7 +184,7 @@ export function defaultCabinet(row, type) {
   const height = isTall ? 84 : isWall ? 30 : BASE_HEIGHT;
   const depth = isWall ? WALL_DEPTH : BASE_DEPTH;
 
-  return {
+  const cab = {
     id: "", // caller must set
     type: type || (isWall ? "wall" : isTall ? "tall_pantry" : "base"),
     label: "",
@@ -201,6 +202,16 @@ export function defaultCabinet(row, type) {
       ],
     },
   };
+
+  if (isWall) {
+    if (typeof placement.yOffset === "number") {
+      cab.yOffset = Math.max(0, placement.yOffset);
+    }
+  } else {
+    cab.lane = placement.lane === "back" ? "back" : "front";
+  }
+
+  return cab;
 }
 
 /**

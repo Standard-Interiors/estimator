@@ -109,9 +109,11 @@ export default function specReducer(state, action) {
     case "ADD_CABINET": {
       const layoutKey = getLayoutKey(action.row);
       if (!layoutKey) return spec;
-      spec.cabinets.push(action.cabinet);
+      const cab = clone(action.cabinet || {});
+      applyRowDefaults(cab, action.row);
+      spec.cabinets.push(cab);
       const pos = Math.min(action.position, spec[layoutKey].length);
-      spec[layoutKey].splice(pos, 0, { ref: action.cabinet.id });
+      spec[layoutKey].splice(pos, 0, { ref: cab.id });
       return spec;
     }
 

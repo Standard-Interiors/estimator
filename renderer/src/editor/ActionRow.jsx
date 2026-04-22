@@ -15,10 +15,13 @@ export default function ActionRow({ cabId, spec, dispatch, onSelect }) {
   const layoutKey = layoutKeyForCabinetRow(row);
   const layout = spec[layoutKey] || [];
   const refIdx = layout.findIndex(item => item.ref === cabId);
+  const placementSeed = row === "wall"
+    ? { yOffset: cab.yOffset }
+    : { lane: cab.lane };
 
   const handleAddBefore = () => {
     const newId = generateId(row, spec);
-    const newCab = defaultCabinet(row);
+    const newCab = defaultCabinet(row, undefined, placementSeed);
     newCab.id = newId;
     dispatch({ type: "ADD_CABINET", row, position: Math.max(refIdx, 0), cabinet: newCab });
     if (onSelect) onSelect(newId);
@@ -26,10 +29,28 @@ export default function ActionRow({ cabId, spec, dispatch, onSelect }) {
 
   const handleAddAfter = () => {
     const newId = generateId(row, spec);
-    const newCab = defaultCabinet(row);
+    const newCab = defaultCabinet(row, undefined, placementSeed);
     newCab.id = newId;
     dispatch({ type: "ADD_CABINET", row, position: refIdx + 1, cabinet: newCab });
     if (onSelect) onSelect(newId);
+  };
+
+  const handleAddSpaceBefore = () => {
+    dispatch({
+      type: "ADD_GAP",
+      row,
+      position: Math.max(refIdx, 0),
+      gap: { type: "filler", label: "Filler", width: 3 },
+    });
+  };
+
+  const handleAddSpaceAfter = () => {
+    dispatch({
+      type: "ADD_GAP",
+      row,
+      position: refIdx + 1,
+      gap: { type: "filler", label: "Filler", width: 3 },
+    });
   };
 
   const handleSplitStart = () => {
@@ -176,9 +197,9 @@ export default function ActionRow({ cabId, spec, dispatch, onSelect }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
       <div style={{ display: "flex", gap: 6 }}>
-        {pillBtn("\u25C0 Move", canMoveLeft ? handleMoveLeft : undefined, "#1a1a2a",
+        {pillBtn("\u25C0 Slot", canMoveLeft ? handleMoveLeft : undefined, "#1a1a2a",
           canMoveLeft ? "#ccc" : "#444", canMoveLeft ? {} : { opacity: 0.4 })}
-        {pillBtn("Move \u25B6", canMoveRight ? handleMoveRight : undefined, "#1a1a2a",
+        {pillBtn("Slot \u25B6", canMoveRight ? handleMoveRight : undefined, "#1a1a2a",
           canMoveRight ? "#ccc" : "#444", canMoveRight ? {} : { opacity: 0.4 })}
         {pillBtn("Split", canSplit ? handleSplitStart : undefined, "#1a1a2a",
           canSplit ? "#ccc" : "#444", canSplit ? {} : { opacity: 0.4 })}
@@ -192,6 +213,10 @@ export default function ActionRow({ cabId, spec, dispatch, onSelect }) {
           canMergeRight ? handleMergeRight : undefined, "#1a1a2a",
           canMergeRight ? rowColor : "#444",
           canMergeRight ? {} : { opacity: 0.4 })}
+      </div>
+      <div style={{ display: "flex", gap: 6 }}>
+        {pillBtn("+ Space \u2190", handleAddSpaceBefore, "#1a1a2a", rowColor)}
+        {pillBtn("Space \u2192 +", handleAddSpaceAfter, "#1a1a2a", rowColor)}
       </div>
       <div style={{ display: "flex", gap: 6 }}>
         {pillBtn("+ Before", handleAddBefore, "#1a1a2a", rowColor)}
