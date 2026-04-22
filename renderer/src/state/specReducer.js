@@ -637,6 +637,10 @@ export default function specReducer(state, action) {
       const baseCab = spec.cabinets.find((c) => c.id === action.base);
       if (!wallCab || wallCab.row !== "wall") return state;
       if (!isFrontBaseCabinet(baseCab)) return state;
+      const occupiedBase = (spec.alignment || []).find(
+        (a) => a.base === action.base && a.wall !== action.wall
+      );
+      if (occupiedBase) return state;
 
       spec.alignment = (spec.alignment || []).filter(
         (a) => a.wall !== action.wall && a.base !== action.base

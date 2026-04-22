@@ -106,3 +106,6 @@ If runtime behavior needs to be checked, stay inside Chrome MCP for the full ver
 
 ### 21. When the user asks for sustained iteration, one clean batch is not a stopping point
 If the user explicitly asks for a long-running multi-iteration push, do not treat a successful patch/deploy cycle as the natural end of the turn. Finish the batch, then immediately start the next fresh-eye review cycle and keep going until you hit a real blocker or the user redirects.
+
+### 22. Temporary editor modes need full event-path audits, not just button lockouts
+When adding a mode like Align Over, do not stop after wiring the visible controls. Audit every other input path that can mutate the same state: pointer-down, click, drag, keyboard navigation, selection jumps, and mobile action rows. If the mode changes what a tap means, duplicate event paths will create stale state or bypass the guardrails.

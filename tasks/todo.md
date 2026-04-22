@@ -301,9 +301,17 @@
 
 # Editor Correction Iteration 2 (2026-04-22)
 
-- [ ] Re-open the active alignment model in code and verify exactly how uppers anchor to lowers today
-- [ ] Use Chrome MCP on real field data to prove the current editor still lacks a direct upper-alignment correction path
-- [ ] Decide the smallest truthful editor affordance for fixing bad upper alignment without rewriting extraction
-- [ ] Implement the alignment correction flow on the active production editor path
-- [ ] Re-verify the alignment correction flow in Chrome MCP locally on real data
-- [ ] Deploy, Chrome MCP verify on the real site, and restore production data to the clean baseline
+- [x] Re-open the active alignment model in code and verify exactly how uppers anchor to lowers today
+- [x] Use Chrome MCP on real field data to prove the current editor still lacks a direct upper-alignment correction path
+- [x] Decide the smallest truthful editor affordance for fixing bad upper alignment without rewriting extraction
+- [x] Implement the alignment correction flow on the active production editor path
+- [x] Re-verify the alignment correction flow in Chrome MCP locally on real data
+- [x] Deploy, Chrome MCP verify on the real site, and restore production data to the clean baseline
+
+Review:
+- Added a real `Align Over` correction flow on desktop and mobile, backed by persisted `alignment` entries instead of fake filler geometry.
+- Guardrails now keep alignments one-to-one, reject non-front-base anchors, clear unsafe anchors on split/merge/row/lane changes, and stop stale pick mode from hanging around after selection changes.
+- Closed the hidden bypasses that the first fresh-eye review found: aligned uppers no longer move horizontally by drag, an occupied base cannot be silently stolen by another upper, and mobile keeps merge actions even while alignment is active.
+- Chrome MCP runtime proof:
+- Local localhost-with-prod-data pass: `W3 -> Align Over -> B3` saved `alignment:[{wall:\"W3\",base:\"B3\"}]`, selecting `B3` for `W2` showed `B3 is already anchoring W3`, `Tab` canceled stale pick mode by moving back to `W3`, and a simulated horizontal drag on aligned `W3` produced no extra PATCH.
+- Live Fly pass: the deployed build showed the same desktop and mobile `Align Over` controls, saved and cleared `W3 <-> B3` alignment through `PATCH /api/rooms/24ca994d2d3db8de/spec`, and the production room was restored to `alignment: []` afterward.

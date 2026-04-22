@@ -287,6 +287,10 @@ function getAlignmentBaseId(spec, wallId) {
   return (spec?.alignment || []).find((entry) => entry.wall === wallId)?.base || null;
 }
 
+function getAlignmentWallId(spec, baseId) {
+  return (spec?.alignment || []).find((entry) => entry.base === baseId)?.wall || null;
+}
+
 function getAlignableBaseTargets(spec) {
   const cabMap = {};
   (spec?.cabinets || []).forEach((cab) => { cabMap[cab.id] = cab; });
@@ -915,6 +919,11 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
         showEditorNotice("Tap a front base cabinet to align this upper", 3000);
         return;
       }
+      const occupiedWallId = getAlignmentWallId(specRef.current, id);
+      if (occupiedWallId && occupiedWallId !== alignmentTargetWallId) {
+        showEditorNotice(`${id} is already anchoring ${occupiedWallId}. Clear that align first`, 4000);
+        return;
+      }
       const result = getWallAlignmentEligibility(specRef.current, alignmentTargetWallId, id);
       if (!result.ok) {
         showEditorNotice(result.reason, 4000);
@@ -946,6 +955,14 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
   const selectedCab = selectedId ? spec.cabinets.find((cab) => cab.id === selectedId) : null;
   const selectedWallIsAligned = selectedCab?.row === "wall" && !!selectedAlignmentBaseId;
   const alignableBaseTargets = getAlignableBaseTargets(spec);
+
+  useEffect(() => {
+    if (!alignmentTargetWallId) return;
+    const targetCab = spec.cabinets.find((cab) => cab.id === alignmentTargetWallId);
+    if (!targetCab || targetCab.row !== "wall" || (selectedId && selectedId !== alignmentTargetWallId) || selectedGapItem) {
+      cancelAlignmentPick();
+    }
+  }, [alignmentTargetWallId, cancelAlignmentPick, selectedGapItem, selectedId, spec.cabinets]);
 
   const hasSpec = mode === "loaded" && spec;
 

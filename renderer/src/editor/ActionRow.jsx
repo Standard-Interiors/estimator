@@ -104,8 +104,8 @@ export default function ActionRow({ cabId, spec, dispatch, onSelect, isAlignedWa
   const canMoveRight = !isAlignedWall && refIdx < layout.length - 1;
 
   // Merge — only available when there's an adjacent neighbor in the same row
-  const leftNeighborRef = canMoveLeft ? layout[refIdx - 1] : null;
-  const rightNeighborRef = canMoveRight ? layout[refIdx + 1] : null;
+  const leftNeighborRef = refIdx > 0 ? layout[refIdx - 1] : null;
+  const rightNeighborRef = refIdx >= 0 && refIdx < layout.length - 1 ? layout[refIdx + 1] : null;
   const leftNeighbor = leftNeighborRef?.ref
     ? spec.cabinets.find(c => c.id === leftNeighborRef.ref)
     : null;

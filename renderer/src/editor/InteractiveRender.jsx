@@ -85,6 +85,7 @@ export default function InteractiveRender({ spec, selectedId, isMobile, onSelect
   const bMap = {}; lowerItems.forEach(b => { bMap[b.id] = b; });
 
   const aMap = {}; (spec.alignment || []).forEach(a => { aMap[a.wall] = a.base; });
+  const baseToWallMap = {}; (spec.alignment || []).forEach((a) => { baseToWallMap[a.base] = a.wall; });
   const wallItems = []; let wx = PAD; let prevWasGap = false;
   (spec.wall_layout || []).forEach(item => {
     const id = item.ref || item.id, cab = cabMap[id], w = cab ? cab.width : (item.width || 30);
@@ -204,12 +205,15 @@ export default function InteractiveRender({ spec, selectedId, isMobile, onSelect
     const targetRow = activeDrag.row;
     const targetItems = (targetRow === "wall" ? wallItems : lowerItems).filter((item) => item.id !== activeDrag.id);
     const currentItems = activeDrag.row === "wall" ? wallItems : lowerItems;
-    const targetIndex = getInsertIndexAtX(targetItems, activeDrag.svgX);
     const currentIndex = getCurrentInsertIndex(currentItems, activeDrag.id);
+    const targetIndex = activeDrag.lockHorizontal
+      ? currentIndex
+      : getInsertIndexAtX(targetItems, activeDrag.svgX);
     const currentYOffset = cabMap[activeDrag.id]?.yOffset || 0;
     const targetYOffset = targetRow === "wall"
       ? Math.max(0, activeDrag.row === "wall" ? currentYOffset + (activeDrag.dyInches || 0) : 0)
       : undefined;
+    const currentItem = currentItems.find((item) => item.id === activeDrag.id);
 
     return {
       id: activeDrag.id,
@@ -217,7 +221,9 @@ export default function InteractiveRender({ spec, selectedId, isMobile, onSelect
       targetIndex,
       currentIndex,
       targetYOffset,
-      previewX: getInsertX(targetItems, targetIndex),
+      previewX: activeDrag.lockHorizontal && currentItem
+        ? currentItem.x
+        : getInsertX(targetItems, targetIndex),
     };
   };
 
@@ -227,8 +233,17 @@ export default function InteractiveRender({ spec, selectedId, isMobile, onSelect
     if (alignmentTargetWallId) return;
     e.currentTarget.setPointerCapture(e.pointerId);
     onSelect(id);
-    setDrag({ id, row, startClientX: e.clientX, startClientY: e.clientY, dx: 0, dy: 0, started: false });
-  }, [alignmentTargetWallId, onSelect]);
+    setDrag({
+      id,
+      row,
+      startClientX: e.clientX,
+      startClientY: e.clientY,
+      dx: 0,
+      dy: 0,
+      started: false,
+      lockHorizontal: row === "wall" && !!aMap[id],
+    });
+  }, [aMap, alignmentTargetWallId, onSelect]);
 
   const onPointerMove = useCallback((e) => {
     if (!drag) return;
@@ -243,7 +258,7 @@ export default function InteractiveRender({ spec, selectedId, isMobile, onSelect
     const svgY = (e.clientY - rect.top) / svgScale + svg.viewBox.baseVal.y;
     // Horizontal snap
     const dxSvg = rawDx / svgScale;
-    const snapInchX = Math.round(dxSvg / SC);
+    const snapInchX = drag.lockHorizontal ? 0 : Math.round(dxSvg / SC);
     const snappedDx = snapInchX * SC * svgScale;
     // Vertical snap (wall cabinets only)
     let snappedDy = 0, snapInchY = 0;
@@ -346,7 +361,10 @@ export default function InteractiveRender({ spec, selectedId, isMobile, onSelect
           const drawY = cy + laneOffset.y;
           const isSelected = selectedId === bi.id;
           const isAlignmentCandidate =
-            !!alignmentTargetWallId && c.row === "base" && lowerLane(c) === "front";
+            !!alignmentTargetWallId &&
+            c.row === "base" &&
+            lowerLane(c) === "front" &&
+            (!baseToWallMap[bi.id] || baseToWallMap[bi.id] === alignmentTargetWallId);
           const isDragging = drag?.started && drag.id === bi.id;
           const dragTx = isDragging ? `translate(${drag.dx / (svgRef.current ? svgRef.current.getBoundingClientRect().width / svgW : 1)}, 0)` : undefined;
           const cs = confStyle(c);
@@ -381,7 +399,10 @@ export default function InteractiveRender({ spec, selectedId, isMobile, onSelect
           const c = bi.cab, ch = c.height || 34.5, d = c.depth || 24, cy = FLOOR - TOE - ch * SC;
           const isSelected = selectedId === bi.id;
           const isAlignmentCandidate =
-            !!alignmentTargetWallId && c.row === "base" && lowerLane(c) === "front";
+            !!alignmentTargetWallId &&
+            c.row === "base" &&
+            lowerLane(c) === "front" &&
+            (!baseToWallMap[bi.id] || baseToWallMap[bi.id] === alignmentTargetWallId);
           const isDragging = drag?.started && drag.id === bi.id;
           const dragTx = isDragging ? `translate(${drag.dx / (svgRef.current ? svgRef.current.getBoundingClientRect().width / svgW : 1)}, 0)` : undefined;
           const cs = confStyle(c);
