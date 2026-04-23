@@ -358,6 +358,7 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
   const [wireframePreview, setWireframePreview] = useState(null);
   const [photoFile, setPhotoFile] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(null);
+  const [roomLoadError, setRoomLoadError] = useState(false);
   const [dragTarget, setDragTarget] = useState(null); // "photo" | null
   const photoInputRef = useRef(null);
   const cameraInputRef = useRef(null);
@@ -476,6 +477,7 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
 
     const nextSpec = normalizeLoadedSpec(room?.spec);
     dispatch({ type: "LOAD_SPEC", spec: nextSpec });
+    setRoomLoadError(false);
 
     const nextMode = room?.spec ? "loaded" : "home";
     modeRef.current = nextMode;
@@ -500,24 +502,33 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
 
   const reloadLatestRoom = useCallback(async ({ activateTab = false, saveStateValue = null, extractionMessage = null } = {}) => {
     if (!roomId) return null;
-    const latestRoom = await api.getRoom(roomId);
-    hydrateRoomSnapshot(latestRoom, { activateTab, resetSelection: true });
-    if (saveStateValue) showTransientSaveState(saveStateValue, 4000);
-    if (extractionMessage) {
-      setUploadStatus("");
-      setExtractionError(extractionMessage);
+    try {
+      const latestRoom = await api.getRoom(roomId);
+      hydrateRoomSnapshot(latestRoom, { activateTab, resetSelection: true });
+      if (saveStateValue) showTransientSaveState(saveStateValue, 4000);
+      if (extractionMessage) {
+        setUploadStatus("");
+        setExtractionError(extractionMessage);
+      }
+      return latestRoom;
+    } catch (e) {
+      setRoomLoadError(true);
+      throw e;
     }
-    return latestRoom;
   }, [hydrateRoomSnapshot, roomId, showTransientSaveState]);
 
   // Load spec from DB when a roomId is provided
   useEffect(() => {
     if (!roomId) return;
     (async () => {
+      setRoomLoadError(false);
       try {
         const r = await api.getRoom(roomId);
         hydrateRoomSnapshot(r, { activateTab: !!r.spec, resetSelection: true });
-      } catch (e) { console.error("Failed to load room:", e); }
+      } catch (e) {
+        console.error("Failed to load room:", e);
+        setRoomLoadError(true);
+      }
     })();
   }, [hydrateRoomSnapshot, roomId]);
 
@@ -1059,7 +1070,12 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
       </div>
 
       <div style={{padding:"14px 20px"}}>
-        {mode === "home" && (
+        {roomLoadError ? (
+          <div style={{maxWidth:640,margin:"80px auto",textAlign:"center"}}>
+            <div style={{fontSize:18,fontWeight:700,color:"#eee",marginBottom:8,letterSpacing:"-0.03em"}}>Failed to load room.</div>
+            <div style={{fontSize:13,color:"#666"}}>Refresh or go back to the project list before making changes.</div>
+          </div>
+        ) : mode === "home" && (
           <div style={{maxWidth:640,margin:"0 auto"}}>
             {/* Hero */}
             <div style={{textAlign:"center",paddingTop:40,paddingBottom:24}}>
