@@ -1,3 +1,16 @@
+# Live Data Triage (2026-04-22)
+
+- [x] Review prior live-production anomaly notes for duplicate projects, copy media loss, and empty room records
+- [x] Inspect current duplication and room persistence code paths in `extractor/db.py`, `extractor/server.py`, and related UI entry points
+- [x] Classify each anomaly as trust-breaking product bug vs stale or user-owned data and capture fix priority
+
+## Review Notes
+
+- Empty duplicate projects: product-trust issue if duplication produced them, but the current `duplicate_project()` implementation now copies rooms. Treat the existing empty shells as stale historical fallout unless users can still reproduce empty duplicates today.
+- Historical copy that lost images and `room_name`: real trust-breaking product bug at the time it happened. Current code includes a dedicated fix commit (`f0db483`, `Preserve room names and images on duplicates`), so the remaining bad record is historical damage, not proof of an active data model problem by itself.
+- `Bell` → `Bathroom` → `Wall 1` empty room record: not trust-breaking on its own. The product intentionally allows creating a room/wall before adding a photo or extraction, so one completely empty wall reads like an abandoned draft unless we have evidence the system created it without user intent.
+- Product-code priority: prevent duplicate/copy operations from ever yielding incomplete copies and consider surfacing draft vs populated state more clearly so abandoned empty walls and true failures are easier to distinguish.
+
 # Branch Comparison
 
 - [x] Identify the two branches to compare
@@ -239,6 +252,20 @@
 
 - Highest-risk behavior if row changes are added: `MOVE_ROW` rewrites row, dimensions, and the cabinet ID prefix, but the active editor selection still keys off the old `selectedId`. Without consuming `_movedTo`, the row-changed cabinet immediately loses selection and the bottom editor path goes blank.
 
+# Project/Room Shell Audit (2026-04-22)
+
+- [x] Trace live project create/duplicate/delete flows
+- [x] Trace live room create/duplicate/delete flows
+- [x] Check frontend actions that can leave a project shell behind
+- [x] Inspect local SQLite data to separate active issues from historical artifacts
+
+## Review Notes
+
+- Active bug: project creation persists a zero-room draft immediately and does not clean it up if the user leaves before adding a room.
+- Active bug: deleting the last room leaves the parent project behind as a zero-room shell.
+- Active bug: duplicating a zero-room project will duplicate the empty shell too.
+- Historical data: the local DB has no active zero-room projects today; the empty shell records present are attached only to soft-deleted projects from 2026-04-01/02.
+
 # UI Parity Review After Lane Feature (2026-04-22)
 
 - [x] Confirm the active production editor path in `App.jsx` still routes desktop and mobile through the expected components
@@ -479,3 +506,44 @@ Review:
 - header totals corrected from the old live-style lie (`Base 66"`, `Tall 24"`) to the truthful `Base 48"`, `Tall 42"`
 - `B2` now opens with tall controls (`pantry/oven`, lane, front/back, up/down) instead of base controls
 - saved local payload no longer contains `tall_layout`, and `B2` persists as `row: "tall", type: "tall_pantry"`
+# Empty Room Audit (2026-04-22)
+
+- [x] Review task constraints and lessons before touching the audit
+- [x] Trace backend room creation, persistence, and extraction requirements for rooms with missing assets
+- [x] Trace frontend project detail and room editor behavior for rooms with no photo, no wireframe, and no spec
+- [x] Check whether current local data contains fully empty room rows
+- [x] Classify each finding as bug, intentional draft behavior, or ambiguous
+
+## Review
+
+- Backend intentionally persists draft room rows before any asset exists. `create_room()` inserts a `rooms` row with `spec_version=0` and `cabinet_count=0`, but no `photo_id`, `wireframe_id`, or `spec_json`, and the API returns that row immediately for the UI flow. Evidence: `extractor/server.py`, `extractor/db.py`.
+- Project detail intentionally renders every persisted room row. `get_project()` returns all rooms for a project and only computes `thumb_url` plus `has_spec`; `ProjectDetail` then groups and renders every room without filtering for missing assets. Evidence: `extractor/db.py`, `renderer/src/pages/ProjectDetail.jsx`.
+- The current UI only flags one incomplete state: `has_spec === false` becomes `No extraction`. A fully empty room, a photo-only draft, and a failed/never-finished extraction all collapse into the same visual treatment. Evidence: `extractor/db.py`, `renderer/src/components/RoomCard.jsx`.
+- Opening an empty room is a supported path, not an accidental crash path. `EditorApp` loads rooms with no spec into `mode === "home"` and shows the upload/extract onboarding screen, while server-side extraction explicitly rejects rooms that still lack `photo_id`. Evidence: `renderer/src/App.jsx`, `extractor/server.py`.
+- Current local data proves the path is active in practice: `sqlite3 data/estimator.db` shows 5 room rows where `spec_json`, `photo_id`, and `wireframe_id` are all null.
+
+# Draft Shell Guardrails (2026-04-22)
+
+- [x] Prevent empty projects from being duplicated into more empty shells
+- [x] Make empty project cards read as intentional drafts instead of broken data
+- [x] Distinguish empty/photo-only/ready/extracted room states in the project detail grid
+- [x] Guard create-project, create-room, and add-wall flows against double submit
+- [x] Verify the new draft-shell behavior in Chrome MCP locally before shipping
+
+## Review
+
+- Backend duplication now rejects zero-room projects with `400 Project has no rooms to duplicate` instead of cloning another empty shell. Evidence: `extractor/db.py`, `extractor/server.py`.
+- Project cards now show `No rooms yet` for zero-room drafts and disable the duplicate action as `Nothing to duplicate` instead of pretending the project is a normal copy candidate. Evidence: `renderer/src/components/ProjectCard.jsx`, `renderer/src/pages/ProjectList.jsx`.
+- Room cards now distinguish the real draft states:
+- `Draft · no photo` for a brand-new empty wall
+- `Photo added` for a photo-only draft
+- `Ready to extract` when photo + wireframe exist but no spec yet
+- `Extracted` once a spec exists
+- Create-project, create-room, and add-wall actions now hold a local pending lock so a double click only persists one record. Evidence: `renderer/src/pages/ProjectList.jsx`, `renderer/src/pages/ProjectDetail.jsx`.
+- Local Chrome MCP proof:
+- double-clicking `Create` on a new project produced exactly one project (`Temp Empty Draft 2`) and landed on a zero-room detail page
+- that detail page showed `No rooms yet`
+- browser `fetch()` from Chrome MCP to `POST /api/projects/{id}/duplicate` returned `400 {"detail":"Project has no rooms to duplicate"}`
+- double-clicking `Create` for `Draft Room` only created one room
+- double-clicking `Add` for `Wall 2` only created one new wall, leaving the room at `2 walls`
+- the project detail grid labeled both new walls as `Draft · no photo`

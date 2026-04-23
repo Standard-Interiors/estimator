@@ -29,6 +29,15 @@ export default function RoomCard({ room, onClick, onRename, onDuplicate, onDelet
   const thumbSrc = imageUrl(room.thumb_url);
   const cabCount = room.cabinet_count || 0;
   const hasSpec = room.has_spec;
+  const hasPhoto = !!room.photo_id;
+  const hasWireframe = !!room.wireframe_id;
+  const roomState = hasSpec
+    ? { label: "Extracted", color: "#22c55e", bg: "rgba(34,197,94,0.15)", icon: "check" }
+    : hasPhoto && hasWireframe
+      ? { label: "Ready to extract", color: "#D94420", bg: "rgba(217,68,32,0.15)", icon: "arrow" }
+      : hasPhoto
+        ? { label: "Photo added", color: "#1a6fbf", bg: "rgba(26,111,191,0.15)", icon: "photo" }
+        : { label: "Draft · no photo", color: "#888", bg: "rgba(255,255,255,0.04)", icon: "draft" };
 
   const handleRename = () => {
     const val = renameVal.trim();
@@ -128,27 +137,25 @@ export default function RoomCard({ room, onClick, onRename, onDuplicate, onDelet
         display: "flex", justifyContent: "space-between", alignItems: "center",
         padding: "0 12px 10px",
       }}>
-        {hasSpec ? (
-          <span style={{
-            fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 8,
-            fontFamily: "'JetBrains Mono', monospace",
-            color: "#22c55e", background: "rgba(34,197,94,0.15)",
-            display: "flex", alignItems: "center", gap: 4,
-          }}>
+        <span style={{
+          fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 8,
+          fontFamily: "'JetBrains Mono', monospace",
+          color: roomState.color, background: roomState.bg,
+          display: "flex", alignItems: "center", gap: 4,
+        }}>
+          {roomState.icon === "check" && (
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg>
-            Extracted
-          </span>
-        ) : (
-          <span style={{
-            fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 8,
-            fontFamily: "'JetBrains Mono', monospace",
-            color: "#666", background: "rgba(255,255,255,0.04)",
-          }}>
-            No extraction
-          </span>
-        )}
+          )}
+          {roomState.icon === "arrow" && (
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none"><path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          )}
+          {roomState.icon === "photo" && (
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" strokeWidth="2"/><circle cx="9" cy="10" r="1.5" fill="currentColor"/><path d="M21 16l-5-5-6 6-3-3-4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          )}
+          {roomState.label}
+        </span>
         <span style={{ fontSize: 10, color: "#444", fontFamily: "'JetBrains Mono', monospace" }}>
-          {cabCount > 0 ? `${cabCount} cab${cabCount !== 1 ? "s" : ""}` : ""}
+          {cabCount > 0 ? `${cabCount} cab${cabCount !== 1 ? "s" : ""}` : hasWireframe ? "wireframe" : hasPhoto ? "photo" : ""}
         </span>
       </div>
 

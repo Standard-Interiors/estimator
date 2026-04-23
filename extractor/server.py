@@ -129,7 +129,10 @@ async def delete_project(pid: str):
 
 @app.post("/api/projects/{pid}/duplicate")
 async def duplicate_project(pid: str):
-    p = db.duplicate_project(pid)
+    try:
+        p = db.duplicate_project(pid)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
     if not p:
         raise HTTPException(404, "Project not found")
     return p

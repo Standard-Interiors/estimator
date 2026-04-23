@@ -393,6 +393,8 @@ def duplicate_project(pid: str) -> dict | None:
     p = get_project(pid)
     if not p:
         return None
+    if not p.get("rooms"):
+        raise ValueError("Project has no rooms to duplicate")
     new_p = create_project(name=f"{p['name']} (copy)", notes=p.get("notes"))
     for r in p.get("rooms", []):
         new_r = create_room(

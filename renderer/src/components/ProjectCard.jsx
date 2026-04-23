@@ -5,7 +5,7 @@ import { imageUrl } from "../api";
  * Project card for the project list grid.
  * Shows thumbnail, name, metadata, status pill, date.
  */
-export default function ProjectCard({ project, onClick, onRename, onDuplicate, onDelete }) {
+export default function ProjectCard({ project, onClick, onRename, onDuplicate, onDelete, duplicateDisabled = false }) {
   const [hover, setHover] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [slideIndex, setSlideIndex] = useState(0);
@@ -56,6 +56,8 @@ export default function ProjectCard({ project, onClick, onRename, onDuplicate, o
   const thumbSrc = imageUrl(project.thumb_url);
   const thumbUrls = (project.thumb_urls || []).map(u => imageUrl(u)).filter(Boolean);
   const hasMultiple = thumbUrls.length > 1;
+  const roomCount = project.room_count || 0;
+  const isEmptyDraft = roomCount === 0;
 
   const prevSlide = (e) => { e.stopPropagation(); setSlideIndex(i => (i - 1 + thumbUrls.length) % thumbUrls.length); };
   const nextSlide = (e) => { e.stopPropagation(); setSlideIndex(i => (i + 1) % thumbUrls.length); };
@@ -198,9 +200,10 @@ export default function ProjectCard({ project, onClick, onRename, onDuplicate, o
           fontSize: 11, color: "#555", marginTop: 2,
           fontFamily: "'JetBrains Mono', monospace",
         }}>
-          {project.room_count || 0} room{project.room_count !== 1 ? "s" : ""}
-          {" · "}
-          {project.total_cabinets || 0} cabinet{project.total_cabinets !== 1 ? "s" : ""}
+          {isEmptyDraft
+            ? "No rooms yet"
+            : `${roomCount} room${roomCount !== 1 ? "s" : ""} · ${project.total_cabinets || 0} cabinet${project.total_cabinets !== 1 ? "s" : ""}`
+          }
         </div>
       </div>
 
@@ -245,11 +248,23 @@ export default function ProjectCard({ project, onClick, onRename, onDuplicate, o
           boxShadow: "0 8px 24px rgba(0,0,0,0.5)", minWidth: 140, zIndex: 10,
           padding: "4px 0",
         }}>
-          <div onClick={() => { setMenuOpen(false); onDuplicate?.(); }}
-            style={{ padding: "8px 14px", fontSize: 12, color: "#ddd", cursor: "pointer" }}
-            onMouseEnter={(e) => e.target.style.background = "#2a2a3a"}
-            onMouseLeave={(e) => e.target.style.background = "transparent"}>
-            Duplicate
+          <div
+            onClick={() => {
+              if (duplicateDisabled) return;
+              setMenuOpen(false);
+              onDuplicate?.();
+            }}
+            style={{
+              padding: "8px 14px",
+              fontSize: 12,
+              color: duplicateDisabled ? "#555" : "#ddd",
+              cursor: duplicateDisabled ? "default" : "pointer",
+            }}
+            onMouseEnter={(e) => { if (!duplicateDisabled) e.target.style.background = "#2a2a3a"; }}
+            onMouseLeave={(e) => { e.target.style.background = "transparent"; }}
+            title={duplicateDisabled ? "Add a room before duplicating this project" : ""}
+          >
+            {duplicateDisabled ? "Nothing to duplicate" : "Duplicate"}
           </div>
           <div onClick={() => { setMenuOpen(false); setRenaming(true); setRenameVal(project.name); }}
             style={{ padding: "8px 14px", fontSize: 12, color: "#ddd", cursor: "pointer" }}

@@ -121,3 +121,6 @@ If the user asks for front/back movement, a `front/back` preset pill does not sa
 
 ### 26. Counter geometry has to respect the moved tall cabinet silhouette
 If a tall cabinet can shift backward in the 3D view, do not keep drawing counter segments from raw slot boundaries alone. The counter needs to clip against the tall cabinet's projected body, or it will look like the countertop is passing through the pantry side when the cabinet moves back.
+
+### 27. A long-run audit request stays open after the first good deploy
+If the user asks for a sustained multi-hour audit/fix push, do not close the loop just because one bug is fixed and reverified. Finish the patch, then immediately start the next Chrome MCP sweep with fresh eyes and keep the task open until you hit a real blocker or the user explicitly stops it.

@@ -10,6 +10,8 @@ export default function ProjectList() {
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
+  const [createPending, setCreatePending] = useState(false);
+  const [duplicatePendingId, setDuplicatePendingId] = useState(null);
   const [newName, setNewName] = useState("");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -33,7 +35,8 @@ export default function ProjectList() {
 
   const handleCreate = async () => {
     const name = newName.trim();
-    if (!name) return;
+    if (!name || createPending) return;
+    setCreatePending(true);
     try {
       const p = await api.createProject(name);
       setCreating(false);
@@ -41,6 +44,8 @@ export default function ProjectList() {
       navigate(`/project/${p.id}`);
     } catch (e) {
       console.error("Failed to create project:", e);
+    } finally {
+      setCreatePending(false);
     }
   };
 
@@ -54,11 +59,15 @@ export default function ProjectList() {
   };
 
   const handleDuplicate = async (id) => {
+    if (duplicatePendingId) return;
+    setDuplicatePendingId(id);
     try {
       const p = await api.duplicateProject(id);
       setProjects((prev) => [p, ...prev]);
     } catch (e) {
       console.error("Failed to duplicate:", e);
+    } finally {
+      setDuplicatePendingId(null);
     }
   };
 
@@ -113,7 +122,10 @@ export default function ProjectList() {
               ref={inputRef}
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") handleCreate(); if (e.key === "Escape") setCreating(false); }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleCreate();
+                if (e.key === "Escape" && !createPending) setCreating(false);
+              }}
               placeholder="e.g. Smith Kitchen Remodel"
               style={{
                 background: "#0a0a14", border: "1px solid #D94420", borderRadius: 8,
@@ -122,14 +134,14 @@ export default function ProjectList() {
               }}
             />
             <div style={{ marginTop: 8, display: "flex", gap: 8, justifyContent: "center" }}>
-              <button onClick={handleCreate} style={{
-                background: "#D94420", color: "#fff", border: "none",
+              <button onClick={handleCreate} disabled={!newName.trim() || createPending} style={{
+                background: (!newName.trim() || createPending) ? "#1a1a2a" : "#D94420", color: "#fff", border: "none",
                 padding: "6px 16px", borderRadius: 6, fontSize: 12,
-                fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
+                fontWeight: 600, cursor: (!newName.trim() || createPending) ? "default" : "pointer", fontFamily: "inherit",
               }}>
-                Create
+                {createPending ? "Creating..." : "Create"}
               </button>
-              <button onClick={() => setCreating(false)} style={{
+              <button onClick={() => { if (createPending) return; setCreating(false); }} style={{
                 background: "transparent", color: "#555", border: "none",
                 padding: "6px 16px", fontSize: 12, cursor: "pointer", fontFamily: "inherit",
               }}>
@@ -218,7 +230,10 @@ export default function ProjectList() {
             ref={inputRef}
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter") handleCreate(); if (e.key === "Escape") setCreating(false); }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleCreate();
+              if (e.key === "Escape" && !createPending) setCreating(false);
+            }}
             placeholder="e.g. Smith Kitchen Remodel"
             style={{
               background: "#0a0a14", border: "1px solid #2a2a3a", borderRadius: 6,
@@ -227,16 +242,16 @@ export default function ProjectList() {
             }}
           />
           <div style={{ marginTop: 10, display: "flex", gap: 8, justifyContent: "center" }}>
-            <button onClick={handleCreate} disabled={!newName.trim()} style={{
-              background: newName.trim() ? "#D94420" : "#1a1a2a",
+            <button onClick={handleCreate} disabled={!newName.trim() || createPending} style={{
+              background: newName.trim() && !createPending ? "#D94420" : "#1a1a2a",
               color: "#fff", border: "none",
               padding: "8px 20px", borderRadius: 6, fontSize: 12,
-              fontWeight: 600, cursor: newName.trim() ? "pointer" : "default",
+              fontWeight: 600, cursor: newName.trim() && !createPending ? "pointer" : "default",
               fontFamily: "inherit",
             }}>
-              Create
+              {createPending ? "Creating..." : "Create"}
             </button>
-            <button onClick={() => { setCreating(false); setNewName(""); }} style={{
+            <button onClick={() => { if (createPending) return; setCreating(false); setNewName(""); }} style={{
               background: "transparent", color: "#555", border: "none",
               padding: "8px 16px", fontSize: 12, cursor: "pointer", fontFamily: "inherit",
             }}>
@@ -261,6 +276,7 @@ export default function ProjectList() {
             onRename={(name) => handleRename(p.id, name)}
             onDuplicate={() => handleDuplicate(p.id)}
             onDelete={() => handleDelete(p.id)}
+            duplicateDisabled={!p.room_count || duplicatePendingId === p.id}
           />
         ))}
       </div>

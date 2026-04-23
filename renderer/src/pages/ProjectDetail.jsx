@@ -11,8 +11,10 @@ export default function ProjectDetail() {
 
   // Two-step create: first room name, then wall name
   const [creatingRoom, setCreatingRoom] = useState(false);
+  const [creatingRoomPending, setCreatingRoomPending] = useState(false);
   const [newRoomName, setNewRoomName] = useState("");
   const [addingWallTo, setAddingWallTo] = useState(null); // room_name string
+  const [addingWallPending, setAddingWallPending] = useState(false);
   const [newWallName, setNewWallName] = useState("");
   const [renamingRoom, setRenamingRoom] = useState(null); // room_name being edited
   const [renameRoomVal, setRenameRoomVal] = useState("");
@@ -42,7 +44,8 @@ export default function ProjectDetail() {
   // Create a new room with its first wall
   const handleCreateRoom = async () => {
     const roomName = newRoomName.trim();
-    if (!roomName) return;
+    if (!roomName || creatingRoomPending) return;
+    setCreatingRoomPending(true);
     try {
       // Create first wall with auto-name "Wall 1"
       const r = await api.createRoom(projectId, null, roomName);
@@ -51,12 +54,16 @@ export default function ProjectDetail() {
       navigate(`/project/${projectId}/room/${r.id}`);
     } catch (e) {
       console.error("Failed to create room:", e);
+    } finally {
+      setCreatingRoomPending(false);
     }
   };
 
   // Add a wall to an existing room group
   const handleAddWall = async (roomName) => {
     const wallName = newWallName.trim() || null; // null = auto-name
+    if (addingWallPending) return;
+    setAddingWallPending(true);
     try {
       const r = await api.createRoom(projectId, wallName, roomName);
       setAddingWallTo(null);
@@ -64,6 +71,8 @@ export default function ProjectDetail() {
       navigate(`/project/${projectId}/room/${r.id}`);
     } catch (e) {
       console.error("Failed to add wall:", e);
+    } finally {
+      setAddingWallPending(false);
     }
   };
 
@@ -249,7 +258,10 @@ export default function ProjectDetail() {
           ref={roomInputRef}
           value={newRoomName}
           onChange={(e) => setNewRoomName(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter") handleCreateRoom(); if (e.key === "Escape") { setCreatingRoom(false); setNewRoomName(""); } }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") handleCreateRoom();
+            if (e.key === "Escape" && !creatingRoomPending) { setCreatingRoom(false); setNewRoomName(""); }
+          }}
           placeholder="e.g. Kitchen, Master Bath, Laundry"
           style={{
             background: "#0a0a14", border: "1px solid #2a2a3a", borderRadius: 6,
@@ -258,16 +270,16 @@ export default function ProjectDetail() {
           }}
         />
         <div style={{ marginTop: 10, display: "flex", gap: 8, justifyContent: "center" }}>
-          <button onClick={handleCreateRoom} disabled={!newRoomName.trim()} style={{
-            background: newRoomName.trim() ? "#D94420" : "#1a1a2a",
+          <button onClick={handleCreateRoom} disabled={!newRoomName.trim() || creatingRoomPending} style={{
+            background: newRoomName.trim() && !creatingRoomPending ? "#D94420" : "#1a1a2a",
             color: "#fff", border: "none",
             padding: "8px 20px", borderRadius: 6, fontSize: 12,
-            fontWeight: 600, cursor: newRoomName.trim() ? "pointer" : "default",
+            fontWeight: 600, cursor: newRoomName.trim() && !creatingRoomPending ? "pointer" : "default",
             fontFamily: "inherit",
           }}>
-            Create
+            {creatingRoomPending ? "Creating..." : "Create"}
           </button>
-          <button onClick={() => { setCreatingRoom(false); setNewRoomName(""); }} style={{
+          <button onClick={() => { if (creatingRoomPending) return; setCreatingRoom(false); setNewRoomName(""); }} style={{
             background: "transparent", color: "#555", border: "none",
             padding: "8px 16px", fontSize: 12, cursor: "pointer", fontFamily: "inherit",
           }}>
@@ -289,7 +301,10 @@ export default function ProjectDetail() {
           ref={wallInputRef}
           value={newWallName}
           onChange={(e) => setNewWallName(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter") handleAddWall(roomName); if (e.key === "Escape") { setAddingWallTo(null); setNewWallName(""); } }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") handleAddWall(roomName);
+            if (e.key === "Escape" && !addingWallPending) { setAddingWallTo(null); setNewWallName(""); }
+          }}
           placeholder="e.g. Sink Wall, Range Wall (optional)"
           style={{
             background: "#0a0a14", border: "1px solid #2a2a3a", borderRadius: 6,
@@ -298,14 +313,14 @@ export default function ProjectDetail() {
           }}
         />
         <div style={{ marginTop: 8, display: "flex", gap: 6, justifyContent: "center" }}>
-          <button onClick={() => handleAddWall(roomName)} style={{
-            background: "#D94420", color: "#fff", border: "none",
+          <button onClick={() => handleAddWall(roomName)} disabled={addingWallPending} style={{
+            background: addingWallPending ? "#1a1a2a" : "#D94420", color: "#fff", border: "none",
             padding: "6px 14px", borderRadius: 6, fontSize: 11,
-            fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
+            fontWeight: 600, cursor: addingWallPending ? "default" : "pointer", fontFamily: "inherit",
           }}>
-            Add
+            {addingWallPending ? "Adding..." : "Add"}
           </button>
-          <button onClick={() => { setAddingWallTo(null); setNewWallName(""); }} style={{
+          <button onClick={() => { if (addingWallPending) return; setAddingWallTo(null); setNewWallName(""); }} style={{
             background: "transparent", color: "#555", border: "none",
             padding: "6px 10px", fontSize: 11, cursor: "pointer", fontFamily: "inherit",
           }}>
