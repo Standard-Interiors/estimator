@@ -64,11 +64,21 @@ function rowSupportsVerticalOffset(row) {
   return row === "wall" || row === "tall";
 }
 
+function rowSupportsDepthOffset(row) {
+  return row === "tall";
+}
+
 function normalizeYOffset(row, yOffset) {
   if (!rowSupportsVerticalOffset(row)) return undefined;
   const value = Number.isFinite(yOffset) ? Math.round(yOffset * 4) / 4 : 0;
   if (row === "wall") return Math.max(0, value);
   return Math.max(-96, Math.min(96, value));
+}
+
+function normalizeDepthOffset(row, depthOffset) {
+  if (!rowSupportsDepthOffset(row)) return undefined;
+  const value = Number.isFinite(depthOffset) ? Math.round(depthOffset * 4) / 4 : 0;
+  return Math.max(-24, Math.min(24, value));
 }
 
 function sanitizeAlignments(spec) {
@@ -160,6 +170,12 @@ function initializeCabinetForRow(cab, targetRow) {
   } else {
     delete cab.lane;
   }
+
+  if (rowSupportsDepthOffset(targetRow)) {
+    cab.depthOffset = normalizeDepthOffset(targetRow, cab.depthOffset);
+  } else {
+    delete cab.depthOffset;
+  }
 }
 
 function moveCabinetToRow(cab, targetRow, sourceRow = cab.row) {
@@ -180,6 +196,13 @@ function moveCabinetToRow(cab, targetRow, sourceRow = cab.row) {
     cab.lane = normalizeLane(targetRow, cab.lane);
   } else {
     delete cab.lane;
+  }
+
+  if (rowSupportsDepthOffset(targetRow)) {
+    const seedDepthOffset = rowSupportsDepthOffset(sourceRow) ? cab.depthOffset : 0;
+    cab.depthOffset = normalizeDepthOffset(targetRow, seedDepthOffset);
+  } else {
+    delete cab.depthOffset;
   }
 }
 
@@ -364,6 +387,11 @@ export default function specReducer(state, action) {
       } else {
         cab.lane = normalizeLane(targetRow, cab.lane);
       }
+      if (!rowSupportsDepthOffset(targetRow)) {
+        delete cab.depthOffset;
+      } else {
+        cab.depthOffset = normalizeDepthOffset(targetRow, cab.depthOffset);
+      }
 
       if (currentRow === "wall") {
         spec.alignment = (spec.alignment || []).filter((a) => a.wall !== action.id);
@@ -387,6 +415,18 @@ export default function specReducer(state, action) {
       if ((cab.lane || "front") === nextLane) return state;
       cab.lane = nextLane;
       sanitizeAlignments(spec);
+      return spec;
+    }
+
+    case "NUDGE_DEPTH": {
+      // Move a tall cabinet forward/back by adjusting its saved depth offset.
+      // action: { id, amount } — positive = back, negative = front
+      const cabIdx = findCabinetIndex(spec, action.id);
+      if (cabIdx === -1) return spec;
+      const cab = spec.cabinets[cabIdx];
+      if (!rowSupportsDepthOffset(cab.row)) return spec;
+      const cur = cab.depthOffset || 0;
+      cab.depthOffset = normalizeDepthOffset(cab.row, cur + (action.amount || 0));
       return spec;
     }
 
@@ -842,12 +882,15 @@ export default function specReducer(state, action) {
       loaded.cabinets.forEach((cab) => {
         if (cab?.row === "wall") {
           delete cab.lane;
+          delete cab.depthOffset;
           cab.yOffset = normalizeYOffset("wall", cab.yOffset);
         } else if (cab?.row === "tall") {
           cab.lane = normalizeLane(cab.row, cab.lane);
+          cab.depthOffset = normalizeDepthOffset("tall", cab.depthOffset);
           cab.yOffset = normalizeYOffset("tall", cab.yOffset);
         } else if (cab) {
           delete cab.yOffset;
+          delete cab.depthOffset;
           cab.lane = normalizeLane(cab.row, cab.lane);
         }
         const layoutKey = getLayoutKey(cab?.row);

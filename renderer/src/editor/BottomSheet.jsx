@@ -235,7 +235,7 @@ export default function BottomSheet({
           <div style={{
             fontSize: 10, color: "#666", fontWeight: 600,
             fontFamily: "'DM Sans',sans-serif", marginBottom: 6, letterSpacing: "0.05em"
-          }}>LANE</div>
+          }}>{row === "tall" ? "SNAP LANE" : "LANE"}</div>
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
             {["front", "back"].map((lane) => {
               const active = (cab.lane || "front") === lane;

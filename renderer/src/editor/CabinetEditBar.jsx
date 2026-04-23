@@ -32,7 +32,7 @@ function sectionSummary(sec) {
   return s;
 }
 
-export default function CabinetEditBar({ cab, spec, dispatch, selColor, widthInputRef, currentAlignmentBaseId, isAligningOver, onStartAlign, onCancelAlign, onClearAlign, onSelectNext, onSelectId, onDelete, onAddGap, onAddCab, onSlotLeft, onSlotRight, onSpaceLeft, onSpaceRight, onMoveUp, onMoveDown, onSectionClick }) {
+export default function CabinetEditBar({ cab, spec, dispatch, selColor, widthInputRef, currentAlignmentBaseId, isAligningOver, onStartAlign, onCancelAlign, onClearAlign, onSelectNext, onSelectId, onDelete, onAddGap, onAddCab, onSlotLeft, onSlotRight, onSpaceLeft, onSpaceRight, onMoveUp, onMoveDown, onMoveFront, onMoveBack, onSectionClick }) {
   const [editingSec, setEditingSec] = useState(null); // index of section being edited
   const [showSecPicker, setShowSecPicker] = useState(false);
   const sections = cab?.face?.sections || [];
@@ -179,9 +179,9 @@ export default function CabinetEditBar({ cab, spec, dispatch, selColor, widthInp
                   onClick={() => {
                     if (!active) dispatch({ type: "SET_LANE", id: cab.id, lane });
                   }}
-                  title={`Move ${cab.id} to the ${lane} lane`}
+                  title={`Snap ${cab.id} to the ${lane} lane`}
                 >
-                  {lane}
+                  {cab.row === "tall" ? `${lane} lane` : lane}
                 </button>
               );
             })}
@@ -246,6 +246,8 @@ export default function CabinetEditBar({ cab, spec, dispatch, selColor, widthInp
         <div style={actionGroupStyle}>
           {onSlotLeft && <button onClick={onSlotLeft} title="Move cabinet one slot left (Ctrl/Cmd + Arrow Left)" style={{ height: 32, padding: "0 8px", borderRadius: 6, background: "#1a1a2a", border: "1px solid #2a2a3a", color: selColor, fontWeight: 700, fontSize: 11, cursor: "pointer", fontFamily: MONO, display: "flex", alignItems: "center", justifyContent: "center" }}>{"\u2190"} Slot</button>}
           {onSlotRight && <button onClick={onSlotRight} title="Move cabinet one slot right (Ctrl/Cmd + Arrow Right)" style={{ height: 32, padding: "0 8px", borderRadius: 6, background: "#1a1a2a", border: "1px solid #2a2a3a", color: selColor, fontWeight: 700, fontSize: 11, cursor: "pointer", fontFamily: MONO, display: "flex", alignItems: "center", justifyContent: "center" }}>Slot {"\u2192"}</button>}
+          {onMoveFront && <button onClick={onMoveFront} title="Move cabinet 6 inches toward the front" style={{ height: 32, padding: "0 8px", borderRadius: 6, background: "#1a1a2a", border: "1px solid #2a2a3a", color: selColor, fontWeight: 700, fontSize: 11, cursor: "pointer", fontFamily: MONO, display: "flex", alignItems: "center", justifyContent: "center" }}>{"\u2199"} Front</button>}
+          {onMoveBack && <button onClick={onMoveBack} title="Move cabinet 6 inches toward the back" style={{ height: 32, padding: "0 8px", borderRadius: 6, background: "#1a1a2a", border: "1px solid #2a2a3a", color: selColor, fontWeight: 700, fontSize: 11, cursor: "pointer", fontFamily: MONO, display: "flex", alignItems: "center", justifyContent: "center" }}>Back {"\u2197"}</button>}
           {onMoveUp && <button onClick={onMoveUp} title="Move cabinet up 3 inches (Arrow Up)" style={{ height: 32, width: 32, padding: 0, borderRadius: 6, background: "#1a1a2a", border: "1px solid #2a2a3a", color: selColor, fontWeight: 700, fontSize: 14, cursor: "pointer", fontFamily: MONO, display: "flex", alignItems: "center", justifyContent: "center" }}>{"\u2191"}</button>}
           {onMoveDown && <button onClick={onMoveDown} title="Move cabinet down 3 inches (Arrow Down)" style={{ height: 32, width: 32, padding: 0, borderRadius: 6, background: "#1a1a2a", border: "1px solid #2a2a3a", color: selColor, fontWeight: 700, fontSize: 14, cursor: "pointer", fontFamily: MONO, display: "flex", alignItems: "center", justifyContent: "center" }}>{"\u2193"}</button>}
           {onSpaceLeft && <button onClick={onSpaceLeft} title="Resize space on the left (Arrow Left)" style={{ height: 32, padding: "0 8px", borderRadius: 6, background: "#1a1a2a", border: "1px solid #2a2a3a", color: selColor, fontWeight: 700, fontSize: 11, cursor: "pointer", fontFamily: MONO, display: "flex", alignItems: "center", justifyContent: "center" }}>Space {"\u2190"}</button>}

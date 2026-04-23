@@ -1388,9 +1388,19 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
                       action:()=>{dispatch({type:"MOVE_ROW",id:renderCtxMenu.id,targetRow:row});setSelectedId(renderCtxMenu.id);setRenderCtxMenu(null);}
                     }))),
                     ...((ctxCab.row !== "wall") ? ["front","back"].filter((lane)=>(ctxCab.lane||"front")!==lane).map((lane)=>({
-                      label:`Move ${lane}`,
+                      label:`Snap ${lane} lane`,
                       action:()=>{dispatch({type:"SET_LANE",id:renderCtxMenu.id,lane});setSelectedId(renderCtxMenu.id);setRenderCtxMenu(null);}
                     })) : []),
+                    ...(ctxCab.row === "tall" ? [
+                      {
+                        label:"Move front",
+                        action:()=>{dispatch({type:"NUDGE_DEPTH",id:renderCtxMenu.id,amount:-6});setSelectedId(renderCtxMenu.id);setRenderCtxMenu(null);}
+                      },
+                      {
+                        label:"Move back",
+                        action:()=>{dispatch({type:"NUDGE_DEPTH",id:renderCtxMenu.id,amount:6});setSelectedId(renderCtxMenu.id);setRenderCtxMenu(null);}
+                      },
+                    ] : []),
                     ...(!ctxWallAligned && spec[layoutKeyForCabinetRow(ctxCab.row)]?.some((item) => item.ref === renderCtxMenu.id) ? [
                       {
                         label:"Move slot left",
@@ -1497,6 +1507,8 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
                     onSlotRight={sel.row === "wall" && selectedAlignmentBaseId ? undefined : () => dispatch({ type: "MOVE_CABINET", id: sel.id, direction: "right" })}
                     onSpaceLeft={sel.row === "wall" && selectedAlignmentBaseId ? undefined : () => handleNudge(sel.id, -3)}
                     onSpaceRight={sel.row === "wall" && selectedAlignmentBaseId ? undefined : () => handleNudge(sel.id, 3)}
+                    onMoveFront={sel.row === "tall" ? () => dispatch({ type: "NUDGE_DEPTH", id: sel.id, amount: -6 }) : undefined}
+                    onMoveBack={sel.row === "tall" ? () => dispatch({ type: "NUDGE_DEPTH", id: sel.id, amount: 6 }) : undefined}
                     onMoveUp={sel.row === "wall" || sel.row === "tall" ? () => dispatch({ type: "NUDGE_VERTICAL", id: sel.id, amount: -3 }) : undefined}
                     onMoveDown={sel.row === "wall" || sel.row === "tall" ? () => dispatch({ type: "NUDGE_VERTICAL", id: sel.id, amount: 3 }) : undefined}
                     onDelete={() => setPendingDelete(sel.id)}
@@ -1508,7 +1520,7 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
                     onAddCab={() => {
                       const placement = sel.row === "wall"
                         ? { yOffset: sel.yOffset }
-                        : { lane: sel.lane, yOffset: sel.row === "tall" ? sel.yOffset : undefined };
+                        : { lane: sel.lane, yOffset: sel.row === "tall" ? sel.yOffset : undefined, depthOffset: sel.row === "tall" ? sel.depthOffset : undefined };
                       const id=generateId(sel.row,spec),cab=defaultCabinet(sel.row, undefined, placement);cab.id=id;
                       const layout=spec[layoutKeyForCabinetRow(sel.row)]||[];
                       const pos=layout.findIndex(i=>i.ref===sel.id);

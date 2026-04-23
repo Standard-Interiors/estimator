@@ -100,7 +100,9 @@ export default function InteractiveRender({ spec, selectedId, isMobile, onSelect
   const baseCabItems = lowerItems.filter((item) => item.cab && item.cab.row !== "tall");
   const tallCabItems = lowerItems.filter((item) => item.cab && item.cab.row === "tall");
   const lowerLane = (cab) => (cab?.lane === "back" ? "back" : "front");
-  const lowerLaneOffset = (cab) => (lowerLane(cab) === "back" ? dp(LOWER_BACK_LANE) : { x: 0, y: 0 });
+  const lowerDepthInset = (cab) => (lowerLane(cab) === "back" ? LOWER_BACK_LANE : 0);
+  const lowerDepthOffset = (cab) => (cab?.row === "tall" ? (cab.depthOffset || 0) : 0);
+  const lowerLaneOffset = (cab) => dp(lowerDepthInset(cab) + lowerDepthOffset(cab));
   const lowerVerticalOffset = (cab) => (cab?.row === "tall" ? (cab.yOffset || 0) * SC : 0);
   const supportsVerticalPlacement = (row) => row === "wall" || row === "tall";
   const maxWH = Math.max(...wallItems.filter(w => w.cab).map(w => (w.cab.height || 30)), 30) * SC;

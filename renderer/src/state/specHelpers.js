@@ -211,6 +211,10 @@ export function defaultCabinet(row, type, placement = {}) {
     cab.yOffset = isWall ? Math.max(0, placement.yOffset) : placement.yOffset;
   }
 
+  if (isTall && typeof placement.depthOffset === "number") {
+    cab.depthOffset = placement.depthOffset;
+  }
+
   return cab;
 }
 

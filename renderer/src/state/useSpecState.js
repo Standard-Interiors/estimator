@@ -36,6 +36,8 @@ function actionLabel(action) {
       return `Nudge ${action.id} ${action.amount > 0 ? "right" : "left"}`;
     case "NUDGE_VERTICAL":
       return `Shift ${action.id} ${action.amount > 0 ? "down" : "up"}`;
+    case "NUDGE_DEPTH":
+      return `Shift ${action.id} ${action.amount > 0 ? "back" : "front"}`;
     case "CHANGE_TYPE":
       return `Change ${action.id} to ${action.newType}`;
     case "ADD_SECTION":

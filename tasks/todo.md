@@ -390,3 +390,15 @@ Review:
 - Chrome MCP live proof on `cabinet-estimator.fly.dev` matches the local fix after a hard reload:
 - `T1` shows the two-tier desktop bar with no clipped movement controls.
 - `B3` still fits with the heavier base-cabinet action set, including merge.
+
+# Tall Front/Back Axis Fix (2026-04-22)
+
+- [x] Reproduce the current `T1` front/back complaint in Chrome MCP on real `Wall 3` data
+- [x] Confirm whether the existing `front/back` control is only a snap preset instead of a true movement axis
+- [ ] Add a true saved front/back movement control for tall cabinets in both desktop and mobile editor paths
+- [ ] Verify the new front/back movement locally in Chrome MCP against production data, then deploy and re-verify on the live site
+
+## Review Notes
+
+- Chrome MCP live proof showed the current `back` pill does save and visibly shifts `T1`, but it is only a lane preset, not the same kind of direct movement control as `left/right` or `up/down`.
+- That mismatch is why the feature still feels missing in practice: the editor has a front/back mode switch, not a real front/back move axis.

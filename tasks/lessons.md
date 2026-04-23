@@ -115,3 +115,6 @@ If the user asked for a multi-hour push, do not summarize the work as if that fu
 
 ### 24. New editor controls must be verified for fit, not just existence
 If you add buttons or pills to the desktop editor, do not stop after confirming the feature works. Re-open the real screen in Chrome MCP and check that the full bar still fits inside the production shell width. If the controls crowd each other, regroup them into rows before shipping instead of shrinking labels or pretending the overflow is acceptable.
+
+### 25. A lane preset is not the same thing as a movement axis
+If the user asks for front/back movement, a `front/back` preset pill does not satisfy that request by itself. Re-check the live screen and make sure there is a true movement control for that axis, plus a visible render change strong enough that the cabinet maker can tell the cabinet actually moved.
