@@ -330,7 +330,16 @@ def get_project(pid: str) -> dict | None:
         p["thumb_urls"] = []
         for r in p["rooms"]:
             r["thumb_url"] = None
-            r["has_spec"] = bool(r.get("spec_json"))
+            r["spec_error"] = False
+            if r.get("spec_json"):
+                try:
+                    normalize_spec(json.loads(r["spec_json"]))
+                    r["has_spec"] = True
+                except (json.JSONDecodeError, TypeError):
+                    r["has_spec"] = False
+                    r["spec_error"] = True
+            else:
+                r["has_spec"] = False
             if r.get("photo_id"):
                 img = conn.execute(
                     images.select().where(images.c.id == r["photo_id"])

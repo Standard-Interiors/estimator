@@ -29,9 +29,12 @@ export default function RoomCard({ room, onClick, onRename, onDuplicate, onDelet
   const thumbSrc = imageUrl(room.thumb_url);
   const cabCount = room.cabinet_count || 0;
   const hasSpec = room.has_spec;
+  const hasSpecError = !!room.spec_error;
   const hasPhoto = !!room.photo_id;
   const hasWireframe = !!room.wireframe_id;
-  const roomState = hasSpec
+  const roomState = hasSpecError
+    ? { label: "Unreadable spec", color: "#f59e0b", bg: "rgba(245,158,11,0.15)", icon: "warn" }
+    : hasSpec
     ? { label: "Extracted", color: "#22c55e", bg: "rgba(34,197,94,0.15)", icon: "check" }
     : hasPhoto && hasWireframe
       ? { label: "Ready to extract", color: "#D94420", bg: "rgba(217,68,32,0.15)", icon: "arrow" }
@@ -151,6 +154,9 @@ export default function RoomCard({ room, onClick, onRename, onDuplicate, onDelet
           )}
           {roomState.icon === "photo" && (
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" strokeWidth="2"/><circle cx="9" cy="10" r="1.5" fill="currentColor"/><path d="M21 16l-5-5-6 6-3-3-4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          )}
+          {roomState.icon === "warn" && (
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none"><path d="M12 8v5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/><circle cx="12" cy="16.5" r="1.2" fill="currentColor"/><path d="M10.3 3.6 2.5 17.1A2 2 0 0 0 4.2 20h15.6a2 2 0 0 0 1.7-2.9L13.7 3.6a2 2 0 0 0-3.4 0Z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/></svg>
           )}
           {roomState.label}
         </span>
