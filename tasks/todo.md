@@ -614,3 +614,17 @@ Review:
 - created and deleted `Deleted URL Temp 170598`
 - opening `/project/d3ae00c1bc3b5f9e` showed `Project not found.`
 - opening `/project/d3ae00c1bc3b5f9e/room/ec350071e7cf734e` also failed cleanly instead of hanging
+
+# Project Load Error States (2026-04-22)
+
+- [x] Separate real 404s from generic load failures on project pages
+- [x] Verify the new failure messaging locally in Chrome MCP with injected fetch failures
+- [ ] Deploy and re-verify the failure messaging on the live site in Chrome MCP
+
+## Review
+
+- Problem: `ProjectDetail`, `ProjectCutList`, and `RoomEditorWrapper` were treating every failed project fetch like a missing project, so offline/500 cases lied to the user with `Project not found.`
+- Fix: those surfaces now track `404` separately from other errors and render `Failed to load project.` for generic load failures. They also clear stale project data when the route changes. Evidence: `renderer/src/pages/ProjectDetail.jsx`, `renderer/src/pages/ProjectCutList.jsx`, `renderer/src/App.jsx`.
+- Local Chrome MCP proof with injected browser-side fetch failures:
+- from the project list, failing `/api/projects/1730a82716a3e412` and opening `My Cabinet Project` showed `Failed to load project.`
+- from project detail, failing that same project fetch and opening `Kitchen Wall` showed `Failed to load project.` in the room wrapper instead of an endless loading state

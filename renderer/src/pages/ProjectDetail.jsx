@@ -8,6 +8,8 @@ export default function ProjectDetail() {
   const navigate = useNavigate();
   const [project, setProject] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [projectMissing, setProjectMissing] = useState(false);
+  const [projectLoadError, setProjectLoadError] = useState(false);
 
   // Two-step create: first room name, then wall name
   const [creatingRoom, setCreatingRoom] = useState(false);
@@ -23,11 +25,17 @@ export default function ProjectDetail() {
   const wallInputRef = useRef(null);
 
   const fetchProject = async () => {
+    setLoading(true);
+    setProjectMissing(false);
+    setProjectLoadError(false);
+    setProject(null);
     try {
       const data = await api.getProject(projectId);
       setProject(data);
     } catch (e) {
       console.error("Failed to load project:", e);
+      if (e?.status === 404) setProjectMissing(true);
+      else setProjectLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -148,7 +156,15 @@ export default function ProjectDetail() {
     );
   }
 
-  if (!project) {
+  if (projectLoadError) {
+    return (
+      <div style={{ textAlign: "center", padding: "60px 0", color: "#555", fontSize: 13 }}>
+        Failed to load project.
+      </div>
+    );
+  }
+
+  if (projectMissing || !project) {
     return (
       <div style={{ textAlign: "center", padding: "60px 0", color: "#555", fontSize: 13 }}>
         Project not found.

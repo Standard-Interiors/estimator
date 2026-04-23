@@ -15,6 +15,8 @@ export default function ProjectCutList() {
   const navigate = useNavigate();
   const [project, setProject] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [projectMissing, setProjectMissing] = useState(false);
+  const [projectLoadError, setProjectLoadError] = useState(false);
   const [shopProfile, setShopProfileState] = useState(loadShopProfile);
   const [showShopProfile, setShowShopProfile] = useState(false);
   const [expandedWalls, setExpandedWalls] = useState(new Set());
@@ -22,6 +24,10 @@ export default function ProjectCutList() {
 
   useEffect(() => {
     (async () => {
+      setLoading(true);
+      setProjectMissing(false);
+      setProjectLoadError(false);
+      setProject(null);
       try {
         const p = await api.getProject(projectId);
         setProject(p);
@@ -30,6 +36,8 @@ export default function ProjectCutList() {
         setExpandedWalls(ids);
       } catch (e) {
         console.error("Failed to load project:", e);
+        if (e?.status === 404) setProjectMissing(true);
+        else setProjectLoadError(true);
       } finally {
         setLoading(false);
       }
@@ -39,7 +47,8 @@ export default function ProjectCutList() {
   const handleProfileChange = (p) => { setShopProfileState(p); saveShopProfile(p); };
 
   if (loading) return <div style={{ textAlign: "center", padding: 60, color: "#555", fontSize: 13 }}>Loading...</div>;
-  if (!project) return <div style={{ textAlign: "center", padding: 60, color: "#555", fontSize: 13 }}>Project not found.</div>;
+  if (projectLoadError) return <div style={{ textAlign: "center", padding: 60, color: "#555", fontSize: 13 }}>Failed to load project.</div>;
+  if (projectMissing || !project) return <div style={{ textAlign: "center", padding: 60, color: "#555", fontSize: 13 }}>Project not found.</div>;
 
   // Parse all wall specs
   const wallData = (project.rooms || [])

@@ -1951,6 +1951,7 @@ function RoomEditorWrapper() {
   const [project, setProject] = useState(null);
   const [loadingProject, setLoadingProject] = useState(true);
   const [projectMissing, setProjectMissing] = useState(false);
+  const [projectLoadError, setProjectLoadError] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -1958,6 +1959,8 @@ function RoomEditorWrapper() {
       if (!cancelled) {
         setLoadingProject(true);
         setProjectMissing(false);
+        setProjectLoadError(false);
+        setProject(null);
       }
       try {
         const p = await api.getProject(projectId);
@@ -1966,7 +1969,8 @@ function RoomEditorWrapper() {
         console.error("Failed to load project:", e);
         if (!cancelled) {
           setProject(null);
-          setProjectMissing(true);
+          if (e?.status === 404) setProjectMissing(true);
+          else setProjectLoadError(true);
         }
       } finally {
         if (!cancelled) setLoadingProject(false);
@@ -1977,6 +1981,10 @@ function RoomEditorWrapper() {
 
   if (loadingProject) {
     return <div style={{minHeight:"100vh",background:"#06060c",color:"#555",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13}}>Loading...</div>;
+  }
+
+  if (projectLoadError) {
+    return <div style={{minHeight:"100vh",background:"#06060c",color:"#555",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13}}>Failed to load project.</div>;
   }
 
   if (projectMissing || !project) {
