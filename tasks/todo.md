@@ -438,3 +438,21 @@ Review:
 - proof screenshots:
 - local: `/Users/william/estimator/tasks/local-counter-fix.png`
 - live: `/Users/william/estimator/tasks/prod-counter-fix.png`
+
+# Site-Wide Chrome Audit (2026-04-22)
+
+- [ ] Inventory every live project and room reachable from the production site in Chrome MCP
+- [ ] Spot-check each room across list view, photo access, 3D render, and active editor path
+- [ ] Log concrete runtime bugs with reproduction notes and trust-impact ranking
+- [ ] Fix the highest-risk issues first and re-verify each one in Chrome MCP locally against production data
+- [ ] Deploy fixes and re-run the affected production flows in Chrome MCP
+- [ ] Do a fresh-eye second sweep after fixes to catch newly visible regressions
+
+## Review Notes
+
+- This audit is runtime-first: every bug has to be seen or reproduced through Chrome MCP before it gets ranked.
+- Priority order for fixes during the sweep:
+- editor truth bugs (what you see is not what saves)
+- render lies (wireframe/3D shows physically impossible geometry)
+- missing correction affordances
+- broken navigation/photo access/room recovery flows

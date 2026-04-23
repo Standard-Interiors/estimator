@@ -258,7 +258,13 @@ def duplicate_project(pid: str) -> dict | None:
         return None
     new_p = create_project(name=f"{p['name']} (copy)", notes=p.get("notes"))
     for r in p.get("rooms", []):
-        new_r = create_room(new_p["id"], name=r["name"], sort_order=r["sort_order"])
+        new_r = create_room(
+            new_p["id"],
+            name=r["name"],
+            room_name=r.get("room_name", ""),
+            sort_order=r["sort_order"],
+        )
+        _duplicate_room_images(r, new_r["id"])
         if r.get("spec_json"):
             save_room_spec(new_r["id"], r["spec_json"], 0)
     return get_project(new_p["id"])
@@ -381,11 +387,39 @@ def delete_room(rid: str):
         conn.execute(rooms.delete().where(rooms.c.id == rid))
 
 
+def _duplicate_room_images(source_room: dict, new_room_id: str):
+    """Clone photo/wireframe image records for a duplicated room."""
+    with engine.connect() as conn:
+        for img_type in ("photo", "wireframe"):
+            img_id = source_room.get(f"{img_type}_id")
+            if not img_id:
+                continue
+            img = conn.execute(
+                images.select().where(images.c.id == img_id)
+            ).mappings().first()
+            if not img:
+                continue
+            save_image(
+                new_room_id,
+                img_type,
+                img["filename"],
+                img["mime_type"],
+                img["file_path"],
+                img.get("thumb_path"),
+            )
+
+
 def duplicate_room(rid: str) -> dict | None:
     r = get_room(rid)
     if not r:
         return None
-    new_r = create_room(r["project_id"], name=f"{r['name']} (copy)", sort_order=r["sort_order"] + 1)
+    new_r = create_room(
+        r["project_id"],
+        name=f"{r['name']} (copy)",
+        room_name=r.get("room_name", ""),
+        sort_order=r["sort_order"] + 1,
+    )
+    _duplicate_room_images(r, new_r["id"])
     if r.get("spec_json"):
         save_room_spec(new_r["id"], r["spec_json"], 0)
     return get_room(new_r["id"])
