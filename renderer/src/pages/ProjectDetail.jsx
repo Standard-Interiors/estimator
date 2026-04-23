@@ -84,22 +84,24 @@ export default function ProjectDetail() {
     }
   };
 
-  const handleDelete = async (id) => {
+  const handleDelete = async (room) => {
+    if (!room) return;
     try {
       const isLastRoom = (project?.rooms || []).length === 1;
-      if (
-        isLastRoom
-        && !window.confirm("Delete the last room? The project will stay as an empty draft.")
-      ) {
+      const prompt = isLastRoom
+        ? "Delete the last room? The project will stay as an empty draft."
+        : `Delete "${room.name || "this wall"}"?`;
+      if (!window.confirm(prompt)) {
         return;
       }
-      const result = await api.deleteRoom(id);
+      await api.deleteRoom(room.id);
       setProject((prev) => ({
         ...prev,
-        rooms: prev.rooms.filter((r) => r.id !== id),
+        rooms: prev.rooms.filter((r) => r.id !== room.id),
       }));
     } catch (e) {
       console.error("Failed to delete wall:", e);
+      fetchProject();
     }
   };
 
@@ -436,7 +438,7 @@ export default function ProjectDetail() {
                 onClick={() => navigate(`/project/${projectId}/room/${w.id}`)}
                 onRename={(name) => handleRename(w.id, name)}
                 onDuplicate={() => handleDuplicate(w.id)}
-                onDelete={() => handleDelete(w.id)}
+                onDelete={() => handleDelete(w)}
               />
             ))}
             {addingWallTo === roomName && renderWallAddForm(roomName)}
