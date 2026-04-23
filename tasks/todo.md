@@ -554,7 +554,7 @@ Review:
 - [x] Decide the desired behavior for that flow
 - [x] Implement backend + project-detail cleanup for last-room deletion
 - [x] Verify the delete flow locally in Chrome MCP before shipping
-- [ ] Deploy and re-verify the delete flow on the live site in Chrome MCP
+- [x] Deploy and re-verify the delete flow on the live site in Chrome MCP
 
 ## Review
 
@@ -567,3 +567,26 @@ Review:
 - opened the room card `···` menu, clicked `Delete`, and accepted the confirmation dialog
 - the project detail page stayed on the same project and re-rendered to `No rooms yet`
 - browser `fetch()` after the delete still returned the project with `room_count: 0`, confirming the empty draft survives
+- Live Chrome MCP proof:
+- created `Live Delete Warning 488075` with one room and one wall on production
+- opened the room card `···` menu, clicked `Delete`, and accepted the confirmation dialog
+- the live project detail page stayed on the same project and re-rendered to `No rooms yet`
+- browser `fetch()` after the delete still returned the project with `room_count: 0`
+- cleaned up the temporary live project afterward with `DELETE /api/projects/146bea0eb72de568`
+
+# Project Delete Confirmation (2026-04-22)
+
+- [x] Reproduce whether project delete fires immediately without any warning
+- [x] Add a confirmation step to the project-list delete action
+- [x] Verify the confirmation locally in Chrome MCP
+- [ ] Deploy and re-verify the confirmation on the live site in Chrome MCP
+
+## Review
+
+- Live repro before the fix: deleting `Live Project Delete 617962` from the project-list card menu removed it immediately with no confirmation dialog.
+- Fix: `ProjectList.handleDelete()` now asks for confirmation before deleting a project, using a slightly different prompt for empty drafts vs projects that still have rooms. Evidence: `renderer/src/pages/ProjectList.jsx`.
+- Local Chrome MCP proof:
+- created `Delete Confirm Temp 765794`
+- opened the project card `···` menu and clicked `Delete`
+- dismissing the confirmation dialog left the project card in place
+- repeating the delete and accepting the dialog removed the project card from the list

@@ -49,10 +49,16 @@ export default function ProjectList() {
     }
   };
 
-  const handleDelete = async (id) => {
+  const handleDelete = async (project) => {
+    if (!project) return;
+    const roomCount = project.room_count || 0;
+    const prompt = roomCount > 0
+      ? `Delete "${project.name}"?`
+      : `Delete empty project "${project.name}"?`;
+    if (!window.confirm(prompt)) return;
     try {
-      await api.deleteProject(id);
-      setProjects((prev) => prev.filter((p) => p.id !== id));
+      await api.deleteProject(project.id);
+      setProjects((prev) => prev.filter((p) => p.id !== project.id));
     } catch (e) {
       console.error("Failed to delete:", e);
     }
@@ -275,7 +281,7 @@ export default function ProjectList() {
             onClick={() => navigate(`/project/${p.id}`)}
             onRename={(name) => handleRename(p.id, name)}
             onDuplicate={() => handleDuplicate(p.id)}
-            onDelete={() => handleDelete(p.id)}
+            onDelete={() => handleDelete(p)}
             duplicateDisabled={!p.room_count || duplicatePendingId === p.id}
           />
         ))}
