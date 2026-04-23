@@ -118,3 +118,6 @@ If you add buttons or pills to the desktop editor, do not stop after confirming 
 
 ### 25. A lane preset is not the same thing as a movement axis
 If the user asks for front/back movement, a `front/back` preset pill does not satisfy that request by itself. Re-check the live screen and make sure there is a true movement control for that axis, plus a visible render change strong enough that the cabinet maker can tell the cabinet actually moved.
+
+### 26. Counter geometry has to respect the moved tall cabinet silhouette
+If a tall cabinet can shift backward in the 3D view, do not keep drawing counter segments from raw slot boundaries alone. The counter needs to clip against the tall cabinet's projected body, or it will look like the countertop is passing through the pantry side when the cabinet moves back.

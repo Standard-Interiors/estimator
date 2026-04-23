@@ -416,3 +416,19 @@ Review:
 - the undo label changes to `Undo: Shift T1 back`
 - the live room payload changes from `depthOffset: 0` to `depthOffset: 6`
 - the room was restored after verification to `depthOffset: 0`
+
+# Counter Projection Fix (2026-04-22)
+
+- [x] Reproduce the bad `T1` counter state in Chrome MCP using the real `Wall 3` room data
+- [x] Trace the counter render path and identify why depth-moved tall cabinets visually overlap the countertop
+- [x] Implement the minimal render fix so counter segments clip against the moved tall cabinet silhouette
+- [ ] Verify locally in Chrome MCP against production data, deploy, and re-verify on the live site
+
+## Review Notes
+
+- The broken state came from mixing two different coordinate systems:
+- `T1` was drawn from its shifted 3D position (`lane` + `depthOffset`)
+- the counter segments were still built from the old slot boundaries
+- In the bad state (`T1` back lane, `depthOffset: 18`, refrigerator gap on the right), the right-side counter segment started inside the pantry's projected body, so the countertop looked like it was coming through the cabinet.
+- The fix clips counter segments against the projected x-range of every tall cabinet before rendering them.
+- Local Chrome MCP on `localhost` with production room data proved the visual fix on the exact bad state: the right-side counter now starts to the right of `T1` instead of cutting through it.

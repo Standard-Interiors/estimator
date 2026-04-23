@@ -135,30 +135,79 @@ export default function InteractiveRender({ spec, selectedId, isMobile, onSelect
     tallBounds.length ? Math.max(...tallBounds.map((b) => b.bottom)) : FLOOR + 42,
   );
   const svgH = contentBottom - contentTop;
+  const mergeIntervals = (intervals) => {
+    if (!intervals.length) return [];
+    const sorted = intervals
+      .filter((interval) => interval.end > interval.start)
+      .sort((a, b) => a.start - b.start);
+    if (!sorted.length) return [];
+    const merged = [sorted[0]];
+    for (let i = 1; i < sorted.length; i += 1) {
+      const prev = merged[merged.length - 1];
+      const next = sorted[i];
+      if (next.start <= prev.end) {
+        prev.end = Math.max(prev.end, next.end);
+      } else {
+        merged.push({ ...next });
+      }
+    }
+    return merged;
+  };
+  const clipCounterSegments = (segments, blockers) => {
+    if (!blockers.length) return segments;
+    return segments.flatMap((segment) => {
+      let visible = [{ start: segment.start, end: segment.end }];
+      blockers.forEach((blocker) => {
+        visible = visible.flatMap((piece) => {
+          if (blocker.end <= piece.start || blocker.start >= piece.end) return [piece];
+          const nextPieces = [];
+          if (blocker.start > piece.start) nextPieces.push({ start: piece.start, end: blocker.start });
+          if (blocker.end < piece.end) nextPieces.push({ start: blocker.end, end: piece.end });
+          return nextPieces;
+        });
+      });
+      return visible;
+    });
+  };
+  const tallCounterBlockers = mergeIntervals(
+    tallCabItems.map((item) => {
+      const cab = item.cab;
+      const laneOffset = lowerLaneOffset(cab);
+      const drawX = item.x + laneOffset.x;
+      const projectedRight = drawX + cab.width * SC + dp(cab.depth || 24).x;
+      return { start: drawX, end: projectedRight };
+    })
+  );
   const buildCounterSegments = (lane) => {
-    const segments = [];
-    let currentCounter = null;
+    const supported = [];
+    let current = null;
     lowerItems.forEach((item) => {
       const itemLane = item.cab ? lowerLane(item.cab) : "front";
       if (itemLane !== lane) {
-        if (currentCounter) segments.push(currentCounter);
-        currentCounter = null;
+        if (current) supported.push(current);
+        current = null;
         return;
       }
       if (item.cab?.row === "tall") {
-        if (currentCounter) segments.push(currentCounter);
-        currentCounter = null;
+        if (current) supported.push(current);
+        current = null;
         return;
       }
       const x2 = item.x + item.w * SC;
-      if (!currentCounter) {
-        currentCounter = { x: item.x, w: item.w, lane };
+      if (!current) {
+        current = { start: item.x, end: x2 };
         return;
       }
-      currentCounter.w = (x2 - currentCounter.x) / SC;
+      current.end = x2;
     });
-    if (currentCounter) segments.push(currentCounter);
-    return segments;
+    if (current) supported.push(current);
+    return clipCounterSegments(supported, tallCounterBlockers)
+      .filter((segment) => segment.end > segment.start)
+      .map((segment) => ({
+        x: segment.start,
+        w: (segment.end - segment.start) / SC,
+        lane,
+      }));
   };
   const frontCounterSegments = buildCounterSegments("front");
   const backCounterSegments = buildCounterSegments("back");
