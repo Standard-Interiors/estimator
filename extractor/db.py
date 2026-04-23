@@ -415,7 +415,17 @@ def duplicate_project(pid: str) -> dict | None:
 # ---------------------------------------------------------------------------
 # CRUD helpers — Rooms
 # ---------------------------------------------------------------------------
-def create_room(project_id: str, name: str = None, room_name: str = "", sort_order: int = 0) -> dict:
+def _next_room_sort_order(conn, project_id: str) -> int:
+    current_max = conn.execute(
+        text("SELECT COALESCE(MAX(sort_order), -1) FROM rooms WHERE project_id = :pid"),
+        {"pid": project_id},
+    ).scalar()
+    if current_max is None or current_max < 0:
+        return 0
+    return int(current_max) + 1
+
+
+def create_room(project_id: str, name: str = None, room_name: str = "", sort_order: int | None = None) -> dict:
     rid = _gen_id()
     now = _now()
     if not name:
@@ -427,6 +437,8 @@ def create_room(project_id: str, name: str = None, room_name: str = "", sort_ord
             ).scalar()
         name = f"Wall {count + 1}"
     with engine.begin() as conn:
+        if sort_order is None:
+            sort_order = _next_room_sort_order(conn, project_id)
         conn.execute(rooms.insert().values(
             id=rid, project_id=project_id, room_name=room_name, name=name, sort_order=sort_order,
             spec_version=0, cabinet_count=0, created_at=now, updated_at=now
@@ -547,6 +559,17 @@ def delete_room(rid: str) -> dict | None:
     }
 
 
+def _shift_room_sort_orders(conn, project_id: str, start_sort_order: int):
+    conn.execute(
+        rooms.update()
+        .where(
+            rooms.c.project_id == project_id,
+            rooms.c.sort_order >= start_sort_order,
+        )
+        .values(sort_order=rooms.c.sort_order + 1)
+    )
+
+
 def _duplicate_room_images(source_room: dict, new_room_id: str):
     """Clone photo/wireframe image records for a duplicated room."""
     with engine.connect() as conn:
@@ -573,11 +596,14 @@ def duplicate_room(rid: str) -> dict | None:
     r = get_room(rid)
     if not r:
         return None
+    insert_sort_order = r["sort_order"] + 1
+    with engine.begin() as conn:
+        _shift_room_sort_orders(conn, r["project_id"], insert_sort_order)
     new_r = create_room(
         r["project_id"],
         name=f"{r['name']} (copy)",
         room_name=r.get("room_name", ""),
-        sort_order=r["sort_order"] + 1,
+        sort_order=insert_sort_order,
     )
     _duplicate_room_images(r, new_r["id"])
     if r.get("spec_json"):

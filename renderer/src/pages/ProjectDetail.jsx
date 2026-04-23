@@ -14,6 +14,7 @@ export default function ProjectDetail() {
   // Two-step create: first room name, then wall name
   const [creatingRoom, setCreatingRoom] = useState(false);
   const [creatingRoomPending, setCreatingRoomPending] = useState(false);
+  const [duplicatingRoomId, setDuplicatingRoomId] = useState(null);
   const [newRoomName, setNewRoomName] = useState("");
   const [addingWallTo, setAddingWallTo] = useState(null); // room_name string
   const [addingWallPending, setAddingWallPending] = useState(false);
@@ -101,19 +102,21 @@ export default function ProjectDetail() {
       }));
     } catch (e) {
       console.error("Failed to delete wall:", e);
-      fetchProject();
+      await fetchProject();
     }
   };
 
-  const handleDuplicate = async (id) => {
+  const handleDuplicate = async (room) => {
+    if (!room || duplicatingRoomId) return;
+    setDuplicatingRoomId(room.id);
     try {
-      const r = await api.duplicateRoom(id);
-      setProject((prev) => ({
-        ...prev,
-        rooms: [...prev.rooms, r],
-      }));
+      await api.duplicateRoom(room.id);
+      await fetchProject();
     } catch (e) {
       console.error("Failed to duplicate wall:", e);
+      await fetchProject();
+    } finally {
+      setDuplicatingRoomId(null);
     }
   };
 
@@ -437,7 +440,7 @@ export default function ProjectDetail() {
                 room={w}
                 onClick={() => navigate(`/project/${projectId}/room/${w.id}`)}
                 onRename={(name) => handleRename(w.id, name)}
-                onDuplicate={() => handleDuplicate(w.id)}
+                onDuplicate={() => handleDuplicate(w)}
                 onDelete={() => handleDelete(w)}
               />
             ))}
