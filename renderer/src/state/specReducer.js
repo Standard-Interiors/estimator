@@ -421,6 +421,11 @@ export default function specReducer(state, action) {
       const nextLane = normalizeLane(cab.row, action.lane);
       if ((cab.lane || "front") === nextLane) return state;
       cab.lane = nextLane;
+      if (rowSupportsDepthOffset(cab.row)) {
+        cab.depthOffset = normalizeDepthOffset(cab.row, 0);
+      } else {
+        delete cab.depthOffset;
+      }
       sanitizeAlignments(spec);
       return spec;
     }
