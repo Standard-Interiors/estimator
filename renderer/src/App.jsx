@@ -421,28 +421,7 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
   modeRef.current = mode;
 
   const normalizeLoadedSpec = useCallback((loadedSpec) => {
-    const nextSpec = JSON.parse(JSON.stringify(loadedSpec || EMPTY_SPEC));
-    nextSpec.base_layout = Array.isArray(nextSpec.base_layout) ? nextSpec.base_layout : [];
-    nextSpec.wall_layout = Array.isArray(nextSpec.wall_layout) ? nextSpec.wall_layout : [];
-    nextSpec.alignment = Array.isArray(nextSpec.alignment) ? nextSpec.alignment : [];
-    nextSpec.cabinets = Array.isArray(nextSpec.cabinets) ? nextSpec.cabinets : [];
-    nextSpec.cabinets.forEach((c) => {
-      if (!c.depth) c.depth = c.row === "wall" ? 12 : 24;
-      if (!c.height) c.height = c.row === "wall" ? 30 : c.row === "tall" ? 84 : 34.5;
-      if (!c.width) c.width = 24;
-    });
-    const placed = new Set(
-      [...nextSpec.base_layout, ...nextSpec.wall_layout]
-        .filter((item) => item?.ref)
-        .map((item) => item.ref)
-    );
-    nextSpec.cabinets.forEach((cab) => {
-      const layoutKey = layoutKeyForCabinetRow(cab?.row);
-      if (!layoutKey || placed.has(cab.id)) return;
-      nextSpec[layoutKey].push({ ref: cab.id });
-      placed.add(cab.id);
-    });
-    return nextSpec;
+    return JSON.parse(JSON.stringify(loadedSpec || EMPTY_SPEC));
   }, []);
 
   const showTransientSaveState = useCallback((nextState, resetMs = 3000) => {

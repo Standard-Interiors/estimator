@@ -52,6 +52,13 @@ function defaultDepthForRow(row) {
   return row === "wall" ? 12 : 24;
 }
 
+function looksTallCabinet(cab, legacyTallIds = new Set()) {
+  if (!cab || cab.row === "wall") return false;
+  if (legacyTallIds.has(cab.id)) return true;
+  if ((cab.type || "").startsWith("tall_")) return true;
+  return Number(cab.height) >= 72;
+}
+
 function isFrontBaseCabinet(cab) {
   return !!cab && cab.row === "base" && (cab.lane || "front") !== "back";
 }
@@ -867,6 +874,10 @@ export default function specReducer(state, action) {
 
     case "LOAD_SPEC": {
       const loaded = clone(action.spec || {});
+      const legacyTallLayout = Array.isArray(loaded.tall_layout) ? loaded.tall_layout : [];
+      const legacyTallIds = new Set(
+        legacyTallLayout.filter((item) => item?.ref).map((item) => item.ref)
+      );
       loaded.base_layout = Array.isArray(loaded.base_layout) ? loaded.base_layout : [];
       loaded.wall_layout = Array.isArray(loaded.wall_layout) ? loaded.wall_layout : [];
       loaded.cabinets = Array.isArray(loaded.cabinets) ? loaded.cabinets : [];
@@ -874,12 +885,24 @@ export default function specReducer(state, action) {
       loaded.alignment = Array.isArray(loaded.alignment)
         ? loaded.alignment.filter((a) => a?.wall && a?.base)
         : [];
-      const placed = new Set(
-        [...loaded.base_layout, ...loaded.wall_layout]
-          .filter((item) => item?.ref)
-          .map((item) => item.ref)
-      );
       loaded.cabinets.forEach((cab) => {
+        if (!cab) return;
+        if (looksTallCabinet(cab, legacyTallIds)) {
+          cab.row = "tall";
+        } else if (cab.row === "wall") {
+          cab.row = "wall";
+        } else {
+          cab.row = "base";
+        }
+        if (!Number.isFinite(cab.width) || cab.width <= 0) {
+          cab.width = 24;
+        }
+        if (!Number.isFinite(cab.height) || cab.height <= 0) {
+          cab.height = defaultHeightForRow(cab.row);
+        }
+        if (!Number.isFinite(cab.depth) || cab.depth <= 0) {
+          cab.depth = defaultDepthForRow(cab.row);
+        }
         if (cab?.row === "wall") {
           delete cab.lane;
           delete cab.depthOffset;
@@ -893,6 +916,35 @@ export default function specReducer(state, action) {
           delete cab.depthOffset;
           cab.lane = normalizeLane(cab.row, cab.lane);
         }
+        if (!typeMatchesRow(cab.type, cab.row)) {
+          cab.type = defaultTypeForRow(cab.row);
+        }
+      });
+      const placed = new Set();
+      const nextBaseLayout = [];
+      const nextWallLayout = [];
+      const appendLayoutItem = (item, fallbackKey) => {
+        if (!item) return;
+        const ref = item?.ref;
+        if (!ref) {
+          if (fallbackKey === "wall_layout") nextWallLayout.push(item);
+          else nextBaseLayout.push(item);
+          return;
+        }
+        const cab = loaded.cabinets.find((entry) => entry.id === ref);
+        if (!cab || placed.has(ref)) return;
+        const targetKey = getLayoutKey(cab.row) || fallbackKey;
+        if (targetKey === "wall_layout") nextWallLayout.push(item);
+        else nextBaseLayout.push(item);
+        placed.add(ref);
+      };
+      loaded.base_layout.forEach((item) => appendLayoutItem(item, "base_layout"));
+      loaded.wall_layout.forEach((item) => appendLayoutItem(item, "wall_layout"));
+      legacyTallLayout.forEach((item) => appendLayoutItem(item, "base_layout"));
+      loaded.base_layout = nextBaseLayout;
+      loaded.wall_layout = nextWallLayout;
+      delete loaded.tall_layout;
+      loaded.cabinets.forEach((cab) => {
         const layoutKey = getLayoutKey(cab?.row);
         if (!layoutKey || placed.has(cab.id)) return;
         loaded[layoutKey].push({ ref: cab.id });

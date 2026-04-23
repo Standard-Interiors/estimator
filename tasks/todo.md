@@ -456,3 +456,26 @@ Review:
 - render lies (wireframe/3D shows physically impossible geometry)
 - missing correction affordances
 - broken navigation/photo access/room recovery flows
+
+# Legacy Tall Layout Normalization (2026-04-22)
+
+- [x] Reproduce the `Desk / Wall 1` production room where saved spec data disagrees with the 3D/editor state
+- [x] Trace whether the bug comes from current extraction output or from legacy saved schema still living in production data
+- [x] Normalize legacy `tall_layout` specs and tall-looking lower cabinets into the current lower-run schema on load/save
+- [x] Verify locally in Chrome MCP with the exact broken field spec before committing
+- [ ] Deploy and re-verify the production room, then repair the live record if the normalized payload still is not persisted
+
+## Review Notes
+
+- Root cause was a legacy schema, not fresh extraction logic:
+- `Resort at University Park 1715A` → `Desk` → `Wall 1` still stored `tall_layout: [{ref: "T1"}]`
+- that same room also had `B2` saved as `row: "base"` with `height: 84`, which made it visually tall but semantically base
+- The current frontend only treats `base_layout` + `wall_layout` as first-class, so it was quietly appending orphan tall refs on load and rendering a half-healed state.
+- The normalization fix now:
+- folds legacy `tall_layout` items into the lower run
+- upgrades non-wall cabinets that clearly look tall (`tall_*` type, legacy tall ref, or height `>= 72`) into `row: "tall"`
+- re-homes refs into the correct layout arrays and drops legacy `tall_layout` on save
+- Local Chrome MCP proof using the exact broken production spec shape:
+- header totals corrected from the old live-style lie (`Base 66"`, `Tall 24"`) to the truthful `Base 48"`, `Tall 42"`
+- `B2` now opens with tall controls (`pantry/oven`, lane, front/back, up/down) instead of base controls
+- saved local payload no longer contains `tall_layout`, and `B2` persists as `row: "tall", type: "tall_pantry"`

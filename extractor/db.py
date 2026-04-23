@@ -40,6 +40,143 @@ def _now():
     return datetime.now(timezone.utc).isoformat()
 
 
+def _default_height_for_row(row: str) -> float:
+    if row == "wall":
+        return 30
+    if row == "tall":
+        return 84
+    return 34.5
+
+
+def _default_depth_for_row(row: str) -> float:
+    return 12 if row == "wall" else 24
+
+
+def _looks_tall_cabinet(cab: dict, legacy_tall_ids: set[str]) -> bool:
+    if not isinstance(cab, dict):
+        return False
+    if cab.get("row") == "wall":
+        return False
+    if cab.get("id") in legacy_tall_ids:
+        return True
+    cab_type = str(cab.get("type") or "")
+    if cab_type.startswith("tall_"):
+        return True
+    try:
+        height = float(cab.get("height"))
+    except (TypeError, ValueError):
+        height = 0
+    return height >= 72
+
+
+def normalize_spec(spec: dict | None) -> dict | None:
+    """Canonicalize older room specs into the current 2-row layout schema."""
+    if not isinstance(spec, dict):
+        return spec
+
+    normalized = json.loads(json.dumps(spec))
+    normalized["base_layout"] = list(normalized.get("base_layout") or [])
+    normalized["wall_layout"] = list(normalized.get("wall_layout") or [])
+    normalized["alignment"] = list(normalized.get("alignment") or [])
+    normalized["cabinets"] = list(normalized.get("cabinets") or [])
+
+    legacy_tall_layout = list(normalized.get("tall_layout") or [])
+    legacy_tall_ids = {
+        item.get("ref") for item in legacy_tall_layout
+        if isinstance(item, dict) and item.get("ref")
+    }
+
+    cab_by_id = {}
+    for cab in normalized["cabinets"]:
+        if not isinstance(cab, dict) or not cab.get("id"):
+            continue
+
+        if _looks_tall_cabinet(cab, legacy_tall_ids):
+            cab["row"] = "tall"
+            if not str(cab.get("type") or "").startswith("tall_"):
+                cab["type"] = "tall_pantry"
+        elif cab.get("row") == "wall":
+            cab["row"] = "wall"
+            if not (
+                cab.get("type") == "wall"
+                or str(cab.get("type") or "").startswith("wall_")
+            ):
+                cab["type"] = "wall"
+        else:
+            cab["row"] = "base"
+            if str(cab.get("type") or "").startswith("tall_"):
+                cab["type"] = "base"
+
+        try:
+            width = float(cab.get("width"))
+        except (TypeError, ValueError):
+            width = 0
+        cab["width"] = width if width > 0 else 24
+
+        try:
+            height = float(cab.get("height"))
+        except (TypeError, ValueError):
+            height = 0
+        cab["height"] = height if height > 0 else _default_height_for_row(cab["row"])
+
+        try:
+            depth = float(cab.get("depth"))
+        except (TypeError, ValueError):
+            depth = 0
+        cab["depth"] = depth if depth > 0 else _default_depth_for_row(cab["row"])
+
+        cab_by_id[cab["id"]] = cab
+
+    placed = set()
+    next_base_layout = []
+    next_wall_layout = []
+
+    def append_item(item: dict, fallback_key: str):
+        if not isinstance(item, dict):
+            return
+        ref = item.get("ref")
+        if not ref:
+            if fallback_key == "wall_layout":
+                next_wall_layout.append(item)
+            else:
+                next_base_layout.append(item)
+            return
+
+        cab = cab_by_id.get(ref)
+        if not cab or ref in placed:
+            return
+
+        target_key = "wall_layout" if cab.get("row") == "wall" else "base_layout"
+        if target_key == "wall_layout":
+            next_wall_layout.append(item)
+        else:
+            next_base_layout.append(item)
+        placed.add(ref)
+
+    for item in normalized["base_layout"]:
+        append_item(item, "base_layout")
+    for item in normalized["wall_layout"]:
+        append_item(item, "wall_layout")
+    for item in legacy_tall_layout:
+        append_item(item, "base_layout")
+
+    for cab in normalized["cabinets"]:
+        cab_id = cab.get("id")
+        if not cab_id or cab_id in placed:
+            continue
+        target_key = "wall_layout" if cab.get("row") == "wall" else "base_layout"
+        if target_key == "wall_layout":
+            next_wall_layout.append({"ref": cab_id})
+        else:
+            next_base_layout.append({"ref": cab_id})
+        placed.add(cab_id)
+
+    normalized["base_layout"] = next_base_layout
+    normalized["wall_layout"] = next_wall_layout
+    normalized.pop("tall_layout", None)
+    return normalized
+
+
 # ---------------------------------------------------------------------------
 # Table definitions (SQLAlchemy Core — no ORM)
 # ---------------------------------------------------------------------------
@@ -308,7 +445,7 @@ def get_room(rid: str) -> dict | None:
         # Parse spec_json
         if r.get("spec_json"):
             try:
-                r["spec"] = json.loads(r["spec_json"])
+                r["spec"] = normalize_spec(json.loads(r["spec_json"]))
             except json.JSONDecodeError:
                 r["spec"] = None
         else:
@@ -334,9 +471,9 @@ def save_room_spec(rid: str, spec_json_str: str, expected_version: int) -> dict:
     cab_count = 0
     try:
         spec = json.loads(spec_json_str) if isinstance(spec_json_str, str) else spec_json_str
+        spec = normalize_spec(spec)
         cab_count = len(spec.get("cabinets", []))
-        if isinstance(spec_json_str, dict):
-            spec_json_str = json.dumps(spec_json_str)
+        spec_json_str = json.dumps(spec)
     except (json.JSONDecodeError, TypeError):
         pass
 
