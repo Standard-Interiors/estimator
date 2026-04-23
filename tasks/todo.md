@@ -422,7 +422,7 @@ Review:
 - [x] Reproduce the bad `T1` counter state in Chrome MCP using the real `Wall 3` room data
 - [x] Trace the counter render path and identify why depth-moved tall cabinets visually overlap the countertop
 - [x] Implement the minimal render fix so counter segments clip against the moved tall cabinet silhouette
-- [ ] Verify locally in Chrome MCP against production data, deploy, and re-verify on the live site
+- [x] Verify locally in Chrome MCP against production data, deploy, and re-verify on the live site
 
 ## Review Notes
 
@@ -432,3 +432,9 @@ Review:
 - In the bad state (`T1` back lane, `depthOffset: 18`, refrigerator gap on the right), the right-side counter segment started inside the pantry's projected body, so the countertop looked like it was coming through the cabinet.
 - The fix clips counter segments against the projected x-range of every tall cabinet before rendering them.
 - Local Chrome MCP on `localhost` with production room data proved the visual fix on the exact bad state: the right-side counter now starts to the right of `T1` instead of cutting through it.
+- Live Chrome MCP on `https://cabinet-estimator.fly.dev/project/3389c9e8abb7ae8b/room/24ca994d2d3db8de` matched the local proof after deploy:
+- production kept the same weird layout state (`Base 194"`, `Tall 30"`, `Refrigerator 110"`, `T1 depthOffset: 18`)
+- the counter no longer exits through the pantry side in that exact state
+- proof screenshots:
+- local: `/Users/william/estimator/tasks/local-counter-fix.png`
+- live: `/Users/william/estimator/tasks/prod-counter-fix.png`
