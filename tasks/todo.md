@@ -1,3 +1,48 @@
+# Nancy Scope Export (2026-04-23)
+
+- [x] Confirm the latest working branch before building
+- [x] Define the simplest quote-scope payload Nancy can call directly
+- [x] Add backend quote-scope builder from normalized saved room specs
+- [x] Add intuitive Nancy API endpoints by project id or project name
+- [x] Add a human export/review button that uses the same backend payload
+- [x] Verify through Chrome MCP on real field data, deploy, and re-verify live
+
+## Review Notes
+
+- `codex/runtime-trust-fixes` is the latest branch: it is 32 commits ahead of `main`, and `main` has no unique commits.
+- The Nancy payload must come from normalized edited room data, not the browser cut-list math.
+- The API should be easy to call by either project id or project name, because Nancy should not need to understand the frontend route structure.
+- Local Chrome MCP proof: `GET /api/projects/1730a82716a3e412/quote-scope` returned `nancy_quote_scope_v1`, and `GET /api/nancy/quote-scope?project=My%20Cabinet%20Project` matched by name.
+- Local Chrome MCP proof: clicking `Export Nancy Scope` on the project cut-list page issued `GET /api/projects/1730a82716a3e412/quote-scope [200]`.
+- Live Chrome MCP proof on `The Heights by Marston Lake`: `/api/projects/3389c9e8abb7ae8b/quote-scope`, `/api/projects/3389c9e8abb7ae8b/nancy-scope`, and `/api/nancy/quote-scope?project=The%20Heights%20by%20Marston%20Lake` all returned `200`.
+- Live Chrome MCP proof: clicking `Export Nancy Scope` on the deployed cut-list page issued `GET /api/projects/3389c9e8abb7ae8b/quote-scope [200]`.
+
+# Live Chrome Audit Continuation (2026-04-23)
+
+- [x] Reproduce the next production trust issue with Chrome MCP instead of code-guessing
+- [x] Confirm that ordinary room deletion on the project page has no confirmation dialog
+- [ ] Add confirmation for every room deletion while preserving the existing last-room warning
+- [ ] Verify local behavior in Chrome MCP, then deploy and re-verify on the live site
+- [ ] Resume the fresh-eye audit immediately after deploy and capture the next issue
+
+## Review Notes
+
+- Live repro on `cabinet-estimator.fly.dev`: deleting `Wall 2` from a two-wall temp project removed it immediately with no confirmation dialog.
+- This is different from the already-fixed last-room flow. The project stayed alive as expected, but ordinary room deletion remained a one-click destructive action.
+- Fix goal: every room delete should confirm first, while the last room keeps its more specific warning text about leaving an empty draft project.
+
+# Fresh-Eye Loading Audit (2026-04-23)
+
+- [x] Review backend read helpers that shape project and room truth for the UI
+- [x] Audit `ProjectDetail.jsx`, `ProjectCutList.jsx`, and `RoomEditorWrapper` / `App.jsx` for load and error-state mismatches
+- [x] Capture only concrete trust-relevant findings where UI messaging can diverge from backend reality
+
+## Review Notes
+
+- `get_project()` still exposes room summaries from raw `spec_json`, while `get_room()` is stricter and nulls invalid specs. That leaves room-summary surfaces vulnerable to overstating extraction success.
+- `ProjectCutList.jsx` silently drops any room whose `spec_json` fails to parse and can fall through to the same empty-state copy used for truly unextracted projects.
+- `EditorApp` still swallows room-read failures after `RoomEditorWrapper` has already confirmed the room exists from the project summary, which can leave users on the blank extraction UI instead of a load failure.
+
 # Live Data Triage (2026-04-22)
 
 - [x] Review prior live-production anomaly notes for duplicate projects, copy media loss, and empty room records
@@ -218,6 +263,20 @@
 # Front/Back State Model Review (2026-04-21)
 
 - [x] Confirm the active production files and current placement/state entry points for front/back questions
+
+# Tall / Offset Trust Audit (2026-04-23)
+
+- [x] Document the active review scope for tall/front-back/yOffset/depthOffset editor behavior
+- [x] Trace reducer and helper invariants in `specReducer.js` and `specHelpers.js`
+- [x] Trace render/control behavior in `InteractiveRender.jsx`, `CabinetEditBar.jsx`, `BottomSheet.jsx`, `ActionRow.jsx`, and `App.jsx`
+- [x] Return prioritized likely bugs/regressions only, with exact file references
+
+## Review Notes
+
+- `SET_LANE` only updates the lane flag. Tall `depthOffset` survives lane snaps, so a cabinet can still render/set save as set back after the UI says `front`.
+- Lower-run drag/drop math still uses front-plane slot `x` positions, while setback tall rendering adds projected lane/depth offsets. Once a tall is moved back/front, the visible box and the slot hit-testing no longer line up.
+- `InteractiveRender` sizes the SVG width from raw layout width plus cabinet depth only. It never budgets for lane/depth offsets, so setback lower cabinets near the far right can be clipped.
+- Gap/opening rendering is still front-plane only. Back-lane lower cabinets can disagree with nearby filler/opening annotations and counter support because gaps have no lane state and are treated as `front`.
 - [x] Trace how `InteractiveRender.jsx` and `App.jsx` currently represent row changes versus spacing/nudges
 - [x] Inspect `specReducer.js` and `specHelpers.js` for the persisted model shape and reducer implications of true front/back movement
 - [x] Decide whether true front/back movement should exist for non-wall cabinets from a state-model perspective
@@ -265,6 +324,20 @@
 - Active bug: deleting the last room leaves the parent project behind as a zero-room shell.
 - Active bug: duplicating a zero-room project will duplicate the empty shell too.
 - Historical data: the local DB has no active zero-room projects today; the empty shell records present are attached only to soft-deleted projects from 2026-04-01/02.
+
+# Destructive Flow Audit (2026-04-23)
+
+- [x] Trace active project create/duplicate/delete flows imported by `App.jsx`
+- [x] Trace active room create/duplicate/delete flows in `ProjectDetail.jsx` and `RoomCard.jsx`
+- [x] Check backend delete/duplicate helpers for state mismatches with the UI
+- [x] Capture only concrete confirmation gaps, misleading success states, and stale-UI issues
+
+## Review Notes
+
+- Deleted projects are still loadable and mutable through direct project routes because `get_project()` does not filter soft-deleted rows, while list queries do.
+- Room duplication still lacks a pending/refetch path in `ProjectDetail.jsx`, so repeated clicks can create extra copies and even one successful duplicate can render in the wrong order until reload.
+- Room deletion is a hard delete with cascading child-data loss, but the current confirmation copy does not warn about photo/spec/history removal.
+- Room deletion does not bump `projects.updated_at`, so project list recency metadata stays stale after a destructive room change.
 
 # UI Parity Review After Lane Feature (2026-04-22)
 
@@ -619,7 +692,7 @@ Review:
 
 - [x] Separate real 404s from generic load failures on project pages
 - [x] Verify the new failure messaging locally in Chrome MCP with injected fetch failures
-- [ ] Deploy and re-verify the failure messaging on the live site in Chrome MCP
+- [x] Deploy and re-verify the failure messaging on the live site in Chrome MCP
 
 ## Review
 
@@ -628,3 +701,6 @@ Review:
 - Local Chrome MCP proof with injected browser-side fetch failures:
 - from the project list, failing `/api/projects/1730a82716a3e412` and opening `My Cabinet Project` showed `Failed to load project.`
 - from project detail, failing that same project fetch and opening `Kitchen Wall` showed `Failed to load project.` in the room wrapper instead of an endless loading state
+- Live Chrome MCP proof with injected browser-side fetch failures:
+- from the live project list, failing `/api/projects/3389c9e8abb7ae8b` and opening `The Heights by Marston Lake` showed `Failed to load project.`
+- from live project detail, failing that same project fetch and opening `Wall 3` showed `Failed to load project.` in the room wrapper

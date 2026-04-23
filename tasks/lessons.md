@@ -124,3 +124,9 @@ If a tall cabinet can shift backward in the 3D view, do not keep drawing counter
 
 ### 27. A long-run audit request stays open after the first good deploy
 If the user asks for a sustained multi-hour audit/fix push, do not close the loop just because one bug is fixed and reverified. Finish the patch, then immediately start the next Chrome MCP sweep with fresh eyes and keep the task open until you hit a real blocker or the user explicitly stops it.
+
+### 28. If the user asks for a timed sustained push, set a heartbeat instead of relying on memory
+When the user says to keep iterating for hours or asks for a timer, create a thread heartbeat right away so the work actually wakes back up on schedule. Do not treat a six-hour push like a normal single-turn promise.
+
+### 29. Branch prompts are not branch truth
+If Codex shows a "continue on a different branch" warning, do not treat that UI label as authoritative. Check git ancestry and ahead/behind counts, then continue on whichever branch actually contains the latest work unless the user explicitly picks another branch.
