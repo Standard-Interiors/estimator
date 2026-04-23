@@ -395,10 +395,24 @@ Review:
 
 - [x] Reproduce the current `T1` front/back complaint in Chrome MCP on real `Wall 3` data
 - [x] Confirm whether the existing `front/back` control is only a snap preset instead of a true movement axis
-- [ ] Add a true saved front/back movement control for tall cabinets in both desktop and mobile editor paths
-- [ ] Verify the new front/back movement locally in Chrome MCP against production data, then deploy and re-verify on the live site
+- [x] Add a true saved front/back movement control for tall cabinets in both desktop and mobile editor paths
+- [x] Verify the new front/back movement locally in Chrome MCP against production data, then deploy and re-verify on the live site
 
 ## Review Notes
 
 - Chrome MCP live proof showed the current `back` pill does save and visibly shifts `T1`, but it is only a lane preset, not the same kind of direct movement control as `left/right` or `up/down`.
 - That mismatch is why the feature still feels missing in practice: the editor has a front/back mode switch, not a real front/back move axis.
+- Fix shipped in commit `69eb92f` and Fly image `registry.fly.io/cabinet-estimator:deployment-01KPW6SW8XPACMC9FYG1E36VGV`.
+- Desktop now exposes both concepts separately:
+- `front lane` / `back lane` snap the cabinet to a lane.
+- `↙ Front` / `Back ↗` move the cabinet along a saved depth axis without changing its lane.
+- Mobile exposes the same split between `SNAP LANE` and `↙ Front` / `Back ↗`.
+- Local Chrome MCP against production data proved the new axis is real:
+- starting state for live `T1` was `lane: "back", yOffset: 8, depthOffset: 0`
+- clicking `Back ↗` changed the saved room payload to `depthOffset: 6`
+- clicking `↙ Front` restored `depthOffset: 0`
+- Live Chrome MCP on `https://cabinet-estimator.fly.dev/project/3389c9e8abb7ae8b/room/24ca994d2d3db8de` matched local after deploy:
+- desktop `T1` shows `front lane`, `back lane`, `↙ Front`, and `Back ↗`
+- the undo label changes to `Undo: Shift T1 back`
+- the live room payload changes from `depthOffset: 0` to `depthOffset: 6`
+- the room was restored after verification to `depthOffset: 0`
