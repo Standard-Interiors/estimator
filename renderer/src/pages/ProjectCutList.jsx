@@ -50,8 +50,9 @@ export default function ProjectCutList() {
   if (projectLoadError) return <div style={{ textAlign: "center", padding: 60, color: "#555", fontSize: 13 }}>Failed to load project.</div>;
   if (projectMissing || !project) return <div style={{ textAlign: "center", padding: 60, color: "#555", fontSize: 13 }}>Project not found.</div>;
 
-  // Parse all wall specs
-  const wallData = (project.rooms || [])
+  // Parse all wall specs and keep explicit track of unreadable saved rooms so the
+  // cut list never silently looks complete when it is actually partial.
+  const parsedWalls = (project.rooms || [])
     .filter(r => r.spec_json)
     .map(r => {
       try {
@@ -59,14 +60,18 @@ export default function ProjectCutList() {
         const profile = resolveShopProfile(spec) || shopProfile;
         const parts = calcProjectCutList(spec, profile);
         return {
+          ok: true,
           room: r,
           spec,
           parts: parts.map(p => ({ ...p, roomName: r.room_name || "", wallName: r.name || "Wall" })),
         };
-      } catch { return null; }
-    })
-    .filter(Boolean);
+      } catch {
+        return { ok: false, room: r };
+      }
+    });
 
+  const wallData = parsedWalls.filter(w => w.ok);
+  const invalidWalls = parsedWalls.filter(w => !w.ok).map(w => w.room);
   const allParts = wallData.flatMap(w => w.parts);
   const totalParts = allParts.reduce((s, p) => s + p.qty, 0);
   const totalCabinets = wallData.reduce((s, w) => s + (w.spec.cabinets?.length || 0), 0);
@@ -148,6 +153,17 @@ export default function ProjectCutList() {
         </div>
       )}
 
+      {invalidWalls.length > 0 && (
+        <div style={{ padding: 12, marginBottom: 14, background: "#14141e", border: "1px solid #f59e0b", borderRadius: 10 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#eee", marginBottom: 4 }}>
+            {invalidWalls.length} saved room{invalidWalls.length !== 1 ? "s" : ""} could not be read
+          </div>
+          <div style={{ fontSize: 11, color: "#888", lineHeight: 1.5 }}>
+            Totals and exports below only include readable rooms. Problem rooms: {invalidWalls.map((room) => [room.room_name, room.name].filter(Boolean).join(" › ") || "Unnamed wall").join(", ")}.
+          </div>
+        </div>
+      )}
+
       {/* Legend */}
       <div style={{ display: "flex", gap: 14, marginBottom: 14, fontSize: 10, color: "#555", fontFamily: MONO }}>
         {[["#1a6fbf", "Box"], ["#22c55e", "Fronts"], ["#f97216", "Drawer Box"]].map(([c, l]) => (
@@ -156,10 +172,17 @@ export default function ProjectCutList() {
       </div>
 
       {/* Empty state */}
-      {wallData.length === 0 && (
+      {wallData.length === 0 && invalidWalls.length === 0 && (
         <div style={{ textAlign: "center", padding: 60, color: "#555" }}>
           <div style={{ fontSize: 14, marginBottom: 8 }}>No cabinet specs found</div>
           <div style={{ fontSize: 12, color: "#444" }}>Extract cabinets from photos in your rooms first.</div>
+        </div>
+      )}
+
+      {wallData.length === 0 && invalidWalls.length > 0 && (
+        <div style={{ textAlign: "center", padding: 60, color: "#555" }}>
+          <div style={{ fontSize: 14, marginBottom: 8 }}>Saved cabinet specs could not be read</div>
+          <div style={{ fontSize: 12, color: "#444" }}>Fix the unreadable room data before exporting a project cut list.</div>
         </div>
       )}
 
