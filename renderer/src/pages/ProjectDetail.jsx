@@ -90,8 +90,8 @@ export default function ProjectDetail() {
     try {
       const isLastRoom = (project?.rooms || []).length === 1;
       const prompt = isLastRoom
-        ? "Delete the last room? The project will stay as an empty draft."
-        : `Delete "${room.name || "this wall"}"?`;
+        ? "Delete the last room? The project will stay as an empty draft, but this removes the room's photo, wireframe, saved spec, and exports."
+        : `Delete "${room.name || "this wall"}"? This removes its photo, wireframe, saved spec, and exports.`;
       if (!window.confirm(prompt)) {
         return;
       }
