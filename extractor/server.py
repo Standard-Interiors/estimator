@@ -199,8 +199,10 @@ async def save_room_spec_post(rid: str, body: dict):
 
 @app.delete("/api/rooms/{rid}")
 async def delete_room(rid: str):
-    db.delete_room(rid)
-    return {"ok": True}
+    result = db.delete_room(rid)
+    if not result:
+        raise HTTPException(404, "Room not found")
+    return result
 
 
 @app.post("/api/rooms/{rid}/duplicate")

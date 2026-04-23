@@ -78,7 +78,14 @@ export default function ProjectDetail() {
 
   const handleDelete = async (id) => {
     try {
-      await api.deleteRoom(id);
+      const isLastRoom = (project?.rooms || []).length === 1;
+      if (
+        isLastRoom
+        && !window.confirm("Delete the last room? The project will stay as an empty draft.")
+      ) {
+        return;
+      }
+      const result = await api.deleteRoom(id);
       setProject((prev) => ({
         ...prev,
         rooms: prev.rooms.filter((r) => r.id !== id),

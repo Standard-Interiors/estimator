@@ -521,9 +521,22 @@ def update_room(rid: str, **kwargs) -> dict | None:
     return get_room(rid)
 
 
-def delete_room(rid: str):
+def delete_room(rid: str) -> dict | None:
     with engine.begin() as conn:
+        room = conn.execute(
+            rooms.select().where(rooms.c.id == rid)
+        ).mappings().first()
+        if not room:
+            return None
+
+        project_id = room["project_id"]
         conn.execute(rooms.delete().where(rooms.c.id == rid))
+
+    return {
+        "ok": True,
+        "project_id": project_id,
+        "project_deleted": False,
+    }
 
 
 def _duplicate_room_images(source_room: dict, new_room_id: str):

@@ -547,3 +547,23 @@ Review:
 - double-clicking `Create` for `Draft Room` only created one room
 - double-clicking `Add` for `Wall 2` only created one new wall, leaving the room at `2 walls`
 - the project detail grid labeled both new walls as `Draft · no photo`
+
+# Last-Room Delete Cleanup (2026-04-22)
+
+- [x] Reproduce whether deleting the last room in a project leaves an empty shell behind
+- [x] Decide the desired behavior for that flow
+- [x] Implement backend + project-detail cleanup for last-room deletion
+- [x] Verify the delete flow locally in Chrome MCP before shipping
+- [ ] Deploy and re-verify the delete flow on the live site in Chrome MCP
+
+## Review
+
+- Live repro before the fix: a throwaway production project (`Audit Temp 884438`) with one room still existed as a `No rooms yet` shell after its only room was deleted.
+- Chosen behavior after staff review: deleting the last room should not auto-delete the project. Empty projects are already a first-class draft state, so the safer fix is a warning before the final room is removed and then a clean transition into the existing empty-project screen.
+- Backend change: `delete_room()` still returns structured success info, but it no longer soft-deletes the parent project on last-room delete. Evidence: `extractor/db.py`, `extractor/server.py`.
+- Frontend change: `ProjectDetail` now warns only when the user is deleting the last remaining room: `Delete the last room? The project will stay as an empty draft.` After confirmation, the page re-renders into the empty-project state instead of leaving the user guessing. Evidence: `renderer/src/pages/ProjectDetail.jsx`.
+- Local Chrome MCP proof:
+- created `Delete Warning Temp 309380` with one room and one wall
+- opened the room card `···` menu, clicked `Delete`, and accepted the confirmation dialog
+- the project detail page stayed on the same project and re-rendered to `No rooms yet`
+- browser `fetch()` after the delete still returned the project with `room_count: 0`, confirming the empty draft survives
