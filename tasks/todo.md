@@ -372,8 +372,8 @@ Review:
 - [x] Re-check the live desktop `T1` editor in Chrome MCP and confirm the new movement controls overflow the fixed-width shell
 - [x] Inspect the active desktop editor path and confirm the squeeze is in `CabinetEditBar.jsx`, not a hidden parent clip
 - [x] Restructure the desktop edit bar so identity/setup/dimensions stay readable and action controls get their own wrapped row
-- [ ] Verify the new layout in Chrome MCP on real `Wall 3` data and iterate if the bar still feels cramped
-- [ ] Build, commit, push, deploy, and re-verify the shipped layout in Chrome MCP once the fit is clean
+- [x] Verify the new layout in Chrome MCP on real `Wall 3` data and iterate if the bar still feels cramped
+- [x] Build, commit, push, deploy, and re-verify the shipped layout in Chrome MCP once the fit is clean
 
 ## Review Notes
 
@@ -382,3 +382,11 @@ Review:
 - The cleanest fix is a two-tier desktop bar:
 - top row = cabinet identity, label, type/row/lane or alignment controls, and dimensions
 - second row = movement, spacing, merge, add, duplicate, and delete actions with wrapping
+- Chrome MCP local proof on real `Wall 3` data:
+- `T1` now renders with a clean two-row editor: top row for label/type/row/lane + dimensions, second row for slot/up/down/space/add actions.
+- The denser `B3` editor also fits cleanly with merge + filler + duplicate actions still visible.
+- DOM measurements in Chrome MCP show both the top row and action row at `scrollWidth === clientWidth === 1124` on the fixed-width desktop shell.
+- Fly deploy shipped from commit `2e9f7f7` as image `registry.fly.io/cabinet-estimator:deployment-01KPW5PQZ7HMAWJ2QZP6ERZQWN`.
+- Chrome MCP live proof on `cabinet-estimator.fly.dev` matches the local fix after a hard reload:
+- `T1` shows the two-tier desktop bar with no clipped movement controls.
+- `B3` still fits with the heavier base-cabinet action set, including merge.
