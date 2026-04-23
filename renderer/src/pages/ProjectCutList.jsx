@@ -46,6 +46,20 @@ export default function ProjectCutList() {
 
   const handleProfileChange = (p) => { setShopProfileState(p); saveShopProfile(p); };
 
+  const exportNancyScope = async () => {
+    try {
+      const scope = await api.getProjectQuoteScope(projectId);
+      const blob = new Blob([JSON.stringify(scope, null, 2)], { type: "application/json" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `${(project.name || "project").replace(/\s+/g, "_")}_nancy_scope_${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } catch (e) {
+      window.alert(`Nancy scope export failed: ${e.message || e}`);
+    }
+  };
+
   if (loading) return <div style={{ textAlign: "center", padding: 60, color: "#555", fontSize: 13 }}>Loading...</div>;
   if (projectLoadError) return <div style={{ textAlign: "center", padding: 60, color: "#555", fontSize: 13 }}>Failed to load project.</div>;
   if (projectMissing || !project) return <div style={{ textAlign: "center", padding: 60, color: "#555", fontSize: 13 }}>Project not found.</div>;
@@ -123,6 +137,10 @@ export default function ProjectCutList() {
           padding: "5px 10px", borderRadius: 6, fontSize: 10, fontWeight: 600,
           cursor: "pointer", background: "#1a1a2a", border: "1px solid #2a2a3a", color: "#888",
         }}>⚙ Shop Profile</button>
+        <button onClick={exportNancyScope} style={{
+          padding: "5px 10px", borderRadius: 6, fontSize: 10, fontWeight: 600,
+          cursor: "pointer", background: "#1a1a2a", border: "1px solid #2a2a3a", color: "#888",
+        }}>Export Nancy Scope</button>
         <button onClick={exportCSV} style={{
           padding: "5px 10px", borderRadius: 6, fontSize: 10, fontWeight: 600,
           cursor: "pointer", background: "#1a1a2a", border: "1px solid #2a2a3a", color: "#888",

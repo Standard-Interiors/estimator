@@ -24,6 +24,7 @@ from extract_cabinets import extract_from_bytes, extract_from_photo, PROMPT
 from pipeline import run_pipeline
 import db
 import tasks
+from quote_scope import build_project_quote_scope
 
 # ---------------------------------------------------------------------------
 # Load .env (needed when run via CMD in Docker, not just __main__)
@@ -107,6 +108,58 @@ async def get_project(pid: str):
     if not p:
         raise HTTPException(404, "Project not found")
     return p
+
+
+def _resolve_project_for_nancy(project_ref: str) -> tuple[dict, dict]:
+    value = (project_ref or "").strip()
+    if not value:
+        raise HTTPException(400, "project is required")
+
+    by_id = db.get_project(value)
+    if by_id:
+        return by_id, {"matched_by": "id", "value": value}
+
+    matches = [
+        project for project in db.list_projects()
+        if (project.get("name") or "").strip().lower() == value.lower()
+    ]
+    if not matches:
+        raise HTTPException(404, "Project not found")
+    if len(matches) > 1:
+        raise HTTPException(
+            409,
+            "Multiple projects have that name. Use the project id instead."
+        )
+    project = db.get_project(matches[0]["id"])
+    if not project:
+        raise HTTPException(404, "Project not found")
+    return project, {"matched_by": "name", "value": value}
+
+
+@app.get("/api/projects/{pid}/quote-scope")
+async def get_project_quote_scope(pid: str):
+    """Stable cabinet-scope JSON for Nancy and manual quote-scope export."""
+    p = db.get_project(pid)
+    if not p:
+        raise HTTPException(404, "Project not found")
+    return build_project_quote_scope(p, lookup={"matched_by": "id", "value": pid})
+
+
+@app.get("/api/projects/{pid}/nancy-scope")
+async def get_project_nancy_scope(pid: str):
+    """Alias with a Nancy-friendly name."""
+    return await get_project_quote_scope(pid)
+
+
+@app.get("/api/nancy/quote-scope")
+async def get_nancy_quote_scope(project: str = Query(...)):
+    """Fetch quote scope by project id or exact project name.
+
+    Example:
+      /api/nancy/quote-scope?project=The%20Heights%20by%20Marston%20Lake
+    """
+    p, lookup = _resolve_project_for_nancy(project)
+    return build_project_quote_scope(p, lookup=lookup)
 
 
 @app.patch("/api/projects/{pid}")

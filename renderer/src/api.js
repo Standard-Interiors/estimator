@@ -38,6 +38,8 @@ export const createProject = (name, notes) =>
 
 export const getProject = (id) => _fetch(`/api/projects/${id}`);
 
+export const getProjectQuoteScope = (id) => _fetch(`/api/projects/${id}/quote-scope`);
+
 export const updateProject = (id, data) =>
   _fetch(`/api/projects/${id}`, {
     method: "PATCH",
