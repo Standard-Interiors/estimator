@@ -551,6 +551,7 @@ def update_room(rid: str, **kwargs) -> dict | None:
 
 
 def delete_room(rid: str) -> dict | None:
+    now = _now()
     with engine.begin() as conn:
         room = conn.execute(
             rooms.select().where(rooms.c.id == rid)
@@ -560,6 +561,10 @@ def delete_room(rid: str) -> dict | None:
 
         project_id = room["project_id"]
         conn.execute(rooms.delete().where(rooms.c.id == rid))
+        conn.execute(
+            projects.update().where(projects.c.id == project_id)
+            .values(updated_at=now)
+        )
 
     return {
         "ok": True,
