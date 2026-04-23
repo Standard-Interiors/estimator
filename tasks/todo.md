@@ -579,7 +579,7 @@ Review:
 - [x] Reproduce whether project delete fires immediately without any warning
 - [x] Add a confirmation step to the project-list delete action
 - [x] Verify the confirmation locally in Chrome MCP
-- [ ] Deploy and re-verify the confirmation on the live site in Chrome MCP
+- [x] Deploy and re-verify the confirmation on the live site in Chrome MCP
 
 ## Review
 
@@ -590,3 +590,27 @@ Review:
 - opened the project card `···` menu and clicked `Delete`
 - dismissing the confirmation dialog left the project card in place
 - repeating the delete and accepting the dialog removed the project card from the list
+- Live Chrome MCP proof:
+- created `Live Project Confirm 947935`
+- opened the project card `···` menu and clicked `Delete`
+- dismissing the confirmation dialog left the project card in place
+- repeating the delete and accepting the dialog removed the project card from the live list
+- follow-on issue discovered: the deleted project still loads by direct URL because project fetches do not currently filter `deleted_at`
+
+# Deleted Project URL Hardening (2026-04-22)
+
+- [x] Reproduce that a deleted project still loads by direct URL
+- [x] Make project and room fetches ignore soft-deleted parent projects
+- [x] Add a real not-found state to the room wrapper so deleted-room URLs do not hang
+- [x] Verify the deleted project and deleted room URLs locally in Chrome MCP
+- [ ] Deploy and re-verify the deleted URL behavior on the live site in Chrome MCP
+
+## Review
+
+- Live repro before the fix: after deleting `Live Project Delete 617962`, opening `/project/e4852a30c5486b00` still rendered the deleted project instead of a not-found state.
+- Backend fix: `get_project()` now filters out soft-deleted projects, and `get_room()` now joins through the parent project so rooms under deleted projects also disappear. Evidence: `extractor/db.py`.
+- Frontend fix: `RoomEditorWrapper` now distinguishes loading from missing and renders `Project not found.` or `Room not found.` instead of sitting on an endless loading screen when the backend returns 404. Evidence: `renderer/src/App.jsx`.
+- Local Chrome MCP proof:
+- created and deleted `Deleted URL Temp 170598`
+- opening `/project/d3ae00c1bc3b5f9e` showed `Project not found.`
+- opening `/project/d3ae00c1bc3b5f9e/room/ec350071e7cf734e` also failed cleanly instead of hanging

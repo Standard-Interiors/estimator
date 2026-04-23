@@ -308,7 +308,10 @@ def create_project(name: str, notes: str = None) -> dict:
 def get_project(pid: str) -> dict | None:
     with engine.connect() as conn:
         row = conn.execute(
-            projects.select().where(projects.c.id == pid)
+            projects.select().where(
+                projects.c.id == pid,
+                projects.c.deleted_at.is_(None),
+            )
         ).mappings().first()
         if not row:
             return None
@@ -439,7 +442,12 @@ def create_room(project_id: str, name: str = None, room_name: str = "", sort_ord
 def get_room(rid: str) -> dict | None:
     with engine.connect() as conn:
         row = conn.execute(
-            rooms.select().where(rooms.c.id == rid)
+            rooms.select()
+            .select_from(rooms.join(projects, rooms.c.project_id == projects.c.id))
+            .where(
+                rooms.c.id == rid,
+                projects.c.deleted_at.is_(None),
+            )
         ).mappings().first()
         if not row:
             return None

@@ -1949,23 +1949,44 @@ function RoomEditorWrapper() {
   const { projectId, roomId } = useParams();
   const navigate = useNavigate();
   const [project, setProject] = useState(null);
+  const [loadingProject, setLoadingProject] = useState(true);
+  const [projectMissing, setProjectMissing] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      if (!cancelled) {
+        setLoadingProject(true);
+        setProjectMissing(false);
+      }
       try {
         const p = await api.getProject(projectId);
         if (!cancelled) setProject(p);
-      } catch (e) { console.error("Failed to load project:", e); }
+      } catch (e) {
+        console.error("Failed to load project:", e);
+        if (!cancelled) {
+          setProject(null);
+          setProjectMissing(true);
+        }
+      } finally {
+        if (!cancelled) setLoadingProject(false);
+      }
     })();
     return () => { cancelled = true; };
   }, [projectId]);
 
-  if (!project) {
+  if (loadingProject) {
     return <div style={{minHeight:"100vh",background:"#06060c",color:"#555",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13}}>Loading...</div>;
   }
 
+  if (projectMissing || !project) {
+    return <div style={{minHeight:"100vh",background:"#06060c",color:"#555",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13}}>Project not found.</div>;
+  }
+
   const wall = project.rooms?.find(r => r.id === roomId);
+  if (!wall) {
+    return <div style={{minHeight:"100vh",background:"#06060c",color:"#555",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13}}>Room not found.</div>;
+  }
   const roomName = wall?.room_name || "";
   const wallName = wall?.name || "Wall";
 
