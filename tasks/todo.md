@@ -366,3 +366,19 @@ Review:
 - `P1` Duplicate empty projects exist: `Lambertson Farms 1516` (`1165b9e914a1aab8`) and `Lambertson Farms 631` (`e8036b825308817c`) both open to `0 rooms · 0 walls`, which looks like duplicate/project-creation leakage rather than a real project state.
 - `P2` Empty unfinished room remains in production: `Bell` → `Wall 1` (`067d7a058d10ca15`) opens to the fresh extraction/upload screen with no photo, no wireframe, and no cabinets.
 - `P2` Upper alignment still looks under-modeled across field data: 24 live rooms have both base and wall cabinets but `alignment: []`. I spot-checked `Velo A104` → `Wall 1`, and it does render with no persisted alignment anchors at all.
+
+# Desktop Edit Bar Fit Fix (2026-04-22)
+
+- [x] Re-check the live desktop `T1` editor in Chrome MCP and confirm the new movement controls overflow the fixed-width shell
+- [x] Inspect the active desktop editor path and confirm the squeeze is in `CabinetEditBar.jsx`, not a hidden parent clip
+- [x] Restructure the desktop edit bar so identity/setup/dimensions stay readable and action controls get their own wrapped row
+- [ ] Verify the new layout in Chrome MCP on real `Wall 3` data and iterate if the bar still feels cramped
+- [ ] Build, commit, push, deploy, and re-verify the shipped layout in Chrome MCP once the fit is clean
+
+## Review Notes
+
+- The desktop shell is still capped by `#root { width: 1126px; max-width: 100%; }`, so the bottom editor has a real width ceiling even on large monitors.
+- The overflow bug is mostly self-inflicted inside `CabinetEditBar`: row 1 was still one rigid strip with label, type pills, row/lane controls, dimensions, and every edit action fighting for the same line.
+- The cleanest fix is a two-tier desktop bar:
+- top row = cabinet identity, label, type/row/lane or alignment controls, and dimensions
+- second row = movement, spacing, merge, add, duplicate, and delete actions with wrapping

@@ -80,6 +80,23 @@ export default function CabinetEditBar({ cab, spec, dispatch, selColor, widthInp
     color: "#fff", fontSize: 14, textAlign: "center", fontFamily: MONO, fontWeight: 700,
   });
 
+  const topRowStyle = {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+    padding: "6px 10px",
+    borderBottom: "1px solid #111118",
+    flexWrap: "wrap",
+  };
+
+  const wrapGroupStyle = { display: "flex", alignItems: "center", gap: 3, flexWrap: "wrap" };
+  const headerGroupStyle = { display: "flex", alignItems: "center", gap: 8, flex: "1 1 580px", minWidth: 0, flexWrap: "wrap" };
+  const dimensionGroupStyle = { display: "flex", alignItems: "center", gap: 6, flexShrink: 0, marginLeft: "auto" };
+  const dividerStyle = { width: 1, height: 20, background: "#1a1a2a", flexShrink: 0 };
+  const actionRowStyle = { display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", borderBottom: "1px solid #111118", flexWrap: "wrap" };
+  const actionGroupStyle = { display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" };
+
   const commitDim = (field, val, inputEl) => {
     let v = parseFloat(val);
     if (isNaN(v) || v <= 0) {
@@ -102,8 +119,9 @@ export default function CabinetEditBar({ cab, spec, dispatch, selColor, widthInp
 
   return (
     <div style={{ flexShrink: 0, background: "#0c0c14", borderTop: "1px solid #1a1a2a" }}>
-      {/* Row 1: Identity + Dimensions */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", borderBottom: "1px solid #111118" }}>
+      {/* Row 1: Identity + Placement + Dimensions */}
+      <div style={topRowStyle}>
+        <div style={headerGroupStyle}>
         <span style={{ color: selColor, fontWeight: 700, fontSize: 16, fontFamily: MONO }}>{cab.id}</span>
         <input
           key={cab.id + "-label"}
@@ -116,14 +134,14 @@ export default function CabinetEditBar({ cab, spec, dispatch, selColor, widthInp
           title={cab.label || ""}
           onBlur={e => { const v = e.target.value.trim(); if (v !== (cab.label || "")) dispatch({ type: "SET_LABEL", id: cab.id, label: v }); }}
           onKeyDown={e => { if (e.key === "Enter") e.target.blur(); if (e.key === "Escape") { e.target.value = cab.label || ""; e.target.blur(); } }}
-          style={{ flex: "1 1 auto", minWidth: 120, maxWidth: 320, height: 24, background: "transparent", border: "1px solid transparent", borderRadius: 4, color: "#888", fontSize: 11, fontFamily: MONO, padding: "0 4px", cursor: "text" }}
+          style={{ flex: "1 1 220px", minWidth: 160, maxWidth: 360, height: 24, background: "transparent", border: "1px solid transparent", borderRadius: 4, color: "#888", fontSize: 11, fontFamily: MONO, padding: "0 4px", cursor: "text" }}
           onFocus={e => { e.target.style.borderColor = "#2a2a3a"; e.target.style.background = "#14141e"; }}
           onMouseEnter={e => { if (document.activeElement !== e.target) e.target.style.borderColor = "#1a1a2a"; }}
           onMouseLeave={e => { if (document.activeElement !== e.target) e.target.style.borderColor = "transparent"; }}
         />
 
         {/* Type pills */}
-        <div style={{ display: "flex", gap: 3 }}>
+        <div style={wrapGroupStyle}>
           {types.map(t => (
             <button key={t} style={btnStyle(cab.type === t)}
               onClick={() => dispatch({ type: "CHANGE_TYPE", id: cab.id, newType: t })}>
@@ -132,7 +150,7 @@ export default function CabinetEditBar({ cab, spec, dispatch, selColor, widthInp
           ))}
         </div>
 
-        <div style={{ display: "flex", gap: 3 }}>
+        <div style={wrapGroupStyle}>
           {ROWS.map((row) => {
             const active = cab.row === row;
             return (
@@ -151,7 +169,7 @@ export default function CabinetEditBar({ cab, spec, dispatch, selColor, widthInp
         </div>
 
         {cab.row !== "wall" && (
-          <div style={{ display: "flex", gap: 3 }}>
+          <div style={wrapGroupStyle}>
             {LANES.map((lane) => {
               const active = (cab.lane || "front") === lane;
               return (
@@ -171,7 +189,7 @@ export default function CabinetEditBar({ cab, spec, dispatch, selColor, widthInp
         )}
 
         {cab.row === "wall" && (
-          <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
+          <div style={wrapGroupStyle}>
             <button
               style={btnStyle(!!isAligningOver)}
               onClick={isAligningOver ? onCancelAlign : onStartAlign}
@@ -191,7 +209,10 @@ export default function CabinetEditBar({ cab, spec, dispatch, selColor, widthInp
           </div>
         )}
 
-        <span style={{ width: 1, height: 20, background: "#1a1a2a", flexShrink: 0 }} />
+        </div>
+
+        <div style={dimensionGroupStyle}>
+        <span style={dividerStyle} />
 
         {/* Dimensions — key includes current value so external changes (merge,
             chip click, undo) re-initialize the input. Within-typing state isn't
@@ -217,41 +238,55 @@ export default function CabinetEditBar({ cab, spec, dispatch, selColor, widthInp
           style={{ ...inputStyle(48, selColor), border: `2px solid ${selColor}` }}
         />
         <span style={{ color: "#555", fontSize: 12, fontFamily: MONO }}>d</span>
+        </div>
+      </div>
 
-        <span style={{ flex: 1 }} />
+      {/* Row 2: Placement + Edit Actions */}
+      <div style={actionRowStyle}>
+        <div style={actionGroupStyle}>
+          {onSlotLeft && <button onClick={onSlotLeft} title="Move cabinet one slot left (Ctrl/Cmd + Arrow Left)" style={{ height: 32, padding: "0 8px", borderRadius: 6, background: "#1a1a2a", border: "1px solid #2a2a3a", color: selColor, fontWeight: 700, fontSize: 11, cursor: "pointer", fontFamily: MONO, display: "flex", alignItems: "center", justifyContent: "center" }}>{"\u2190"} Slot</button>}
+          {onSlotRight && <button onClick={onSlotRight} title="Move cabinet one slot right (Ctrl/Cmd + Arrow Right)" style={{ height: 32, padding: "0 8px", borderRadius: 6, background: "#1a1a2a", border: "1px solid #2a2a3a", color: selColor, fontWeight: 700, fontSize: 11, cursor: "pointer", fontFamily: MONO, display: "flex", alignItems: "center", justifyContent: "center" }}>Slot {"\u2192"}</button>}
+          {onMoveUp && <button onClick={onMoveUp} title="Move cabinet up 3 inches (Arrow Up)" style={{ height: 32, width: 32, padding: 0, borderRadius: 6, background: "#1a1a2a", border: "1px solid #2a2a3a", color: selColor, fontWeight: 700, fontSize: 14, cursor: "pointer", fontFamily: MONO, display: "flex", alignItems: "center", justifyContent: "center" }}>{"\u2191"}</button>}
+          {onMoveDown && <button onClick={onMoveDown} title="Move cabinet down 3 inches (Arrow Down)" style={{ height: 32, width: 32, padding: 0, borderRadius: 6, background: "#1a1a2a", border: "1px solid #2a2a3a", color: selColor, fontWeight: 700, fontSize: 14, cursor: "pointer", fontFamily: MONO, display: "flex", alignItems: "center", justifyContent: "center" }}>{"\u2193"}</button>}
+          {onSpaceLeft && <button onClick={onSpaceLeft} title="Resize space on the left (Arrow Left)" style={{ height: 32, padding: "0 8px", borderRadius: 6, background: "#1a1a2a", border: "1px solid #2a2a3a", color: selColor, fontWeight: 700, fontSize: 11, cursor: "pointer", fontFamily: MONO, display: "flex", alignItems: "center", justifyContent: "center" }}>Space {"\u2190"}</button>}
+          {onSpaceRight && <button onClick={onSpaceRight} title="Resize space on the right (Arrow Right)" style={{ height: 32, padding: "0 8px", borderRadius: 6, background: "#1a1a2a", border: "1px solid #2a2a3a", color: selColor, fontWeight: 700, fontSize: 11, cursor: "pointer", fontFamily: MONO, display: "flex", alignItems: "center", justifyContent: "center" }}>{"\u2192"} Space</button>}
+        </div>
 
-        {onSlotLeft && <button onClick={onSlotLeft} title="Move cabinet one slot left (Ctrl/Cmd + Arrow Left)" style={{ height: 32, padding: "0 8px", borderRadius: 6, background: "#1a1a2a", border: "1px solid #2a2a3a", color: selColor, fontWeight: 700, fontSize: 11, cursor: "pointer", fontFamily: MONO, display: "flex", alignItems: "center", justifyContent: "center" }}>{"\u2190"} Slot</button>}
-        {onSlotRight && <button onClick={onSlotRight} title="Move cabinet one slot right (Ctrl/Cmd + Arrow Right)" style={{ height: 32, padding: "0 8px", borderRadius: 6, background: "#1a1a2a", border: "1px solid #2a2a3a", color: selColor, fontWeight: 700, fontSize: 11, cursor: "pointer", fontFamily: MONO, display: "flex", alignItems: "center", justifyContent: "center" }}>Slot {"\u2192"}</button>}
-        {onMoveUp && <button onClick={onMoveUp} title="Move cabinet up 3 inches (Arrow Up)" style={{ height: 32, width: 32, padding: 0, borderRadius: 6, background: "#1a1a2a", border: "1px solid #2a2a3a", color: selColor, fontWeight: 700, fontSize: 14, cursor: "pointer", fontFamily: MONO, display: "flex", alignItems: "center", justifyContent: "center" }}>{"\u2191"}</button>}
-        {onMoveDown && <button onClick={onMoveDown} title="Move cabinet down 3 inches (Arrow Down)" style={{ height: 32, width: 32, padding: 0, borderRadius: 6, background: "#1a1a2a", border: "1px solid #2a2a3a", color: selColor, fontWeight: 700, fontSize: 14, cursor: "pointer", fontFamily: MONO, display: "flex", alignItems: "center", justifyContent: "center" }}>{"\u2193"}</button>}
-        {onSpaceLeft && <button onClick={onSpaceLeft} title="Resize space on the left (Arrow Left)" style={{ height: 32, padding: "0 8px", borderRadius: 6, background: "#1a1a2a", border: "1px solid #2a2a3a", color: selColor, fontWeight: 700, fontSize: 11, cursor: "pointer", fontFamily: MONO, display: "flex", alignItems: "center", justifyContent: "center" }}>Space {"\u2190"}</button>}
-        {onSpaceRight && <button onClick={onSpaceRight} title="Resize space on the right (Arrow Right)" style={{ height: 32, padding: "0 8px", borderRadius: 6, background: "#1a1a2a", border: "1px solid #2a2a3a", color: selColor, fontWeight: 700, fontSize: 11, cursor: "pointer", fontFamily: MONO, display: "flex", alignItems: "center", justifyContent: "center" }}>{"\u2192"} Space</button>}
-        {onMergeLeft && <button onClick={onMergeLeft}
-          title={`Merge with ${leftNeighbor.id} (left neighbor) — widths add, face sections combine`}
-          style={{ height: 32, padding: "0 8px", borderRadius: 6, background: "#1a1a2a", border: "1px solid #2a2a3a", color: selColor, fontWeight: 600, fontSize: 11, cursor: "pointer", fontFamily: SANS }}>
-          &#8592; Merge {leftNeighbor.id}
-        </button>}
-        {onMergeRight && <button onClick={onMergeRight}
-          title={`Merge with ${rightNeighbor.id} (right neighbor) — widths add, face sections combine`}
-          style={{ height: 32, padding: "0 8px", borderRadius: 6, background: "#1a1a2a", border: "1px solid #2a2a3a", color: selColor, fontWeight: 600, fontSize: 11, cursor: "pointer", fontFamily: SANS }}>
-          Merge {rightNeighbor.id} &#8594;
-        </button>}
-        {onAddGap && <button onClick={onAddGap} style={{ height: 32, padding: "0 8px", borderRadius: 6, background: "#1a1a2a", border: "1px solid #2a2a3a", color: "#888", fontWeight: 600, fontSize: 11, cursor: "pointer", fontFamily: SANS }}>Filler</button>}
-        <button onClick={onAddCab} style={{ height: 32, padding: "0 8px", borderRadius: 6, background: "#1a1a2a", border: "1px solid #2a2a3a", color: selColor, fontWeight: 600, fontSize: 11, cursor: "pointer", fontFamily: SANS }}>+ Cab</button>
-        <button
-          onClick={() => dispatch({ type: "SET_EXCLUDE_FROM_CUTLIST", id: cab.id, value: !cab.exclude_from_cutlist })}
-          title={cab.exclude_from_cutlist
-            ? "Currently EXCLUDED from cut list (duplicate of another photo). Click to include again."
-            : "Mark as duplicate — keep in layout view but skip in project cut list"}
-          style={{
-            height: 32, padding: "0 8px", borderRadius: 6,
-            background: cab.exclude_from_cutlist ? "#eab30822" : "#1a1a2a",
-            border: `1px solid ${cab.exclude_from_cutlist ? "#eab308" : "#2a2a3a"}`,
-            color: cab.exclude_from_cutlist ? "#eab308" : "#888",
-            fontWeight: 600, fontSize: 11, cursor: "pointer", fontFamily: SANS
-          }}
-        >{cab.exclude_from_cutlist ? "Dup \u2713" : "Dup?"}</button>
-        <button onClick={onDelete} style={{ height: 32, padding: "0 8px", borderRadius: 6, background: "#1a1a2a", border: "1px solid #2a2a3a", color: "#e04040", fontWeight: 600, fontSize: 11, cursor: "pointer", fontFamily: SANS }}>Del</button>
+        {(onMergeLeft || onMergeRight || onAddGap || onAddCab) && <span style={dividerStyle} />}
+
+        <div style={actionGroupStyle}>
+          {onMergeLeft && <button onClick={onMergeLeft}
+            title={`Merge with ${leftNeighbor.id} (left neighbor) — widths add, face sections combine`}
+            style={{ height: 32, padding: "0 8px", borderRadius: 6, background: "#1a1a2a", border: "1px solid #2a2a3a", color: selColor, fontWeight: 600, fontSize: 11, cursor: "pointer", fontFamily: SANS }}>
+            &#8592; Merge {leftNeighbor.id}
+          </button>}
+          {onMergeRight && <button onClick={onMergeRight}
+            title={`Merge with ${rightNeighbor.id} (right neighbor) — widths add, face sections combine`}
+            style={{ height: 32, padding: "0 8px", borderRadius: 6, background: "#1a1a2a", border: "1px solid #2a2a3a", color: selColor, fontWeight: 600, fontSize: 11, cursor: "pointer", fontFamily: SANS }}>
+            Merge {rightNeighbor.id} &#8594;
+          </button>}
+          {onAddGap && <button onClick={onAddGap} style={{ height: 32, padding: "0 8px", borderRadius: 6, background: "#1a1a2a", border: "1px solid #2a2a3a", color: "#888", fontWeight: 600, fontSize: 11, cursor: "pointer", fontFamily: SANS }}>Filler</button>}
+          <button onClick={onAddCab} style={{ height: 32, padding: "0 8px", borderRadius: 6, background: "#1a1a2a", border: "1px solid #2a2a3a", color: selColor, fontWeight: 600, fontSize: 11, cursor: "pointer", fontFamily: SANS }}>+ Cab</button>
+        </div>
+
+        <span style={dividerStyle} />
+
+        <div style={actionGroupStyle}>
+          <button
+            onClick={() => dispatch({ type: "SET_EXCLUDE_FROM_CUTLIST", id: cab.id, value: !cab.exclude_from_cutlist })}
+            title={cab.exclude_from_cutlist
+              ? "Currently EXCLUDED from cut list (duplicate of another photo). Click to include again."
+              : "Mark as duplicate — keep in layout view but skip in project cut list"}
+            style={{
+              height: 32, padding: "0 8px", borderRadius: 6,
+              background: cab.exclude_from_cutlist ? "#eab30822" : "#1a1a2a",
+              border: `1px solid ${cab.exclude_from_cutlist ? "#eab308" : "#2a2a3a"}`,
+              color: cab.exclude_from_cutlist ? "#eab308" : "#888",
+              fontWeight: 600, fontSize: 11, cursor: "pointer", fontFamily: SANS
+            }}
+          >{cab.exclude_from_cutlist ? "Dup \u2713" : "Dup?"}</button>
+          <button onClick={onDelete} style={{ height: 32, padding: "0 8px", borderRadius: 6, background: "#1a1a2a", border: "1px solid #2a2a3a", color: "#e04040", fontWeight: 600, fontSize: 11, cursor: "pointer", fontFamily: SANS }}>Del</button>
+        </div>
       </div>
 
       {cab.row === "wall" && isAligningOver && (

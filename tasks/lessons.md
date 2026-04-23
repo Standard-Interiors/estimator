@@ -1,6 +1,6 @@
 # Lessons Learned
 
-Updated: 2026-04-16
+Updated: 2026-04-22
 
 ---
 
@@ -112,3 +112,6 @@ When adding a mode like Align Over, do not stop after wiring the visible control
 
 ### 23. Do not claim elapsed effort you did not actually put in
 If the user asked for a multi-hour push, do not summarize the work as if that full duration already happened unless it really did. Report the actual state of the iteration honestly: what was implemented, what was verified, and what is still in flight.
+
+### 24. New editor controls must be verified for fit, not just existence
+If you add buttons or pills to the desktop editor, do not stop after confirming the feature works. Re-open the real screen in Chrome MCP and check that the full bar still fits inside the production shell width. If the controls crowd each other, regroup them into rows before shipping instead of shrinking labels or pretending the overflow is acceptable.
