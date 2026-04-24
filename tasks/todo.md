@@ -6,7 +6,7 @@
 - [x] Add cut-list and preview-modal buttons for the verification pack
 - [x] Verify locally in Chrome MCP using real production project data
 - [x] Run targeted lint/build checks
-- [ ] If clean, commit/push/deploy and verify live in Chrome MCP
+- [x] If clean, commit/push/deploy and verify live in Chrome MCP
 
 ## Review Notes
 
@@ -18,6 +18,11 @@
 - Local Chrome MCP real-data proof on `The Heights by Marston Lake`: the cut-list header shows `Verification Pack`, the CNC preview modal shows `Verification Pack` and `External Verification Path`, and the generated ZIP parsed successfully in-browser.
 - Local ZIP proof: filename `The_Heights_by_Marston_Lake_fagor_cnc_2026-04-24_verification_pack.zip`, MIME `application/zip`, 35 entries, 24 per-sheet `.nc` files, required README/setup/profile/report/simulator files present, and no nested material-name folder paths.
 - Main cut-list button proof: clicking `Verification Pack` generated the same ZIP and showed the alert summary for 157 parts, 24 sheets, and 2 warnings.
+- Committed and pushed `5e701e2 Add CNC verification pack export` to `main`.
+- Deployed Fly image `registry.fly.io/cabinet-estimator:deployment-01KPYRZA5VF8JM2V723E535K05`.
+- Production Chrome MCP proof on live `https://cabinet-estimator.fly.dev/project/3389c9e8abb7ae8b/cutlist`: preview modal exposes `External Verification Path` and modal `Verification Pack`.
+- Live modal ZIP proof: filename `The_Heights_by_Marston_Lake_fagor_cnc_2026-04-24_verification_pack.zip`, MIME `application/zip`, 35 entries, 24 per-sheet `.nc` files, all required README/setup/profile/report/simulator files present, no nested material-name folder paths.
+- Live header button proof: clicking top-level `Verification Pack` generated the same ZIP and showed the 157 parts / 24 sheets / 2 warnings alert.
 
 # CNC In-App Simulator (2026-04-23)
 

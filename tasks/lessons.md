@@ -1,6 +1,6 @@
 # Lessons Learned
 
-Updated: 2026-04-22
+Updated: 2026-04-24
 
 ---
 
@@ -130,3 +130,6 @@ When the user says to keep iterating for hours or asks for a timer, create a thr
 
 ### 29. Branch prompts are not branch truth
 If Codex shows a "continue on a different branch" warning, do not treat that UI label as authoritative. Check git ancestry and ahead/behind counts, then continue on whichever branch actually contains the latest work unless the user explicitly picks another branch.
+
+### 30. External machine verification should be a packaged workflow, not just advice
+If the user asks about deeper Fagor/CAMotics/Predator checking, do not stop at an explanation. Ship an operator-ready verification package that contains the exact generated job, per-sheet files, reports, setup notes, simulator guidance, and live Chrome MCP proof that both export paths work.
