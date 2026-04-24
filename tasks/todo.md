@@ -6,7 +6,7 @@
 - [x] Reuse the browser cut-list calculator so CNC export honors the current shop profile
 - [x] Add frontend G-code and CNC JSON export buttons on the cut-list page
 - [x] Verify through Chrome MCP on real project data
-- [ ] Commit, push, deploy, and verify live if runtime checks pass
+- [x] Commit, push, deploy, and verify live if runtime checks pass
 
 ## Review Notes
 
@@ -17,6 +17,10 @@
 - Local Chrome MCP verification on real production project `The Heights by Marston Lake`: cut-list page showed `Export Fagor G-Code` and `CNC JSON`; export generated 157 programmed parts across 24 4x8 sheets with 0 skipped parts.
 - Downloaded `.nc` proof includes Fagor inch header `G70 G90 G17 G94`, Freedom Patriot/Fagor metadata, simulation warnings, sheet-change `M00` stops, and final `M30`.
 - Downloaded CNC JSON proof uses schema `cnc_gcode_package_v1` and machine profile `Patriot 4x8` / `Fagor`.
+- Deployed Fly image `registry.fly.io/cabinet-estimator:deployment-01KPYNHFTS4VD2QBZMRNYVFZA2`.
+- Production Chrome MCP verification on the live Fly cut-list page intercepted the generated download blobs directly:
+- `.nc` filename `The_Heights_by_Marston_Lake_fagor_cnc_2026-04-24.nc`; contains `G70 G90 G17 G94`, Freedom Patriot/Fagor metadata, sheet-change `M00`, and `%` wrapper.
+- JSON filename `The_Heights_by_Marston_Lake_fagor_cnc_2026-04-24_package.json`; schema `cnc_gcode_package_v1`, project `The Heights by Marston Lake`, totals `157` programmed parts, `0` skipped parts, `24` sheets, `2` warnings.
 
 # Branch Cleanup (2026-04-23)
 
