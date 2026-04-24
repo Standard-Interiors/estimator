@@ -1,3 +1,24 @@
+# CNC External Verification Pack (2026-04-23)
+
+- [x] Confirm the current CNC preview/export package is already the single source of truth
+- [x] Add a shop-ready verification pack export from the same package data
+- [x] Include Fagor `.nc`, CNC JSON, per-sheet `.nc` files, setup sheet, warnings, sheet list, part list, and external simulator instructions
+- [x] Add cut-list and preview-modal buttons for the verification pack
+- [x] Verify locally in Chrome MCP using real production project data
+- [x] Run targeted lint/build checks
+- [ ] If clean, commit/push/deploy and verify live in Chrome MCP
+
+## Review Notes
+
+- The external check should not be a second interpretation of the job. It should package the exact same Fagor output and sheet placements the cabinet maker just previewed.
+- CAMotics is useful as a free 3-axis visual simulator, but it is not a Fagor controller emulator. The verification pack should say that plainly.
+- Fagor/Predator verification should be supported as an operator workflow/package export, not falsely embedded as if the web app can certify a proprietary controller run.
+- Targeted ESLint passed: `npm exec eslint -- src/pages/ProjectCutList.jsx src/cnc/fagorGcode.js src/cnc/CncPreviewModal.jsx src/cnc/verificationPack.js`.
+- Production build passed: `npm run build`.
+- Local Chrome MCP real-data proof on `The Heights by Marston Lake`: the cut-list header shows `Verification Pack`, the CNC preview modal shows `Verification Pack` and `External Verification Path`, and the generated ZIP parsed successfully in-browser.
+- Local ZIP proof: filename `The_Heights_by_Marston_Lake_fagor_cnc_2026-04-24_verification_pack.zip`, MIME `application/zip`, 35 entries, 24 per-sheet `.nc` files, required README/setup/profile/report/simulator files present, and no nested material-name folder paths.
+- Main cut-list button proof: clicking `Verification Pack` generated the same ZIP and showed the alert summary for 157 parts, 24 sheets, and 2 warnings.
+
 # CNC In-App Simulator (2026-04-23)
 
 - [x] Reuse the existing CNC JSON package as the single source of truth for preview and export

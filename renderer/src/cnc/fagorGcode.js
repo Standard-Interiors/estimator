@@ -264,6 +264,19 @@ function buildGcode(packageData) {
   return numberLines(lines);
 }
 
+export function buildSingleSheetGcode(packageData, sheet) {
+  const singleSheet = sheet ? { ...sheet, id: `${sheet.id}` } : null;
+  return buildGcode({
+    ...packageData,
+    sheets: singleSheet ? [singleSheet] : [],
+    totals: {
+      ...(packageData?.totals || {}),
+      sheets: singleSheet ? 1 : 0,
+      programmed_parts: singleSheet?.parts?.length || 0,
+    },
+  });
+}
+
 export function buildCncPackage({ project, parts, shopProfile, machineProfile } = {}) {
   const generatedAt = new Date().toISOString();
   const profile = {

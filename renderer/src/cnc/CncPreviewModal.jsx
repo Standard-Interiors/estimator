@@ -110,6 +110,33 @@ function WarningList({ warnings }) {
   );
 }
 
+function ExternalVerificationCard({ packageData }) {
+  return (
+    <div
+      data-testid="cnc-external-verification"
+      style={{
+        padding: 12,
+        borderRadius: 10,
+        background: "rgba(56,189,248,0.07)",
+        border: "1px solid rgba(56,189,248,0.24)",
+      }}
+    >
+      <div style={{ fontSize: 11, color: COLORS.rapid, fontFamily: MONO, fontWeight: 800, marginBottom: 8 }}>
+        External Verification Path
+      </div>
+      <div style={{ display: "grid", gap: 6, fontSize: 11, color: "#cbd5e1", fontFamily: SANS, lineHeight: 1.45 }}>
+        <div>1. Preview here first: sheet layout, rapid moves, cut paths, Z passes, and warnings.</div>
+        <div>2. Download the verification pack for setup sheet, reports, full Fagor file, and per-sheet files.</div>
+        <div>3. Run per-sheet files in CAMotics for free visual simulation, then check the Fagor file on the controller/simulator.</div>
+        <div>4. If the shop has Predator, use the included profile/reports with its Fagor machine profile before dry-run.</div>
+      </div>
+      <div style={{ marginTop: 8, fontSize: 10, color: COLORS.muted, fontFamily: MONO }}>
+        {packageData.totals?.warnings || 0} warning(s) will be bundled into the pack.
+      </div>
+    </div>
+  );
+}
+
 function SheetMap({ sheet, profile, selectedPartId, onSelectPart }) {
   const sheetW = Number(sheet.sheet_width || profile.sheet_width || 48);
   const sheetH = Number(sheet.sheet_height || profile.sheet_height || 96);
@@ -293,7 +320,7 @@ function SelectedPartDetails({ sheet, profile, selectedPartId }) {
   );
 }
 
-export default function CncPreviewModal({ packageData, onClose, onExportGcode, onExportPackage }) {
+export default function CncPreviewModal({ packageData, onClose, onExportGcode, onExportPackage, onExportVerificationPack }) {
   const [sheetIndex, setSheetIndex] = useState(0);
   const [selectedPartId, setSelectedPartId] = useState(
     packageData?.sheets?.[0]?.parts?.[0]?.instanceId || null
@@ -389,6 +416,23 @@ export default function CncPreviewModal({ packageData, onClose, onExportGcode, o
           >
             CNC JSON
           </button>
+          <button
+            data-testid="preview-export-verification-pack"
+            onClick={() => onExportVerificationPack(packageData)}
+            style={{
+              padding: "7px 11px",
+              borderRadius: 8,
+              border: `1px solid ${COLORS.border}`,
+              background: COLORS.panel2,
+              color: COLORS.text,
+              fontFamily: MONO,
+              fontSize: 10,
+              fontWeight: 700,
+              cursor: "pointer",
+            }}
+          >
+            Verification Pack
+          </button>
           <button onClick={onClose} style={{
             width: 30,
             height: 30,
@@ -474,6 +518,8 @@ export default function CncPreviewModal({ packageData, onClose, onExportGcode, o
               </div>
               <WarningList warnings={warnings} />
             </div>
+
+            <ExternalVerificationCard packageData={packageData} />
 
             {sheet && (
               <>

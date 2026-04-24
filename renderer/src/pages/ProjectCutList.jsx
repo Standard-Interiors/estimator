@@ -8,6 +8,7 @@ import {
   calcProjectCutList,
 } from "../state/specHelpers";
 import { buildCncPackage } from "../cnc/fagorGcode";
+import { buildCncVerificationPack } from "../cnc/verificationPack";
 import CncPreviewModal from "../cnc/CncPreviewModal";
 
 const MONO = "'JetBrains Mono',monospace";
@@ -161,6 +162,16 @@ export default function ProjectCutList() {
     downloadFile(JSON.stringify(pkg, null, 2), filename, "application/json");
   };
 
+  const downloadCncVerificationPack = (pkg, showAlert = true) => {
+    const pack = buildCncVerificationPack(pkg);
+    downloadFile(pack.bytes, pack.filename, pack.mimeType);
+    if (showAlert) {
+      window.alert(
+        `CNC verification pack exported: ${pkg.totals.programmed_parts} parts, ${pkg.totals.sheets} sheet(s), ${pkg.totals.warnings} warning(s).\n\nUse the included setup sheet and simulator notes before cutting.`
+      );
+    }
+  };
+
   const previewCnc = () => {
     const pkg = getCurrentCncPackage();
     if (!pkg) return;
@@ -177,6 +188,12 @@ export default function ProjectCutList() {
     const pkg = getCurrentCncPackage();
     if (!pkg) return;
     downloadCncPackageJson(pkg);
+  };
+
+  const exportCncVerificationPack = () => {
+    const pkg = getCurrentCncPackage();
+    if (!pkg) return;
+    downloadCncVerificationPack(pkg);
   };
 
   return (
@@ -211,6 +228,10 @@ export default function ProjectCutList() {
           padding: "5px 10px", borderRadius: 6, fontSize: 10, fontWeight: 600,
           cursor: "pointer", background: "#1a1a2a", border: "1px solid #2a2a3a", color: "#888",
         }}>CNC JSON</button>
+        <button data-testid="export-cnc-verification-pack" onClick={exportCncVerificationPack} style={{
+          padding: "5px 10px", borderRadius: 6, fontSize: 10, fontWeight: 600,
+          cursor: "pointer", background: "#1a1a2a", border: "1px solid #2a2a3a", color: "#ddd",
+        }}>Verification Pack</button>
         <button onClick={exportCSV} style={{
           padding: "5px 10px", borderRadius: 6, fontSize: 10, fontWeight: 600,
           cursor: "pointer", background: "#1a1a2a", border: "1px solid #2a2a3a", color: "#888",
@@ -385,6 +406,7 @@ export default function ProjectCutList() {
           onClose={() => setCncPreviewPackage(null)}
           onExportGcode={(pkg) => downloadFagorGcode(pkg, false)}
           onExportPackage={downloadCncPackageJson}
+          onExportVerificationPack={(pkg) => downloadCncVerificationPack(pkg, false)}
         />
       )}
     </div>
