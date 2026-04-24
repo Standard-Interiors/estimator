@@ -5,7 +5,7 @@
 - [x] Render 4x8 sheet layouts with every placed part, order number, material/thickness, and warnings
 - [x] Show rapid moves, cut paths, and Z-depth pass counts before export
 - [x] Verify locally in Chrome MCP using real production project data
-- [ ] Build, lint targeted files, commit, push, deploy, and verify live with Chrome MCP
+- [x] Build, lint targeted files, commit, push, deploy, and verify live with Chrome MCP
 
 ## Review Notes
 
@@ -15,6 +15,12 @@
 - Dense sheet verification: `S1-14` shows 29 ordered toolpath rows with rapid moves, cut paths, and 4 Z passes per 3/4" part.
 - Modal download verification intercepted the generated `.nc` blob from the preview button and confirmed the Fagor `G70 G90 G17 G94` header, Freedom Patriot/Fagor metadata, sheet-change `M00`, and simulation warning text.
 - Mobile Chrome MCP pass found and fixed the preview body's desktop-only column layout. The sheet tabs remain horizontally scrollable by design; the preview body now stacks instead of requiring a desktop grid.
+- Targeted lint passed: `npx eslint src/pages/ProjectCutList.jsx src/cnc/fagorGcode.js src/cnc/CncPreviewModal.jsx`.
+- Production build passed locally and inside Fly deploy.
+- Deployed Fly image `registry.fly.io/cabinet-estimator:deployment-01KPYQSWZN89MCX5H8WEX1ZD9N`.
+- Production Chrome MCP verification on live `https://cabinet-estimator.fly.dev/project/3389c9e8abb7ae8b/cutlist`: `Preview CNC` opens on real field data with 24 sheet tabs, 48x96 SVG sheet view, warning cards, Fagor G-code preview, and modal download output.
+- Live dense-sheet proof: `S1-14` shows 29 ordered toolpath rows, 31 SVG rects including sheet/margin, 31 SVG paths including cut/grid paths, and 29 rapid move lines.
+- Live modal download proof: intercepted `.nc` filename `The_Heights_by_Marston_Lake_fagor_cnc_2026-04-24.nc` and confirmed `G70 G90 G17 G94`, Freedom Patriot/Fagor metadata, `M00`, and simulation warning text.
 
 # CNC / G-Code Export (2026-04-23)
 
