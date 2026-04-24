@@ -1,3 +1,22 @@
+# Branch Cleanup (2026-04-23)
+
+- [x] Fetch/prune branch refs from origin
+- [x] Confirm all non-main branches have their changes merged into `main`
+- [x] Merge any remaining unique branch commits into `main`
+- [x] Push `main`
+- [x] Delete merged non-main local branches
+- [x] Delete merged non-main remote branches
+- [x] Verify final branch state is only `main` plus untracked local artifacts
+
+## Review Notes
+
+- `codex/runtime-trust-fixes` was identical to `main` and already pushed, so `git merge --ff-only codex/runtime-trust-fixes` reported `Already up to date`.
+- `claude/hungry-bose` had no unique commits (`main...claude/hungry-bose` was `55 0`), so `git merge --ff-only claude/hungry-bose` reported `Already up to date`.
+- `claude/hungry-bose` was checked out in `/Users/william/estimator/.claude/worktrees/hungry-bose`; that worktree had stale uncommitted local-only files, including an unused Vite proxy change and older task docs, so it was removed before deleting the branch.
+- Deleted local branches: `codex/runtime-trust-fixes`, `claude/hungry-bose`.
+- Deleted remote branch: `origin/codex/runtime-trust-fixes`.
+- Final branch inventory: local `main`; remote `origin/main` and `origin/HEAD`.
+
 # Nancy Scope Export (2026-04-23)
 
 - [x] Confirm the latest working branch before building
