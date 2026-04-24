@@ -8,6 +8,7 @@ import {
   calcProjectCutList,
 } from "../state/specHelpers";
 import { buildCncPackage } from "../cnc/fagorGcode";
+import CncPreviewModal from "../cnc/CncPreviewModal";
 
 const MONO = "'JetBrains Mono',monospace";
 
@@ -20,6 +21,7 @@ export default function ProjectCutList() {
   const [projectLoadError, setProjectLoadError] = useState(false);
   const [shopProfile, setShopProfileState] = useState(loadShopProfile);
   const [showShopProfile, setShowShopProfile] = useState(false);
+  const [cncPreviewPackage, setCncPreviewPackage] = useState(null);
   const [expandedWalls, setExpandedWalls] = useState(new Set());
   const [showFirstRun, setShowFirstRun] = useState(!isShopProfileConfigured());
 
@@ -137,26 +139,44 @@ export default function ProjectCutList() {
     shopProfile,
   });
 
-  const exportFagorGcode = () => {
+  const getCurrentCncPackage = () => {
     if (!allParts.length) {
       window.alert("No cut-list parts are available for CNC export.");
-      return;
+      return null;
     }
-    const pkg = buildCurrentCncPackage();
+    return buildCurrentCncPackage();
+  };
+
+  const downloadFagorGcode = (pkg, showAlert = true) => {
     downloadFile(pkg.gcode.content, pkg.gcode.filename, "text/plain");
-    window.alert(
-      `Fagor G-code exported for review: ${pkg.totals.programmed_parts} parts on ${pkg.totals.sheets} sheet(s).\n\nSimulate/dry-run before cutting. This first export is rectangular profiles only; warnings are written into the file.`
-    );
+    if (showAlert) {
+      window.alert(
+        `Fagor G-code exported for review: ${pkg.totals.programmed_parts} parts on ${pkg.totals.sheets} sheet(s).\n\nSimulate/dry-run before cutting. This first export is rectangular profiles only; warnings are written into the file.`
+      );
+    }
+  };
+
+  const downloadCncPackageJson = (pkg) => {
+    const filename = pkg.gcode.filename.replace(/\.nc$/i, "_package.json");
+    downloadFile(JSON.stringify(pkg, null, 2), filename, "application/json");
+  };
+
+  const previewCnc = () => {
+    const pkg = getCurrentCncPackage();
+    if (!pkg) return;
+    setCncPreviewPackage(pkg);
+  };
+
+  const exportFagorGcode = () => {
+    const pkg = getCurrentCncPackage();
+    if (!pkg) return;
+    downloadFagorGcode(pkg);
   };
 
   const exportCncPackageJson = () => {
-    if (!allParts.length) {
-      window.alert("No cut-list parts are available for CNC export.");
-      return;
-    }
-    const pkg = buildCurrentCncPackage();
-    const filename = pkg.gcode.filename.replace(/\.nc$/i, "_package.json");
-    downloadFile(JSON.stringify(pkg, null, 2), filename, "application/json");
+    const pkg = getCurrentCncPackage();
+    if (!pkg) return;
+    downloadCncPackageJson(pkg);
   };
 
   return (
@@ -179,6 +199,10 @@ export default function ProjectCutList() {
           padding: "5px 10px", borderRadius: 6, fontSize: 10, fontWeight: 600,
           cursor: "pointer", background: "#1a1a2a", border: "1px solid #2a2a3a", color: "#888",
         }}>Export Nancy Scope</button>
+        <button data-testid="preview-cnc" onClick={previewCnc} style={{
+          padding: "5px 10px", borderRadius: 6, fontSize: 10, fontWeight: 600,
+          cursor: "pointer", background: "rgba(217,68,32,0.12)", border: "1px solid rgba(217,68,32,0.55)", color: "#eee",
+        }}>Preview CNC</button>
         <button data-testid="export-fagor-gcode" onClick={exportFagorGcode} style={{
           padding: "5px 10px", borderRadius: 6, fontSize: 10, fontWeight: 600,
           cursor: "pointer", background: "#1a1a2a", border: "1px solid #D94420", color: "#D94420",
@@ -353,6 +377,14 @@ export default function ProjectCutList() {
           profile={shopProfile}
           onChange={handleProfileChange}
           onClose={() => setShowShopProfile(false)}
+        />
+      )}
+      {cncPreviewPackage && (
+        <CncPreviewModal
+          packageData={cncPreviewPackage}
+          onClose={() => setCncPreviewPackage(null)}
+          onExportGcode={(pkg) => downloadFagorGcode(pkg, false)}
+          onExportPackage={downloadCncPackageJson}
         />
       )}
     </div>

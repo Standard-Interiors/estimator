@@ -1,3 +1,21 @@
+# CNC In-App Simulator (2026-04-23)
+
+- [x] Reuse the existing CNC JSON package as the single source of truth for preview and export
+- [x] Add a `Preview CNC` action next to `Export Fagor G-Code`
+- [x] Render 4x8 sheet layouts with every placed part, order number, material/thickness, and warnings
+- [x] Show rapid moves, cut paths, and Z-depth pass counts before export
+- [x] Verify locally in Chrome MCP using real production project data
+- [ ] Build, lint targeted files, commit, push, deploy, and verify live with Chrome MCP
+
+## Review Notes
+
+- The preview must not invent a second CNC interpretation. It should consume `buildCncPackage()` output so the user previews the same sheet placement and toolpath assumptions that the exported Fagor file uses.
+- This is an operator review simulator, not a certified Fagor controller simulation. It should catch obvious bad sheet placement, wrong order, excessive sheets, skipped parts, and warning conditions before download.
+- Local Chrome MCP verification against production project `The Heights by Marston Lake`: `Preview CNC` opens a modal with 24 sheet tabs, a 48x96 SVG sheet view, warning cards, Z-pass detail, rapid/cut path overlays, and G-code preview.
+- Dense sheet verification: `S1-14` shows 29 ordered toolpath rows with rapid moves, cut paths, and 4 Z passes per 3/4" part.
+- Modal download verification intercepted the generated `.nc` blob from the preview button and confirmed the Fagor `G70 G90 G17 G94` header, Freedom Patriot/Fagor metadata, sheet-change `M00`, and simulation warning text.
+- Mobile Chrome MCP pass found and fixed the preview body's desktop-only column layout. The sheet tabs remain horizontally scrollable by design; the preview body now stacks instead of requiring a desktop grid.
+
 # CNC / G-Code Export (2026-04-23)
 
 - [x] Identify the CNC machine/controller from user photos
