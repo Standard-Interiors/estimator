@@ -1,3 +1,23 @@
+# CNC / G-Code Export (2026-04-23)
+
+- [x] Identify the CNC machine/controller from user photos
+- [x] Trace the current cut-list and quote-scope data model
+- [x] Define a safe first CNC package from edited room data
+- [x] Reuse the browser cut-list calculator so CNC export honors the current shop profile
+- [x] Add frontend G-code and CNC JSON export buttons on the cut-list page
+- [x] Verify through Chrome MCP on real project data
+- [ ] Commit, push, deploy, and verify live if runtime checks pass
+
+## Review Notes
+
+- Photos show a Freedom Patriot 4x8 CNC router with a Fagor control panel.
+- The visible shop-side source document is a measured door/drawer list in inches.
+- Safety constraint: do not silently generate final production motion without machine setup assumptions. First version should produce reviewable G-code/package output with explicit warnings and machine profile metadata.
+- Backend CNC API is intentionally deferred for this pass because the current shop profile lives in browser localStorage. Generating from the frontend keeps the CNC package aligned with the exact cut list the cabinet maker is reviewing.
+- Local Chrome MCP verification on real production project `The Heights by Marston Lake`: cut-list page showed `Export Fagor G-Code` and `CNC JSON`; export generated 157 programmed parts across 24 4x8 sheets with 0 skipped parts.
+- Downloaded `.nc` proof includes Fagor inch header `G70 G90 G17 G94`, Freedom Patriot/Fagor metadata, simulation warnings, sheet-change `M00` stops, and final `M30`.
+- Downloaded CNC JSON proof uses schema `cnc_gcode_package_v1` and machine profile `Patriot 4x8` / `Fagor`.
+
 # Branch Cleanup (2026-04-23)
 
 - [x] Fetch/prune branch refs from origin

@@ -5,8 +5,9 @@ import ShopProfile from "../editor/ShopProfile";
 import {
   loadShopProfile, saveShopProfile, resolveShopProfile,
   isShopProfileConfigured, markShopProfileConfigured,
-  calcProjectCutList, formatFraction,
+  calcProjectCutList,
 } from "../state/specHelpers";
+import { buildCncPackage } from "../cnc/fagorGcode";
 
 const MONO = "'JetBrains Mono',monospace";
 
@@ -100,6 +101,15 @@ export default function ProjectCutList() {
 
   const catColor = (c) => c === "front" ? "#22c55e" : c === "drawer_box" ? "#f97216" : "#1a6fbf";
 
+  const downloadFile = (contents, filename, type) => {
+    const blob = new Blob([contents], { type });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+
   const toggleWall = (id) => {
     setExpandedWalls(prev => {
       const next = new Set(prev);
@@ -119,6 +129,34 @@ export default function ProjectCutList() {
     a.href = URL.createObjectURL(blob);
     a.download = `${(project.name || "project").replace(/\s+/g, "_")}_cutlist_${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
+  };
+
+  const buildCurrentCncPackage = () => buildCncPackage({
+    project,
+    parts: allParts,
+    shopProfile,
+  });
+
+  const exportFagorGcode = () => {
+    if (!allParts.length) {
+      window.alert("No cut-list parts are available for CNC export.");
+      return;
+    }
+    const pkg = buildCurrentCncPackage();
+    downloadFile(pkg.gcode.content, pkg.gcode.filename, "text/plain");
+    window.alert(
+      `Fagor G-code exported for review: ${pkg.totals.programmed_parts} parts on ${pkg.totals.sheets} sheet(s).\n\nSimulate/dry-run before cutting. This first export is rectangular profiles only; warnings are written into the file.`
+    );
+  };
+
+  const exportCncPackageJson = () => {
+    if (!allParts.length) {
+      window.alert("No cut-list parts are available for CNC export.");
+      return;
+    }
+    const pkg = buildCurrentCncPackage();
+    const filename = pkg.gcode.filename.replace(/\.nc$/i, "_package.json");
+    downloadFile(JSON.stringify(pkg, null, 2), filename, "application/json");
   };
 
   return (
@@ -141,6 +179,14 @@ export default function ProjectCutList() {
           padding: "5px 10px", borderRadius: 6, fontSize: 10, fontWeight: 600,
           cursor: "pointer", background: "#1a1a2a", border: "1px solid #2a2a3a", color: "#888",
         }}>Export Nancy Scope</button>
+        <button data-testid="export-fagor-gcode" onClick={exportFagorGcode} style={{
+          padding: "5px 10px", borderRadius: 6, fontSize: 10, fontWeight: 600,
+          cursor: "pointer", background: "#1a1a2a", border: "1px solid #D94420", color: "#D94420",
+        }}>Export Fagor G-Code</button>
+        <button data-testid="export-cnc-package" onClick={exportCncPackageJson} style={{
+          padding: "5px 10px", borderRadius: 6, fontSize: 10, fontWeight: 600,
+          cursor: "pointer", background: "#1a1a2a", border: "1px solid #2a2a3a", color: "#888",
+        }}>CNC JSON</button>
         <button onClick={exportCSV} style={{
           padding: "5px 10px", borderRadius: 6, fontSize: 10, fontWeight: 600,
           cursor: "pointer", background: "#1a1a2a", border: "1px solid #2a2a3a", color: "#888",
