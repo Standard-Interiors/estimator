@@ -132,7 +132,7 @@ export default function ProjectList() {
                 if (e.key === "Enter") handleCreate();
                 if (e.key === "Escape" && !createPending) setCreating(false);
               }}
-              placeholder="e.g. Smith Kitchen Remodel"
+              placeholder="e.g. Smith Cabinet Project"
               style={{
                 background: "#0a0a14", border: "1px solid #D94420", borderRadius: 8,
                 color: "#eee", padding: "10px 14px", fontSize: 13, width: 300,
@@ -240,7 +240,7 @@ export default function ProjectList() {
               if (e.key === "Enter") handleCreate();
               if (e.key === "Escape" && !createPending) setCreating(false);
             }}
-            placeholder="e.g. Smith Kitchen Remodel"
+            placeholder="e.g. Smith Cabinet Project"
             style={{
               background: "#0a0a14", border: "1px solid #2a2a3a", borderRadius: 6,
               color: "#eee", padding: "10px 14px", fontSize: 13, width: "100%",

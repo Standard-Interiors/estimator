@@ -133,3 +133,6 @@ If Codex shows a "continue on a different branch" warning, do not treat that UI 
 
 ### 30. External machine verification should be a packaged workflow, not just advice
 If the user asks about deeper Fagor/CAMotics/Predator checking, do not stop at an explanation. Ship an operator-ready verification package that contains the exact generated job, per-sheet files, reports, setup notes, simulator guidance, and live Chrome MCP proof that both export paths work.
+
+### 31. Product audits need real repeated desktop and mobile passes
+If the user asks whether the system actually accomplishes its workflow goals, do not stop at code inspection and agent reviews. Run repeated Chrome MCP passes on the live app in both desktop and mobile viewports, interact with real projects, record concrete bugs with repro steps, and separate "code says it should work" from "a human can actually use it without tripping over UI/runtime bugs."

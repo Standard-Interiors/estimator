@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import * as api from "../api";
 import RoomCard from "../components/RoomCard";
@@ -25,7 +25,7 @@ export default function ProjectDetail() {
   const roomInputRef = useRef(null);
   const wallInputRef = useRef(null);
 
-  const fetchProject = async () => {
+  const fetchProject = useCallback(async () => {
     setLoading(true);
     setProjectMissing(false);
     setProjectLoadError(false);
@@ -40,9 +40,9 @@ export default function ProjectDetail() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [projectId]);
 
-  useEffect(() => { fetchProject(); }, [projectId]);
+  useEffect(() => { fetchProject(); }, [fetchProject]);
   useEffect(() => {
     if (creatingRoom && roomInputRef.current) roomInputRef.current.focus();
   }, [creatingRoom]);
@@ -290,7 +290,7 @@ export default function ProjectDetail() {
             if (e.key === "Enter") handleCreateRoom();
             if (e.key === "Escape" && !creatingRoomPending) { setCreatingRoom(false); setNewRoomName(""); }
           }}
-          placeholder="e.g. Kitchen, Master Bath, Laundry"
+          placeholder="e.g. Main Room, North Room, Utility Room"
           style={{
             background: "#0a0a14", border: "1px solid #2a2a3a", borderRadius: 6,
             color: "#eee", padding: "10px 14px", fontSize: 13, width: "100%",

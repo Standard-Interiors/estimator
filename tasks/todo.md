@@ -1,3 +1,82 @@
+# System Goal Audit (2026-04-24)
+
+- [x] Define the three product goals being evaluated
+- [x] Run independent product, CNC, API, and cabinet-maker estimator reviews
+- [x] Inspect current implementation against those goals
+- [x] Check external CNC verification assumptions against current simulator/controller reality
+- [x] Produce a ranked list of gaps, product risks, and next recommendations
+
+## Goal Criteria
+
+- Easier estimator workflow: reduce manual measurement entry, make AI correction fast, and keep the estimator in control.
+- Faster estimates: produce structured cabinet scope that Nancy can pull without needing the cut-list page as a source of truth.
+- Faster CNC handoff: produce cut-list/CNC data that gets the shop closer to machine-ready output without pretending it is certified production CAM.
+
+## Review Notes
+
+- Four independent reviews agreed on the same high-level answer: the app is already useful as an AI-assisted takeoff and correction tool, but it is not yet quote/build/CNC-safe without estimator review.
+- Goal 1, easier estimator workflow: partially achieved. The editor is the strongest product surface because users can correct cabinet dimensions, rows, face sections, duplicate exclusions, fillers, openings, and 3D placement faster than manually rebuilding every line item. Remaining gap: there is no explicit quote-readiness workflow that says count verified, dimensions reviewed, openings labeled, and ready for Nancy.
+- Goal 2, faster estimates/Nancy: mostly achieved as a draft handoff. The backend exposes `/api/projects/{pid}/quote-scope`, `/api/projects/{pid}/nancy-scope`, and `/api/nancy/quote-scope?project=...`, and the payload comes from edited saved room specs rather than cut-list math. Remaining gap: Nancy can pull useful scope, but the payload is not yet final-estimate-safe because there is no project-level verified status, immutable scope hash/version, auth/API contract, or hard blocker gate.
+- Goal 3, faster CNC handoff: achieved as a review/prove-out package, not as certified production CAM. The app now produces CNC JSON, Fagor-style G-code, in-app preview, and a verification pack. Remaining gap: the G-code is rectangular-profile-only and intentionally does not include dados, shelf-pin holes, hinge boring, drawer-slide holes, tabs, onion-skin, vacuum/hold-down strategy, tool-length validation, or a proven machine-specific Fagor post.
+- External verification reality check: CAMotics is useful as a free visual G-code simulator, but its own docs say it supports a subset of LinuxCNC G-code and lacks several CNC features. Predator Virtual CNC is closer to serious offline machine verification and collision/toolpath checking, but it is a commercial system and still needs machine-specific setup. Fagor publishes controller programming manuals, so a real production post should be validated against the exact Patriot/Fagor controller, not assumed from generic ISO-style G-code.
+- Cabinet-maker domain gap: stock-fit is not implemented yet. Width chips and fillers help manually, but there is no inventory catalog, SKU mapping, nearest-stock suggestion, filler optimization, or standard/modified/custom classification.
+- Data-trust gap: dimensions need provenance. Estimators need to know whether a number came from AI, a default, a typed edit, a tape measurement, or a derived run. Right now too much can look equally valid after normalization.
+- Count-trust gap: cabinet count is treated as important, but the extraction pipeline still does not enforce count parity from counted cabinets to saved cabinets to quote scope. A missing cabinet can still become a pricing problem instead of a system blocker.
+- CNC-trust gap: exports are still too permissive. Warnings/skipped parts/missing thickness should block production-style export or require explicit signoff; missing thickness currently warns but can still fall through to generated motion assumptions.
+
+## Ranked Recommendations
+
+- P0: Add a project/wall/cabinet readiness workflow: count verified, dimensions verified, openings labeled, duplicates reviewed, ready for Nancy, ready for CNC.
+- P0: Make quote and CNC exports fail closed on blockers: missing specs, invalid dimensions, count mismatch, unplaced cabinets, unreadable specs, skipped CNC parts, or missing material thickness.
+- P1: Add dimension provenance and review state to every cabinet and generated output: AI/default/edited/tape-verified/needs-measure.
+- P1: Turn Nancy scope into a stable integration contract: OpenAPI/JSON Schema matching the live payload, API key or signed token, project-level scope version/hash, and persisted export records.
+- P1: Add a Quote Scope Review screen before export with grouped room/wall/cabinet rows, cabinet counts, face summary, openings/fillers, warnings, and copy/export rows Nancy or a human estimator can use directly.
+- P1: Add stock/inventory matching: stock catalog, nearest standard size suggestions, filler/spacer recommendations, standard/modified/custom classification, and estimator acceptance flags.
+- P1: Add a persisted Machine Profile screen: controller variant, work offset, safe Z, tool number, tool diameter, feed/speed, pass depth, sheet size, tabs/onion-skin strategy, and post version.
+- P2: Expand CNC from rectangle profiling into cabinet CAM: dados, shelf pins, hinge boring, drawer-slide holes, labels, lead-ins/ramps, operation ordering, hold-down rules, and source-to-programmed reconciliation.
+- P2: Improve correction speed with better photo/model comparison, especially mobile quick overlay or side-by-side review.
+- P2: Clean up room-type-specific copy and docs so the product stays a cabinet-maker tool for any space, not a kitchen-only tool.
+
+# Live Chrome MCP Desktop/Mobile Smoke Audit (2026-04-24)
+
+- [x] Desktop pass 1: project list, project detail, room editor, 3D edits, cut list, Nancy/CNC exports
+- [x] Mobile pass 1: project list, project detail, room editor, bottom sheet/actions, cut list, CNC preview
+- [x] Desktop pass 2: revisit suspicious projects and correction paths with fresh eyes
+- [x] Mobile pass 2: stress scrolling, overflow, modals, and edit-state carryover
+- [x] Document every concrete bug with repro steps, viewport, project/wall, priority, and suspected fix area
+
+## Audit Notes
+
+- Scope: live `https://cabinet-estimator.fly.dev/` via Chrome MCP only, using real production projects and both desktop and mobile emulation.
+- Focus: estimator speed, editor correction reliability, Nancy handoff, cut-list/CNC handoff, mobile parity, overflow/scroll issues, destructive actions, stale state, and runtime console/network errors.
+
+## Findings
+
+- P1 Mobile 3D editor wastes most of the viewport before the drawing. Reproduced in Chrome MCP on iPhone viewport for `The Heights by Marston Lake / Kitchen / Wall 3` and `Resort at University Park 1715A / Kitchen / Wall 2`. The cabinets render, but the SVG is vertically centered in a large white editor area, making the correction tool feel broken on mobile. Suspected fix area: `App.jsx` render container `justifyContent`.
+- P2 Project counts are confusing between list and detail. Reproduced on live `Resort at University Park 1715A`: project list API summary reports `room_count: 6`, while project detail correctly shows `5 rooms · 6 walls`. The list appears to treat walls as rooms. Fixed locally by making project summaries count unique room groups and expose `wall_count`.
+- P2 Wall card text click enters rename mode instead of opening the wall. Reproduced on desktop and mobile in project detail. Clicking the wall name changes to an input and blocks navigation until Enter/blur. Fixed locally by making single tap open the wall and moving rename to double-click/menu.
+- P2 Saved wall briefly flashes the `New Extraction` screen while the room spec is loading. Reproduced in Chrome MCP after opening a real extracted wall under throttled network. Fixed locally with an explicit loading state so the user does not think the saved spec disappeared.
+- P3 Existing saved project data still says `Kitchen` in multiple real projects. Code placeholders/comments have been cleaned up, but saved field data remains user-owned and was not rewritten.
+- P3 Mobile project cut-list and CNC preview are usable but cramped. The CNC preview opens and shows sheets/warnings/toolpaths on iPhone viewport, but the header/actions consume a lot of vertical space and the sheet tabs rely on horizontal scrolling.
+
+## Fix Notes
+
+- Fixed the P1 mobile 3D editor viewport bug by keeping desktop vertically centered but pinning the mobile render to the top of the canvas.
+- Fixed the P2 project-card summary bug by making `list_projects()` and `get_project()` use the same room-vs-wall aggregate rules and rendering cards as `rooms · walls · cabinets`.
+- Fixed the P2 wall-card primary-action bug: mobile menu is visible without hover, single tap opens the wall, and rename remains available from the overflow menu.
+- Fixed the loading flash when opening a saved extracted room: under slow Chrome MCP network, the editor now shows `Loading room...` instead of the wrong `New Extraction` screen.
+- Removed room-type-specific `Kitchen/kitchen` text from source code placeholders/comments without changing extraction prompts or saved project data.
+- Local Chrome MCP proof with live Fly data: `Resort at University Park 1715A / Kitchen / Wall 2` now shows cabinets immediately under the toolbar instead of halfway down a blank white area.
+- Local Chrome MCP proof with live Fly data: `The Heights by Marston Lake / Kitchen / Wall 3`, selecting `T1`, now shows the selected tall cabinet plus the mobile correction controls in the first viewport.
+- Desktop Chrome MCP regression proof: `The Heights by Marston Lake / Kitchen / Wall 3` still renders centered on desktop.
+- Local Chrome MCP backend/UI proof: project cards now show summaries like `2 rooms · 4 walls · 24 cabinets`, proving the card can distinguish rooms from walls.
+- Local Chrome MCP proof with live Fly data: `Resort at University Park 1715A / Kitchen / Wall 2` wall-name tap opens the wall, and the mobile overflow menu exposes Duplicate/Rename/Delete.
+- Local Chrome MCP proof with live Fly data under throttled network: opening an extracted wall shows `Loading room...` before resolving to the 3D editor.
+- Local Chrome MCP proof with normal local API base restored: project cards show `1 room · 3 walls · 0 cabinets` and mobile wall-name tap opens the 3D editor.
+- Targeted lint passed: `npm exec eslint -- src/App.jsx src/pages/ProjectDetail.jsx src/pages/ProjectList.jsx src/components/ProjectCard.jsx src/components/RoomCard.jsx src/editor/BottomSheet.jsx`.
+- Python compile passed: `python3 -m py_compile extractor/db.py`.
+- Build passed after reverting the temporary local API base: `npm run build`.
+
 # CNC External Verification Pack (2026-04-23)
 
 - [x] Confirm the current CNC preview/export package is already the single source of truth

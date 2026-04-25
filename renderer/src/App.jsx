@@ -6,7 +6,7 @@ import InteractiveRender from "./editor/InteractiveRender";
 import CabinetEditBar from "./editor/CabinetEditBar";
 import DoorDetailView from "./editor/DoorDetailView";
 import BottomSheet from "./editor/BottomSheet";
-import { defaultCabinet, generateId, calcDoorSizes, formatFraction, calcScribeNotes, loadShopProfile, saveShopProfile, resolveShopProfile, isShopProfileConfigured, markShopProfileConfigured, calcFullCutList, calcProjectCutList, layoutKeyForCabinetRow } from "./state/specHelpers";
+import { defaultCabinet, generateId, calcDoorSizes, formatFraction, calcScribeNotes, loadShopProfile, saveShopProfile, resolveShopProfile, isShopProfileConfigured, markShopProfileConfigured, calcProjectCutList, layoutKeyForCabinetRow } from "./state/specHelpers";
 import ProjectList from "./pages/ProjectList";
 import ProjectDetail from "./pages/ProjectDetail";
 import ProjectCutList from "./pages/ProjectCutList";
@@ -209,7 +209,7 @@ function Render({ spec }) {
           // Render wall items with collision-free labels
           const wallEls = [];
           const labelPositions = []; // track label x positions for staggering
-          wallItems.forEach((wi, idx) => {
+          wallItems.forEach((wi) => {
             if (!wi.cab) {
               const isFiller = wi.item?.type === "filler";
               if (isFiller) {
@@ -358,6 +358,7 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
   const [wireframePreview, setWireframePreview] = useState(null);
   const [photoFile, setPhotoFile] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(null);
+  const [roomInitialLoading, setRoomInitialLoading] = useState(!!roomId);
   const [roomLoadError, setRoomLoadError] = useState(false);
   const [dragTarget, setDragTarget] = useState(null); // "photo" | null
   const photoInputRef = useRef(null);
@@ -372,7 +373,6 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
   const [alignmentTargetWallId, setAlignmentTargetWallId] = useState(null);
   const [renderCtxMenu, setRenderCtxMenu] = useState(null); // { x, y, id, row }
   const [pendingDelete, setPendingDelete] = useState(null); // cabinet id to confirm delete
-  const [isDragging, setIsDragging] = useState(false);
   const [jsonOpen, setJsonOpen] = useState(false);
   const [exampleHover, setExampleHover] = useState(false);
   const [shopProfile, setShopProfileState] = useState(loadShopProfile);
@@ -401,9 +401,7 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
   const [wallLength, setWallLengthState] = useState(() => { const s = localStorage.getItem(wallLengthKey); return s ? parseFloat(s) : null; });
   const setWallLength = (v) => { setWallLengthState(v); if (v) localStorage.setItem(wallLengthKey, v); else localStorage.removeItem(wallLengthKey); };
 
-  // Ref to the width input in the bottom bar — passed to GridEditor for double-click focus
   const widthInputRef = useRef(null);
-  const fileInputRef = useRef(null);
 
   // ── Auto-save (when inside a project/room context) ──
   // ── Auto-save — uses refs to avoid re-render cascades ──
@@ -519,17 +517,27 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
 
   // Load spec from DB when a roomId is provided
   useEffect(() => {
-    if (!roomId) return;
+    if (!roomId) {
+      setRoomInitialLoading(false);
+      return;
+    }
+    let cancelled = false;
     (async () => {
+      setRoomInitialLoading(true);
       setRoomLoadError(false);
       try {
         const r = await api.getRoom(roomId);
+        if (cancelled) return;
         hydrateRoomSnapshot(r, { activateTab: !!r.spec, resetSelection: true });
       } catch (e) {
+        if (cancelled) return;
         console.error("Failed to load room:", e);
         setRoomLoadError(true);
+      } finally {
+        if (!cancelled) setRoomInitialLoading(false);
       }
     })();
+    return () => { cancelled = true; };
   }, [hydrateRoomSnapshot, roomId]);
 
   // Coalesced save — prevents save storms during rapid edits.
@@ -554,7 +562,11 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
       specVersionRef.current = result.version;
       showTransientSaveState("saved");
       lastSaveTime.current = Date.now();
-      try { localStorage.setItem(`room_spec_${roomId}`, JSON.stringify({ spec: specRef.current, version: result.version, ts: Date.now() })); } catch {}
+      try {
+        localStorage.setItem(`room_spec_${roomId}`, JSON.stringify({ spec: specRef.current, version: result.version, ts: Date.now() }));
+      } catch {
+        // Local cache failure should not mark a successful server save as failed.
+      }
     } catch (e) {
       if (e.status === 409) {
         stashedSave.current = false;
@@ -938,15 +950,6 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
     if (id) setSelectedGapItem(null);
   };
 
-  const handleGapSelect = (item) => {
-    if (alignmentTargetWallId) {
-      showEditorNotice("Tap a front base cabinet to align this upper", 3000);
-      return;
-    }
-    setSelectedGapItem(item);
-    if (item) setSelectedId(null);
-  };
-
   const selectedAlignmentBaseId = selectedId ? getAlignmentBaseId(spec, selectedId) : null;
   const selectedCab = selectedId ? spec.cabinets.find((cab) => cab.id === selectedId) : null;
   const selectedWallIsAligned = selectedCab?.row === "wall" && !!selectedAlignmentBaseId;
@@ -1070,7 +1073,12 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
       </div>
 
       <div style={{padding:"14px 20px"}}>
-        {roomLoadError ? (
+        {roomInitialLoading ? (
+          <div style={{maxWidth:640,margin:"80px auto",textAlign:"center"}}>
+            <div style={{fontSize:18,fontWeight:700,color:"#eee",marginBottom:8,letterSpacing:"-0.03em"}}>Loading room...</div>
+            <div style={{fontSize:13,color:"#666"}}>Opening the saved cabinet layout.</div>
+          </div>
+        ) : roomLoadError ? (
           <div style={{maxWidth:640,margin:"80px auto",textAlign:"center"}}>
             <div style={{fontSize:18,fontWeight:700,color:"#eee",marginBottom:8,letterSpacing:"-0.03em"}}>Failed to load room.</div>
             <div style={{fontSize:13,color:"#666"}}>Refresh or go back to the project list before making changes.</div>
@@ -1282,7 +1290,7 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
           </div>
         )}
 
-        {hasSpec && tab === "render" && (() => {
+        {!roomInitialLoading && hasSpec && tab === "render" && (() => {
           const cabMap = {};
           (spec.cabinets || []).forEach(c => { cabMap[c.id] = c; });
           const sel = selectedId ? cabMap[selectedId] : null;
@@ -1325,7 +1333,7 @@ function EditorApp({ roomId, projectId, projectName, roomName, wallName, onBack 
               {/* Render + optional Photo sidebar */}
               <div style={{display:"flex",flex:"1 1 auto",overflow:"hidden"}}>
               {/* Interactive 3D Render */}
-              <div data-printable style={{flex:"1 1 auto",overflow:"auto",background:"#fff",position:"relative",display:"flex",flexDirection:"column",justifyContent:"center",minHeight:0}} onClick={()=>{setRenderCtxMenu(null);setShowMoreMenu(false);}}>
+              <div data-printable style={{flex:"1 1 auto",overflow:"auto",background:"#fff",position:"relative",display:"flex",flexDirection:"column",justifyContent:isMobile?"flex-start":"center",minHeight:0}} onClick={()=>{setRenderCtxMenu(null);setShowMoreMenu(false);}}>
                 {/* Print-only header — hidden on screen, visible when printing */}
                 <div data-printonly style={{display:"none",padding:"12px 16px 8px",borderBottom:"2px solid #333",marginBottom:8}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline"}}>

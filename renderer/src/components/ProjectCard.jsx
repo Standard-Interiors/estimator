@@ -53,11 +53,17 @@ export default function ProjectCard({ project, onClick, onRename, onDuplicate, o
   };
 
   const sc = statusColors[project.status] || statusColors.draft;
-  const thumbSrc = imageUrl(project.thumb_url);
   const thumbUrls = (project.thumb_urls || []).map(u => imageUrl(u)).filter(Boolean);
   const hasMultiple = thumbUrls.length > 1;
   const roomCount = project.room_count || 0;
+  const wallCount = project.wall_count || 0;
+  const cabinetCount = project.total_cabinets || 0;
   const isEmptyDraft = roomCount === 0;
+  const summaryParts = [
+    `${roomCount} room${roomCount !== 1 ? "s" : ""}`,
+    wallCount ? `${wallCount} wall${wallCount !== 1 ? "s" : ""}` : null,
+    `${cabinetCount} cabinet${cabinetCount !== 1 ? "s" : ""}`,
+  ].filter(Boolean);
 
   const prevSlide = (e) => { e.stopPropagation(); setSlideIndex(i => (i - 1 + thumbUrls.length) % thumbUrls.length); };
   const nextSlide = (e) => { e.stopPropagation(); setSlideIndex(i => (i + 1) % thumbUrls.length); };
@@ -202,7 +208,7 @@ export default function ProjectCard({ project, onClick, onRename, onDuplicate, o
         }}>
           {isEmptyDraft
             ? "No rooms yet"
-            : `${roomCount} room${roomCount !== 1 ? "s" : ""} · ${project.total_cabinets || 0} cabinet${project.total_cabinets !== 1 ? "s" : ""}`
+            : summaryParts.join(" · ")
           }
         </div>
       </div>

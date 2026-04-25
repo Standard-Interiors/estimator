@@ -195,7 +195,7 @@ rooms = Table(
     "rooms", metadata,
     Column("id", Text, primary_key=True, default=_gen_id),
     Column("project_id", Text, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False),
-    Column("room_name", Text, nullable=False, default=""),  # grouping: "Kitchen", "Master Bath"
+    Column("room_name", Text, nullable=False, default=""),  # room/space grouping label
     Column("name", Text, nullable=False, default="Wall 1"),  # wall name within room
     Column("sort_order", Integer, nullable=False, default=0),
     Column("spec_json", Text),
@@ -305,6 +305,12 @@ def create_project(name: str, notes: str = None) -> dict:
     return get_project(pid)
 
 
+def _room_summary_counts(room_rows) -> tuple[int, int]:
+    wall_count = len(room_rows)
+    room_names = {(r.get("room_name") or "") for r in room_rows}
+    return len(room_names), wall_count
+
+
 def get_project(pid: str) -> dict | None:
     with engine.connect() as conn:
         row = conn.execute(
@@ -322,8 +328,10 @@ def get_project(pid: str) -> dict | None:
             .order_by(rooms.c.sort_order)
         ).mappings().all()
         p["rooms"] = [dict(r) for r in room_rows]
-        # Compute aggregates
-        p["room_count"] = len(p["rooms"])
+        # Compute aggregates. A room can contain multiple wall records.
+        room_count, wall_count = _room_summary_counts(p["rooms"])
+        p["room_count"] = room_count
+        p["wall_count"] = wall_count
         p["total_cabinets"] = sum(r.get("cabinet_count") or 0 for r in p["rooms"])
         # Resolve per-room thumb_url and has_spec flag
         p["thumb_url"] = None
@@ -365,7 +373,9 @@ def list_projects(include_deleted: bool = False) -> list[dict]:
             room_rows = conn.execute(
                 rooms.select().where(rooms.c.project_id == p["id"])
             ).mappings().all()
-            p["room_count"] = len(room_rows)
+            room_count, wall_count = _room_summary_counts(room_rows)
+            p["room_count"] = room_count
+            p["wall_count"] = wall_count
             p["total_cabinets"] = sum(r.get("cabinet_count") or 0 for r in room_rows)
             # Thumbnails
             p["thumb_url"] = None

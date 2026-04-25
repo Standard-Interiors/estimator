@@ -1,11 +1,13 @@
 import { useState, useRef, useEffect } from "react";
 import { imageUrl } from "../api";
+import useIsMobile from "../hooks/useIsMobile";
 
 /**
  * Room card for the project detail grid.
  * Shows thumbnail, name, cabinet count, extraction status.
  */
 export default function RoomCard({ room, onClick, onRename, onDuplicate, onDelete }) {
+  const { isMobile } = useIsMobile();
   const [hover, setHover] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [renaming, setRenaming] = useState(false);
@@ -120,15 +122,15 @@ export default function RoomCard({ room, onClick, onRename, onDuplicate, onDelet
           />
         ) : (
           <div
-            onClick={(e) => { e.stopPropagation(); setRenaming(true); setRenameVal(room.name); }}
+            onDoubleClick={(e) => { e.stopPropagation(); setRenaming(true); setRenameVal(room.name); }}
             style={{
               fontSize: 14, fontWeight: 600, color: "#eee",
               whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
-              cursor: "text", borderBottom: "1px dashed transparent",
+              borderBottom: "1px dashed transparent",
             }}
             onMouseEnter={(e) => e.currentTarget.style.borderBottomColor = "#333"}
             onMouseLeave={(e) => e.currentTarget.style.borderBottomColor = "transparent"}
-            title="Tap to rename"
+            title="Open wall. Double-click or use menu to rename."
           >
             {room.name}
           </div>
@@ -166,7 +168,7 @@ export default function RoomCard({ room, onClick, onRename, onDuplicate, onDelet
       </div>
 
       {/* Overflow menu trigger */}
-      {hover && !renaming && (
+      {(hover || isMobile) && !renaming && (
         <div
           onClick={(e) => { e.stopPropagation(); setMenuOpen(!menuOpen); }}
           style={{

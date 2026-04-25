@@ -662,7 +662,7 @@ export default function BottomSheet({
 
       {showMore && (
         <div>
-          {/* Height — preset pills + custom input. Bathroom vanities (26-32"),
+          {/* Height — preset pills + custom input. Short vanities (26-32"),
               short wall cabinets (24, 26, 28, 31"), and any custom height need
               to be enterable directly. */}
           <div style={{ marginBottom: 10 }}>
